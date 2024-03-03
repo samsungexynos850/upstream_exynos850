@@ -181,7 +181,7 @@ static bool abox_dbg_dump_valid(int idx)
 static ssize_t abox_dbg_read_valid(struct file *file, char __user *user_buf,
 				    size_t count, loff_t *ppos)
 {
-	int idx = (int)file->private_data;
+  uintptr_t idx = (uintptr_t)file->private_data;
 	bool valid = abox_dbg_dump_valid(idx);
 	char buf_val[4] = {0, }; /* enough to store a bool and "\n\0" */
 

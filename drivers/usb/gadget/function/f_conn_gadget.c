@@ -1296,13 +1296,13 @@ static int conn_gadget_setup(struct conn_gadget_instance *fi_conn_gadget)
 	return 0;
 err_:
 
-	if (dev->rd_queue_buf)
-		vfree(dev->rd_queue_buf);
+    if (dev->rd_queue_buf)
+	    vfree(dev->rd_queue_buf);
 
-	_conn_gadget_dev = NULL;
-	kfree(dev);
-	CONN_GADGET_ERR("conn_gadget gadget driver failed to initialize\n");
-	return ret;
+	  _conn_gadget_dev = NULL;
+	  kfree(dev);
+	  CONN_GADGET_ERR("conn_gadget gadget driver failed to initialize\n");
+	  return ret;
 }
 
 static void conn_gadget_cleanup(struct kref *kref)
@@ -1316,11 +1316,11 @@ static void conn_gadget_cleanup(struct kref *kref)
 
 	misc_deregister(&conn_gadget_device);
 
-	if (_conn_gadget_dev->rd_queue_buf)
-		vfree(_conn_gadget_dev->rd_queue_buf);
+    if (_conn_gadget_dev->rd_queue_buf)
+	    vfree(_conn_gadget_dev->rd_queue_buf);
 
-	kfree(_conn_gadget_dev);
-	_conn_gadget_dev = NULL;
+	  kfree(_conn_gadget_dev);
+	  _conn_gadget_dev = NULL;
 }
 
 static int conn_gadget_setup_configfs(struct conn_gadget_instance *fi_conn_gadget)
