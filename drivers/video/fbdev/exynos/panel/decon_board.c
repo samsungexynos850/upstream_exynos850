@@ -702,11 +702,9 @@ static int make_list(struct device *dev, struct list_head *lh, const char *name)
 
 		ret = decide_type(action);
 		if (ret < 0)
-			dbg_warn("decide_type function caused kernel to PANIC, ret is < 0", ret);
 			break;
 		ret = decide_subinfo(np, action);
 		if (ret < 0)
-			dbg_warn("decide_subinfo function caused kernel to PANIC, ret is < 0", ret);
 			break;
 
 		if (of_property_count_strings(np, "desc") == count)
@@ -714,9 +712,6 @@ static int make_list(struct device *dev, struct list_head *lh, const char *name)
 
 		list_add_tail(&action->node, lh);
 	}
-
-	// For debugging purposes we will display what ret is
-	dbg_warn("Return value for make_list function is %d", ret);
 
 	if (ret < 0) {
 		kfree(action);
