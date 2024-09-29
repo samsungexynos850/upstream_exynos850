@@ -38,7 +38,6 @@
 #include <linux/regulator/machine.h>
 #endif
 #include <linux/memory_hotplug.h>
-#include <linux/sec_debug.h>
 
 #include "power.h"
 
@@ -557,7 +556,7 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
  */
 int suspend_devices_and_enter(suspend_state_t state)
 {
-	int error;
+	int error, last_dev;
 	bool wakeup = false;
 
 	if (!sleep_state_supported(state))
@@ -573,8 +572,11 @@ int suspend_devices_and_enter(suspend_state_t state)
 	suspend_test_start();
 	error = dpm_suspend_start(PMSG_SUSPEND);
 	if (error) {
+		last_dev = suspend_stats.last_failed_dev + REC_FAILED_NUM - 1;
+		last_dev %= REC_FAILED_NUM;
 		pr_err("Some devices failed to suspend, or early wake event detected\n");
-		log_suspend_abort_reason("Some devices failed to suspend, or early wake event detected");
+		log_suspend_abort_reason("%s device failed to suspend, or early wake event detected",
+			suspend_stats.failed_devs[last_dev]);
 		goto Recover_platform;
 	}
 	suspend_test_finish("suspend devices");
@@ -702,16 +704,12 @@ int pm_suspend(suspend_state_t state)
 
 	if (state <= PM_SUSPEND_ON || state >= PM_SUSPEND_MAX)
 		return -EINVAL;
-
 #ifdef CONFIG_SEC_PM_DEBUG
 	pm_suspend_marker("entry");
 #else
 	pr_info("suspend entry (%s)\n", mem_sleep_labels[state]);
 #endif
-
-	secdbg_base_set_task_in_pm_suspend((uint64_t)current);
 	error = enter_state(state);
-	secdbg_base_set_task_in_pm_suspend(0);
 	if (error) {
 		suspend_stats.fail++;
 		dpm_save_failed_errno(error);

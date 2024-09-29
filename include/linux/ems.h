@@ -17,6 +17,7 @@
 #include <linux/sched/idle.h>
 
 struct rq;
+struct rt_rq;
 
 enum {
 	STATES_FREQ = 0,

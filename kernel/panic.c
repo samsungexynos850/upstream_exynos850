@@ -31,7 +31,6 @@
 #include <linux/debugfs.h>
 #include <asm/sections.h>
 #include <linux/debug-snapshot.h>
-#include <linux/sec_perf.h>
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
@@ -132,11 +131,6 @@ void nmi_panic(struct pt_regs *regs, const char *msg)
 }
 EXPORT_SYMBOL(nmi_panic);
 
-#ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
-unsigned long sec_delay_check __read_mostly = 1;
-EXPORT_SYMBOL(sec_delay_check);
-#endif
-
 /**
  *	panic - halt the system
  *	@fmt: The text string to print
@@ -160,9 +154,6 @@ void panic(const char *fmt, ...)
 	 * context
 	 */
 	dbg_snapshot_early_panic();
-#ifdef CONFIG_SEC_PERF_LATENCYCHECKER
-	sec_perf_latencychecker_stop();
-#endif
 
 	/*
 	 * Disable local interrupts. This will prevent panic_smp_self_stop
@@ -174,9 +165,6 @@ void panic(const char *fmt, ...)
 	in_panic = true;
 	preempt_disable_notrace();
 
-#ifndef CONFIG_SAMSUNG_PRODUCT_SHIP
-	sec_delay_check = 0;
-#endif
 	/*
 	 * It's possible to come here directly from a panic-assertion and
 	 * not have preempt disabled. Some functions called from here want
@@ -309,7 +297,7 @@ void panic(const char *fmt, ...)
 				i += panic_blink(state ^= 1);
 				i_next = i + 3600 / PANIC_BLINK_SPD;
 			}
-			dev_mdelay(PANIC_TIMER_STEP);
+			mdelay(PANIC_TIMER_STEP);
 		}
 	}
 	if (panic_timeout != 0) {
@@ -345,7 +333,7 @@ void panic(const char *fmt, ...)
 			i += panic_blink(state ^= 1);
 			i_next = i + 3600 / PANIC_BLINK_SPD;
 		}
-		dev_mdelay(PANIC_TIMER_STEP);
+		mdelay(PANIC_TIMER_STEP);
 	}
 }
 

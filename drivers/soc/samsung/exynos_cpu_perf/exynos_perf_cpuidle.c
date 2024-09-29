@@ -278,6 +278,7 @@ void exynos_perf_cpuidle_stop(void)
 /************************************************************************
  *                              Show result                             *
  ************************************************************************/
+#ifdef CONFIG_DEBUG_FS
 static int calculate_percent(s64 residency)
 {
 	if (!residency)
@@ -465,6 +466,7 @@ static int freq_debugfs_open(struct inode *inode, struct file *file)
 	return single_open(file, freq_seq_show, inode->i_private);
 }
 
+#endif
 
 /*********************************************************************
  *                   Initialize cpuidle profiler                     *
@@ -490,6 +492,7 @@ exynos_perf_cpu_idle_register(struct cpuidle_driver *drv)
 	cpu_idle_state_count = state_count;
 }
 
+#ifdef CONFIG_DEBUG_FS
 // MAIN
 static struct file_operations run_debugfs_fops = {
 	.owner		= THIS_MODULE,
@@ -509,8 +512,10 @@ static struct file_operations freq_debugfs_fops = {
 	.release	= single_release,
 };
 
+#endif
 static int __init exynos_perf_cpuidle_profile_init(void)
 {
+#ifdef CONFIG_DEBUG_FS
 	struct dentry *root, *d;
 
 	root = debugfs_create_dir("exynos_perf_cpuidle", NULL);
@@ -530,7 +535,7 @@ static int __init exynos_perf_cpuidle_profile_init(void)
 					&freq_debugfs_fops);
 	if (!d)
 		return -ENOMEM;
-
+#endif
 	return 0;
 }
 late_initcall(exynos_perf_cpuidle_profile_init);

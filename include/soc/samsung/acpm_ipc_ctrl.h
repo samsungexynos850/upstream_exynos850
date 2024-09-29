@@ -14,7 +14,6 @@ struct ipc_config {
 #define ACPM_IPC_PROTOCOL_OWN			(31)
 #define ACPM_IPC_PROTOCOL_RSP			(30)
 #define ACPM_IPC_PROTOCOL_INDIRECTION		(29)
-#define ACPM_IPC_PROTOCOL_STOP_WDT		(27)
 #define ACPM_IPC_PROTOCOL_ID			(26)
 #define ACPM_IPC_PROTOCOL_IDX			(0x7 << ACPM_IPC_PROTOCOL_ID)
 #define ACPM_IPC_PROTOCOL_DP_A			(25)
@@ -36,7 +35,6 @@ int acpm_ipc_send_data_lazy(unsigned int channel_id, struct ipc_config *cfg);
 int acpm_ipc_set_ch_mode(struct device_node *np, bool polling);
 void exynos_acpm_reboot(void);
 void exynos_acpm_ps_hold_down(void);
-void exynos_acpm_force_apm_wdt_reset(void);
 void acpm_stop_log(void);
 #else
 
@@ -72,11 +70,6 @@ static inline void exynos_acpm_reboot(void)
 }
 
 static inline void exynos_acpm_ps_hold_down(void)
-{
-	return;
-}
-
-static inline void exynos_acpm_force_wdt_reset(void)
 {
 	return;
 }

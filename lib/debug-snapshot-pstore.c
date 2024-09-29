@@ -150,18 +150,18 @@ static int dbg_snapshot_combine_pmsg(char *buffer, size_t count, unsigned int le
 				break;
 
 			logger.func_hook_logger("log_platform", buffer, count - 1);
-#ifdef CONFIG_SEC_EXT 
-			if (count > 1 && strncmp(buffer, "!@", 2) == 0) { 
-				/* To prevent potential buffer overrun 
-				 * put a null at the end of the buffer if required 
-				 */ 
-				buffer[count - 1] = '\0'; 
+#ifdef CONFIG_SEC_EXT
+			if (count > 1 && strncmp(buffer, "!@", 2) == 0) {
+				/* To prevent potential buffer overrun
+				 * put a null at the end of the buffer if required
+				 */
+				buffer[count - 1] = '\0';
 				pr_info("%s\n", buffer);
 #ifdef CONFIG_SEC_BOOTSTAT
 				if (count > 5 && strncmp(buffer, "!@Boot", 6) == 0)
 					sec_bootstat_add(buffer);
 #endif /* CONFIG_SEC_BOOTSTAT */
-			} 
+			}
 #endif /* CONFIG_SEC_EXT */
 		}
 		break;

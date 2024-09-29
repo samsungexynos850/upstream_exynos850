@@ -178,7 +178,7 @@ int sec_argos_register_notifier(struct notifier_block *n, char *label)
 		return -ENXIO;
 	}
 
-	pr_info("%s: %pf(dev_num:%d)\n", __func__, n->notifier_call, dev_num);
+	pr_info("%s: %ps(dev_num:%d)\n", __func__, n->notifier_call, dev_num);
 
 	return blocking_notifier_chain_register(cnotifier, n);
 }
@@ -203,7 +203,7 @@ int sec_argos_unregister_notifier(struct notifier_block *n, char *label)
 		return -ENXIO;
 	}
 
-	pr_info("%s: %pf(dev_num:%d)\n", __func__, n->notifier_call, dev_num);
+	pr_info("%s: %ps(dev_num:%d)\n", __func__, n->notifier_call, dev_num);
 
 	return blocking_notifier_chain_unregister(cnotifier, n);
 }
@@ -421,7 +421,7 @@ int argos_hmpboost_apply(int dev_num, bool enable)
 #if defined(CONFIG_SCHED_EMS)
 #if defined(CONFIG_SCHED_EMS_TUNE)
 			emstune_boost(&emstune_req, 0);
-#else		
+#else
 			gb_qos_update_request(&gb_req, 0);
 #endif
 #endif
@@ -850,18 +850,22 @@ static int argos_set_device_node(struct device *dev, struct device_node *np, str
 
 	np_table = of_get_child_by_name(np, "net_boost,table");
 	if (!of_device_is_available(np_table)) {
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_out;
 	}
 
 	/* Allocation for freq and time table */
 	node->tables = devm_kzalloc(dev, sizeof(struct boost_table) * of_get_child_count(np_table), GFP_KERNEL);
-	if (!node->tables)
-		return -ENOMEM;
+	if (!node->tables) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
 
 	/* Get and add frequency and time table */
 	for_each_child_of_node(np_table, np_level) {
-		if ((ret = load_table_items(np_level, &node->tables[node->ntables])) != 0)
-			return ret;
+		ret = load_table_items(np_level, &node->tables[node->ntables]);
+		if (ret)
+			goto err_out;
 		node->ntables++;
 	}
 
@@ -876,6 +880,14 @@ static int argos_set_device_node(struct device *dev, struct device_node *np, str
 	BLOCKING_INIT_NOTIFIER_HEAD(&node->argos_notifier);
 
 	return 0;
+
+err_out:
+	if (node->tables)
+		devm_kfree(dev, node->tables);
+	if (node->qos)
+		devm_kfree(dev, node->qos);
+
+	return ret;
 }
 
 static int argos_parse_dt(struct device *dev)
@@ -884,7 +896,7 @@ static int argos_parse_dt(struct device *dev)
 	struct argos *device_node;
 	struct device_node *root_np, *device_np;
 	int device_count = 0;
-	int retval = 0;
+	int ret = 0;
 
 	root_np = dev->of_node;
 	pdata->ndevice = of_get_child_count(root_np);
@@ -899,7 +911,8 @@ static int argos_parse_dt(struct device *dev)
 
 	for_each_child_of_node(root_np, device_np) {
 		device_node = &pdata->devices[device_count];
-		if ((retval = argos_set_device_node(dev, device_np, device_node)) != 0)
+		ret = argos_set_device_node(dev, device_np, device_node);
+		if (ret)
 			goto err_out;
 
 		device_count++;
@@ -908,7 +921,10 @@ static int argos_parse_dt(struct device *dev)
 	return 0;
 
 err_out:
-	return retval;
+	if (pdata->devices)
+		devm_kfree(dev, pdata->devices);
+
+	return ret;
 }
 #endif
 
@@ -917,7 +933,7 @@ static int argos_probe(struct platform_device *pdev)
 	int ret = 0;
 	struct argos_platform_data *pdata;
 
-	pr_info("%s: Start probe\n", __func__);
+	pr_info("%s+++\n", __func__);
 	if (pdev->dev.of_node) {
 		pdata = devm_kzalloc(&pdev->dev,
 				     sizeof(struct argos_platform_data),
@@ -932,7 +948,7 @@ static int argos_probe(struct platform_device *pdev)
 		ret = argos_parse_dt(&pdev->dev);
 		if (ret) {
 			dev_err(&pdev->dev, "Failed to parse dt data\n");
-			return ret;
+			goto err_out;
 		}
 		pr_info("%s: parse dt done\n", __func__);
 	} else {
@@ -941,12 +957,14 @@ static int argos_probe(struct platform_device *pdev)
 
 	if (!pdata) {
 		dev_err(&pdev->dev, "There are no platform data\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_out;
 	}
 
 	if (!pdata->ndevice || !pdata->devices) {
 		dev_err(&pdev->dev, "There are no devices\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_out;
 	}
 
 	pdata->pm_qos_nfb.notifier_call = argos_pm_qos_notify;
@@ -955,7 +973,15 @@ static int argos_probe(struct platform_device *pdev)
 	argos_pdata = pdata;
 	platform_set_drvdata(pdev, pdata);
 
+	pr_info("%s---\n", __func__);
+
 	return 0;
+
+err_out:
+	if (pdev->dev.of_node && pdata)
+		devm_kfree(&pdev->dev, pdata);
+
+	return ret;
 }
 
 static int argos_remove(struct platform_device *pdev)

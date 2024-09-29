@@ -1949,8 +1949,7 @@ void ext4_mb_complex_scan_group(struct ext4_allocation_context *ac,
 	int free;
 
 	free = e4b->bd_info->bb_free;
-	if (WARN_ON(free <= 0))
-		return;
+	BUG_ON(free <= 0);
 
 	i = e4b->bd_info->bb_first_free;
 
@@ -1973,8 +1972,7 @@ void ext4_mb_complex_scan_group(struct ext4_allocation_context *ac,
 		}
 
 		mb_find_extent(e4b, i, ac->ac_g_ex.fe_len, &ex);
-		if (WARN_ON(ex.fe_len <= 0))
-			break;
+		BUG_ON(ex.fe_len <= 0);
 		if (free < ex.fe_len) {
 			ext4_grp_locked_error(sb, e4b->bd_group, 0, 0,
 					"%d free clusters as per "
@@ -2353,55 +2351,6 @@ const struct seq_operations ext4_mb_seq_groups_ops = {
 	.stop   = ext4_mb_seq_groups_stop,
 	.show   = ext4_mb_seq_groups_show,
 };
-
-ssize_t ext4_mb_freefrag_show(struct ext4_sb_info *sbi, char *buf)
-{
-#define EXT4_FREEFRAG_COLUMN 14 /* sb->s_blocksize_bits + 2 */
-	ext4_group_t group = 0;
-	int i;
-	ext4_fsblk_t freeblock[EXT4_FREEFRAG_COLUMN] = {0,};
-	char *size[EXT4_FREEFRAG_COLUMN] = {"4K", "8K", "16K", "32K", "64K",
-		"128K", "256K", "512K", "1M", "2M", "4M", "8M", "16M", "32M"};
-
-	for (group = 0; group < sbi->s_groups_count; group++) {
-		struct super_block *sb = sbi->s_sb;
-		int err, buddy_loaded = 0;
-		struct ext4_buddy e4b;
-		struct ext4_group_info *grinfo;
-		struct sg {
-			struct ext4_group_info info;
-			ext4_grpblk_t counters[EXT4_FREEFRAG_COLUMN+2];
-		} sg;
-
-		i = (sb->s_blocksize_bits + 2) * sizeof(sg.info.bb_counters[0])
-			+ sizeof(struct ext4_group_info);
-		grinfo = ext4_get_group_info(sb, group);
-		/* Load the group info in memory only if not already loaded. */
-		if (unlikely(EXT4_MB_GRP_NEED_INIT(grinfo))) {
-			err = ext4_mb_load_buddy(sb, group, &e4b);
-			if (err) {
-				freeblock[0] = ULLONG_MAX;
-				goto out;
-			}
-			buddy_loaded = 1;
-		}
-
-		memcpy(&sg, ext4_get_group_info(sb, group), i);
-
-		if (buddy_loaded)
-			ext4_mb_unload_buddy(&e4b);
-		for (i = 0; i < EXT4_FREEFRAG_COLUMN; i++)
-			freeblock[i] += (i <= sb->s_blocksize_bits + 1) ?
-					sg.info.bb_counters[i] : 0;
-	}
-out:
-	for (i = 0; i < EXT4_FREEFRAG_COLUMN; i++)
-		snprintf(buf, PAGE_SIZE, "%s\"%s\":\"%llu\",", buf, size[i],
-			(unsigned long long)freeblock[i]);
-	buf[strlen(buf)-1] = '\n';
-
-	return strlen(buf);
-}
 
 static struct kmem_cache *get_groupinfo_cache(int blocksize_bits)
 {

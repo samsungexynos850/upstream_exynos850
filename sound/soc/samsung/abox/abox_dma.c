@@ -1266,7 +1266,7 @@ static irqreturn_t abox_ddma_file_buf_done(int irq, void *dev_id)
 
 static int abox_ddma_file_open(struct inode *i, struct file *f)
 {
-	struct abox_dma_data *data = i->i_private;
+	struct abox_dma_data *data = abox_dump_get_data(f);
 	struct abox_data *abox_data = data->abox_data;
 	struct device *dev = data->dev;
 	int ret;
@@ -1289,7 +1289,7 @@ static int abox_ddma_file_open(struct inode *i, struct file *f)
 
 static int abox_ddma_file_release(struct inode *i, struct file *f)
 {
-	struct abox_dma_data *data = i->i_private;
+	struct abox_dma_data *data = f->private_data;
 	struct device *dev = data->dev;
 	int ret;
 

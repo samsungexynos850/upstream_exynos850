@@ -1,0 +1,142 @@
+config SENSORS
+	bool "Sensors Class Support"
+	help
+	  This option enables the sensor sysfs class in /sys/class/sensors.
+	  You'll need this to do anything useful with sensorss. If unsure, say N.
+
+config SENSORS_SSC
+	bool "Enable Sensors Driver Support for SSC"
+	help
+	  Add support for sensors SSC driver.
+	  This driver is used for exercising sensors use case,
+	  time syncing with ADSP clock.
+
+config SENSORS_FW_VENDOR
+	bool "Locate the Firmware on Vendor"
+	default n
+	help
+	  To use the module automatic system, 
+	  locate the firmware on vendor side.
+
+config SENSORS_A96T3X6
+	depends on I2C
+	tristate "A96T3X6 driver for grip"
+	default n
+	help
+	  Say Y here if you use A96T3X6 for grip.
+	  This option enables grip sensors using
+	  Above A96T3X6 device driver for grip.
+	  Say N here if you do not use A96T3X6 for grip.
+
+config SENSORS_A96T3X6_SUB
+	depends on I2C
+	tristate "A96T3X6_SUB driver for grip"
+	default n
+	help
+	  Say Y here if you use A96T3X6 for grip.
+	  This option enables grip sensors using
+	  Above A96T3X6 device driver for grip.
+	  Say N here if you do not use A96T3X6 for grip.
+
+config SENSOR_A96T3X6_LDO_SHARE
+	depends on I2C
+	tristate "SENSOR_A96T3X6_LDO_SHARE driver for grip"
+	default n
+	help
+	  Say Y here if you use SENSOR_A96T3X6_LDO_SHARE for grip.
+	  This option enables grip sensors using
+	  Above SENSOR_A96T3X6_LDO_SHARE device driver for grip.
+
+config SENSORS_A96T3X6_CRC_CHECK
+	bool "crc check by fw ver"
+	default n
+	help
+	  To use crc check by fw not checking checksum, active this feature
+
+
+config SENSORS_ISG5320A
+	depends on I2C
+	tristate "ISG5320A grip"
+	default n
+	help
+	  If you say yes here if you use ISG5320A for grip.
+	  This option enables grip sensors using
+	  IMAGIS ISG5320A device driver for grip.
+
+config SENSORS_ISG5320A_XCOVER5_KOR
+	depends on I2C
+	tristate "ISG5320A grip for xcover5 KOR"
+	default n
+	help
+	  If you say yes here if you use ISG5320A for XCOVER5 KOR.
+
+config SENSORS_A96T3X6_M12_ALL
+	depends on I2C
+	tristate "A96T3X6 grip frimware for ALL"
+	default n
+	help
+	  If you say yes here if you use A96T3X6 for M12 ALL.
+
+config SENSORS_A96T3X6_M12_KOR
+	depends on I2C
+	tristate "A96T3X6 grip frimware for ALL"
+	default n
+	help
+	  If you say yes here if you use A96T3X6 for M12 KOR.
+
+#
+# grip sensors configuration
+#
+
+config SENSORS_SX9360
+	depends on I2C
+	tristate "SX9360 driver"
+	default n
+	help
+	  Say Y here if you use sx9360.
+	  This option enables grip sensors using
+	  SemTech sx9360 device driver.
+	  Say N here if you do not use sx9360.
+
+config SENSORS_SX9360_SUB
+	depends on I2C
+	tristate "SX9360 sub driver"
+	default n
+	help
+	  Say Y here if you use sx9360 sub.
+	  This option enables grip sensors using
+	  SemTech sx9360 sub device driver.
+	  Say N here if you do not use sx9360 sub.
+
+config SENSORS_SX9364
+	depends on I2C
+	tristate "SX9364 driver"
+	default n
+	help
+	  Say Y here if you use sx9364.
+	  This option enables grip sensors using
+	  SemTech sx9360 device driver.
+	  Say N here if you do not use sx9364.
+
+config SENSORS_SX9364_SUB
+	depends on I2C
+	tristate "SX9364_SUB driver"
+	default n
+	help
+	  Say Y here if you use sx9364_sub.
+	  This option enables grip sensors using
+	  SemTech sx9364_sub device driver.
+	  Say N here if you do not use sx9364_sub.
+
+
+config SENSORS_DUMP_DATA
+	tristate "Grip sensor dump log"
+	default n
+	help
+	  Enable grip dump log data
+	  This option activates log output of grip error data using sensordump_notifier.
+
+config SENSORS_GRIP_FAILURE_DEBUG
+	bool "Grip failure debug"
+	help
+	  Say Y here, Enable Grip failure debug flag.

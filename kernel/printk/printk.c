@@ -103,7 +103,7 @@ enum devkmsg_log_masks {
 };
 
 /* Keep both the 'on' and 'off' bits clear, i.e. ratelimit by default: */
-#define DEVKMSG_LOG_MASK_DEFAULT	0
+#define DEVKMSG_LOG_MASK_DEFAULT	DEVKMSG_LOG_MASK_ON
 
 static unsigned int __read_mostly devkmsg_log = DEVKMSG_LOG_MASK_DEFAULT;
 
@@ -440,6 +440,7 @@ static u32 clear_idx_knox;
 
 #define SYSLOG_ACTION_READ_CLEAR_KNOX 99
 // SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
+
 #ifdef CONFIG_PRINTK_PROCESS
 #define PREFIX_MAX		48
 #else
@@ -552,7 +553,7 @@ static int log_make_free_space(u32 msg_size)
 		clear_seq = log_first_seq;
 		clear_idx = log_first_idx;
 	}
-	
+
 	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
 	/* messages are gone, move to first available one */
 	if (clear_seq_knox < log_first_seq) {
@@ -641,6 +642,7 @@ void register_hook_logbuf(void (*func)(const char *buf, size_t size, int fatal))
 	if (log_first_seq != log_next_seq) {
 		unsigned int step_seq, step_idx, start, end;
 		struct printk_log *msg;
+
 		start = log_first_seq;
 		end = log_next_seq;
 		step_idx = log_first_idx;
@@ -658,7 +660,7 @@ void register_hook_logbuf(void (*func)(const char *buf, size_t size, int fatal))
 EXPORT_SYMBOL(register_hook_logbuf);
 #endif
 
-#if defined(CONFIG_SEC_DEBUG_FIRST2M_LOG)
+#ifdef CONFIG_SEC_DEBUG_FIRST2M_LOG
 void (*func_hook_first_kmsg)(const char *buf, size_t size);
 void register_first_kmsg_hook_func(void (*func)(const char *buf, size_t size))
 {
@@ -802,7 +804,7 @@ static int log_store(int facility, int level,
 			func_hook_init_log(hook_text, hook_size);
 #endif
 
-#if defined(CONFIG_SEC_DEBUG_FIRST2M_LOG)
+#ifdef CONFIG_SEC_DEBUG_FIRST2M_LOG
 		if (func_hook_first_kmsg)
 			func_hook_first_kmsg(hook_text, hook_size);
 #endif
@@ -951,12 +953,11 @@ static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
 		return len;
 
 	/* Ratelimit when not explicitly enabled. */
-/*
 	if (!(devkmsg_log & DEVKMSG_LOG_MASK_ON)) {
 		if (!___ratelimit(&user->rs, current->comm))
 			return ret;
 	}
-*/
+
 	buf = kmalloc(len+1, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
@@ -1563,7 +1564,7 @@ static int syslog_print_all(char __user *buf, int size, bool clear, bool knox)
 		/*
 		 * Find first record that fits, including all following records,
 		 * into the user-provided buffer for this dump.
-	 	*/
+		 */
 		// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
 		/*
 		// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
@@ -1603,8 +1604,6 @@ static int syslog_print_all(char __user *buf, int size, bool clear, bool knox)
 			idx = clear_idx_knox;
 		}
 		// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
-
-
 		while (len > size && seq < log_next_seq) {
 			struct printk_log *msg = log_from_idx(idx);
 
@@ -1644,15 +1643,14 @@ static int syslog_print_all(char __user *buf, int size, bool clear, bool knox)
 			}
 		}
 	}
-
 	if (clear) {
-	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
-	/*
-	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
+		// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+		/*
+		// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
 		clear_seq = log_next_seq;
 		clear_idx = log_next_idx;
-	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
-	*/
+		// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
+		*/
 		if (!knox) {
 			clear_seq = log_next_seq;
 			clear_idx = log_next_idx;
@@ -1660,8 +1658,8 @@ static int syslog_print_all(char __user *buf, int size, bool clear, bool knox)
 			clear_seq_knox = log_next_seq;
 			clear_idx_knox = log_next_idx;
 		}
-	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
-	}
+		// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
+    }
 	logbuf_unlock_irq();
 
 	kfree(text);
@@ -1787,7 +1785,7 @@ int do_syslog(int type, char __user *buf, int len, int source)
 		error = log_buf_len;
 		break;
 	// SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
-	/* edmaudit Read last kernel messages */
+	//edmaudit Read last kernel messages {
 	case SYSLOG_ACTION_READ_CLEAR_KNOX:
 		error = -EINVAL;
 		if (!buf || len < 0)
@@ -1809,7 +1807,6 @@ int do_syslog(int type, char __user *buf, int len, int source)
 // SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM {
 out:
 // SecProductFeature_KNOX.SEC_PRODUCT_FEATURE_KNOX_SUPPORT_MDM }
-
 	return error;
 }
 

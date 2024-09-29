@@ -1427,4 +1427,10 @@ config SND_SOC_SMA1303
 	  multi-band DRC, equalizer function. It would
 	  be set to yes if device with SMA1303 on it.
 
+config SND_SMARTPA_AW8896
+	tristate "SoC Audio for awinic aw8896 series"
+	depends on I2C
+	help
+	  This option enables support for aw8896 series Smart PA.
+
 endmenu

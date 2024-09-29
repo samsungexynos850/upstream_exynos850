@@ -410,7 +410,7 @@ static int dapm_kcontrol_data_alloc(struct snd_soc_dapm_widget *widget,
 
 			memset(&template, 0, sizeof(template));
 			template.reg = e->reg;
-			template.mask = e->mask;
+			template.mask = e->mask << e->shift_l;
 			template.shift = e->shift_l;
 			template.off_val = snd_soc_enum_item_to_val(e, 0);
 			template.on_val = template.off_val;
@@ -536,22 +536,8 @@ static bool dapm_kcontrol_set_value(const struct snd_kcontrol *kcontrol,
 	if (data->value == value)
 		return false;
 
-	if (data->widget) {
-		switch (dapm_kcontrol_get_wlist(kcontrol)->widgets[0]->id) {
-		case snd_soc_dapm_switch:
-		case snd_soc_dapm_mixer:
-		case snd_soc_dapm_mixer_named_ctl:
-			data->widget->on_val = value & data->widget->mask;
-			break;
-		case snd_soc_dapm_demux:
-		case snd_soc_dapm_mux:
-			data->widget->on_val = value >> data->widget->shift;
-			break;
-		default:
-			data->widget->on_val = value;
-			break;
-		}
-	}
+	if (data->widget)
+		data->widget->on_val = value;
 
 	data->value = value;
 
@@ -808,11 +794,14 @@ static void dapm_set_mixer_path_status(struct snd_soc_dapm_path *p, int i,
 	} else {
 		/* since a virtual mixer has no backing registers to
 		 * decide which path to connect, it will try to match
-		 * with initial state.  This is to ensure
+		 * with initial value 0.  This is to ensure
 		 * that the default mixer choice will be
 		 * correctly powered up during initialization.
 		 */
-		p->connect = invert;
+		val = 0;
+		if (invert)
+			val = max - val;
+		p->connect = !!val;
 	}
 }
 
@@ -2012,7 +2001,7 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 	dapm_pre_sequence_async(&card->dapm, 0);
 	/* Run other bias changes in parallel */
 	list_for_each_entry(d, &card->dapm_list, list) {
-		if (d != &card->dapm && d->bias_level != d->target_bias_level)
+		if (d != &card->dapm)
 			async_schedule_domain(dapm_pre_sequence_async, d,
 						&async_domain);
 	}
@@ -2036,7 +2025,7 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 
 	/* Run all the bias changes in parallel */
 	list_for_each_entry(d, &card->dapm_list, list) {
-		if (d != &card->dapm && d->bias_level != d->target_bias_level)
+		if (d != &card->dapm)
 			async_schedule_domain(dapm_post_sequence_async, d,
 						&async_domain);
 	}

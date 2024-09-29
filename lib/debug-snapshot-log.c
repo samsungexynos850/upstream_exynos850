@@ -1392,7 +1392,7 @@ void dbg_snapshot_printkl(size_t msg, size_t val)
 
 #if defined(CONFIG_HARDLOCKUP_DETECTOR_OTHER_CPU) && defined(CONFIG_SEC_DEBUG_LOCKUP_INFO)
 #define for_each_generated_irq_in_snapshot(idx, i, max, base, cpu)	\
-	for (i = 0, idx = base; i < max; ++i, idx = (base - i) & (ARRAY_SIZE(dss_log->irq[0]) - 1))		\
+	for (i = 0, idx = base; i < max; ++i, idx = ((base - i) & (ARRAY_SIZE(dss_log->irq[0]) - 1)))		\
 		if (dss_log->irq[cpu][idx].en == DSS_FLAG_IN)
 
 static inline void secdbg_get_busiest_irq(struct hardlockup_info *hl_info, unsigned long start_idx, int cpu)
@@ -1634,7 +1634,9 @@ void secdbg_show_sched_info(unsigned int cpu, int count)
 		offset += scnprintf(buf + offset, LOG_LINE_MAX - offset, "[%d]<", dss_log->task[cpu][task_idx].pid);
 		task_idx = task_idx > 0 ? (task_idx - 1) : (max_count - 1);
 	}
+#ifdef SEC_DEBUG_AUTO_COMMENT
 	pr_auto(ASL5, "%s\n", buf);
+#endif
 }
 
 static unsigned long long secdbg_make_busy_task_list(unsigned int cpu, unsigned long long duration)
@@ -1736,9 +1738,11 @@ int secdbg_show_busy_task(unsigned int cpu, unsigned long long duration, int cou
 	if (is_busy_info_list)
 		return -1;
 
+#ifdef SEC_DEBUG_AUTO_COMMENT
 	pr_auto(ASL5, "CPU%u [CFS util_avg:%lu load_avg:%lu nr_running:%u][RT util_avg:%lu load_avg:%lu rt_nr_running:%u][avg_rt util_avg:%lu]",	\
 		cpu, cpu_rq(cpu)->cfs.avg.util_avg, cpu_rq(cpu)->cfs.avg.load_avg, cpu_rq(cpu)->cfs.nr_running,	\
 		cpu_rq(cpu)->rt.avg.util_avg, cpu_rq(cpu)->rt.avg.load_avg, cpu_rq(cpu)->rt.rt_nr_running, cpu_rq(cpu)->avg_rt.util_avg);
+#endif
 
 	if (!log_item->entry.enabled)
 		return -1;
@@ -1759,14 +1763,17 @@ int secdbg_show_busy_task(unsigned int cpu, unsigned long long duration, int cou
 		if (--count == 0)
 			break;
 	}
-
+#ifdef SEC_DEBUG_AUTO_COMMENT
 	pr_auto(ASL5, "%s\n", buf);
+#endif
 
 	info = list_first_entry(&busy_info_list, struct busy_info, node);
 	main_busy_tsk = info->tsk;
 
 	if (!is_busy) {
+#ifdef SEC_DEBUG_AUTO_COMMENT
 		pr_auto(ASL5, "CPU%u is not busy.", cpu);
+#endif
 	} else if (main_busy_tsk == cpu_curr(cpu)) {
 		smp_call_function_single(cpu, show_callstack, NULL, 1);
 	} else {
@@ -1780,7 +1787,7 @@ int secdbg_show_busy_task(unsigned int cpu, unsigned long long duration, int cou
 	return is_busy;
 }
 
-struct task_struct *get_the_busiest_task()
+struct task_struct *get_the_busiest_task(void)
 {
 	struct busy_info *info;
 

@@ -487,9 +487,9 @@ static ssize_t read_mtp_store(struct device *dev,
 	}
 
 	mutex_lock(&panel->op_lock);
-//	panel_set_key(panel, 3, true);
+	panel_set_key(panel, 3, true);
 	ret = panel_rx_nbytes(panel, DSI_PKT_TYPE_RD, readbuf, readreg, readpos, readlen);
-//	panel_set_key(panel, 3, false);
+	panel_set_key(panel, 3, false);
 	mutex_unlock(&panel->op_lock);
 
 	if (unlikely(ret != readlen)) {

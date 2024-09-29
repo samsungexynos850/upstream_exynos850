@@ -30,6 +30,21 @@
 #include "dw_mmc-exynos.h"
 #include "../core/queue.h"
 #include "../core/host.h"
+#include "dw_mmc-exynos-fmp.h"
+
+#define UNSTUFF_BITS(resp,start,size)					\
+	({								\
+		const int __size = size;				\
+		const u32 __mask = (__size < 32 ? 1 << __size : 0) - 1;	\
+		const int __off = 3 - ((start) / 32);			\
+		const int __shft = (start) & 31;			\
+		u32 __res;						\
+									\
+		__res = resp[__off] >> __shft;				\
+		if (__size + __shft > 32)				\
+			__res |= resp[__off-1] << ((32 - __shft) % 32);	\
+		__res & __mask;						\
+	})
 
 extern int cal_pll_mmc_set_ssc(unsigned int mfr, unsigned int mrr, unsigned int ssc_on);
 extern int cal_pll_mmc_check(void);
@@ -1285,8 +1300,54 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot, u32 opcode,
 	return ret;
 }
 
-static struct device *sd_detection_cmd_dev;
+static struct device *mmc_card_dev;
+static ssize_t mmc_gen_unique_number_show(struct device *dev,
+			      struct device_attribute *attr,
+			      char *buf)
+{
+	struct dw_mci *host = dev_get_drvdata(dev);
+	struct mmc_card *card = host->slot->mmc->card;
+	char gen_pnm[3];
+	int i;
 
+	if (!card) {
+		dev_info(host->dev, "%s : card is not exist!\n", __func__);
+		return -EINVAL;
+	}
+
+	switch (card->cid.manfid) {
+		case 0x02:	/* Sandisk	-> [3][4] */
+		case 0x45:
+			sprintf(gen_pnm, "%.*s", 2, card->cid.prod_name + 3);
+			break;
+		case 0x11:	/* Toshiba	-> [1][2] */
+		case 0x90:	/* Hynix */
+			sprintf(gen_pnm, "%.*s", 2, card->cid.prod_name + 1);
+			break;
+		case 0x13:
+		case 0xFE:	/* Micron 	-> [4][5] */
+			sprintf(gen_pnm, "%.*s", 2, card->cid.prod_name + 4);
+			break;
+		case 0x15:	/* Samsung 	-> [0][1] */
+		default:
+			sprintf(gen_pnm, "%.*s", 2, card->cid.prod_name + 0);
+			break;
+	}
+
+	/* Convert to Captal */
+	for (i = 0 ; i < 2 ; i++)
+	{
+		if (gen_pnm[i] >= 'a' && gen_pnm[i] <= 'z')
+			gen_pnm[i] -= ('a' - 'A');
+	}
+
+	return sprintf(buf, "C%s%02X%08X%02X\n",
+			gen_pnm, card->cid.prv, card->cid.serial, UNSTUFF_BITS(card->raw_cid, 8, 8));
+}
+
+static DEVICE_ATTR(un, (S_IRUSR|S_IRGRP), mmc_gen_unique_number_show, NULL);
+
+static struct device *sd_detection_cmd_dev;
 static ssize_t sd_detection_cmd_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1509,7 +1570,67 @@ out:
 	return len;
 }
 
-static struct device *mmc_card_dev;
+static ssize_t sd_cid_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct dw_mci *host = dev_get_drvdata(dev);
+	struct mmc_card *cur_card = NULL;
+	int len = 0;
+
+	if (host->slot && host->slot->mmc && host->slot->mmc->card)
+		cur_card = host->slot->mmc->card;
+	else {
+		len = snprintf(buf, PAGE_SIZE, "No Card\n");
+		goto out;
+	}
+
+	len = snprintf(buf, PAGE_SIZE,
+			"%08x%08x%08x%08x\n",
+			cur_card->raw_cid[0], cur_card->raw_cid[1],
+			cur_card->raw_cid[2], cur_card->raw_cid[3]);
+out:
+	return len;
+}
+
+static ssize_t sd_health_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct dw_mci *host = dev_get_drvdata(dev);
+	struct mmc_card *cur_card = NULL;
+	struct mmc_card_error_log *err_log;
+	u64 total_c_cnt = 0;
+	u64 total_t_cnt = 0;
+	int len = 0;
+	int i = 0;
+
+	if (host->slot && host->slot->mmc && host->slot->mmc->card)
+		cur_card = host->slot->mmc->card;
+
+	if (!cur_card) {
+		//There should be no spaces in 'No Card'(Vold Team).
+		len = snprintf(buf, PAGE_SIZE, "NOCARD\n");
+		goto out;
+	}
+
+	err_log = cur_card->err_log;
+
+	for (i = 0; i < 6; i++) {
+		if (err_log[i].err_type == -EILSEQ && total_c_cnt < MAX_CNT_U64)
+			total_c_cnt += err_log[i].count;
+		if (err_log[i].err_type == -ETIMEDOUT && total_t_cnt < MAX_CNT_U64)
+			total_t_cnt += err_log[i].count;
+	}
+
+	if(err_log[0].ge_cnt > 100 || err_log[0].ecc_cnt > 0 || err_log[0].wp_cnt > 0 ||
+	   err_log[0].oor_cnt > 10 || total_t_cnt > 100 || total_c_cnt > 100)
+		len = snprintf(buf, PAGE_SIZE, "BAD\n");
+	else
+		len = snprintf(buf, PAGE_SIZE, "GOOD\n");
+
+out:
+	return len;
+}
+
 static ssize_t mmc_data_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1623,67 +1744,6 @@ static ssize_t mmc_summary_show(struct device *dev,
 	}
 }
 
-static ssize_t sd_cid_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct dw_mci *host = dev_get_drvdata(dev);
-	struct mmc_card *cur_card = NULL;
-	int len = 0;
-
-	if (host->slot && host->slot->mmc && host->slot->mmc->card)
-		cur_card = host->slot->mmc->card;
-	else {
-		len = snprintf(buf, PAGE_SIZE, "No Card\n");
-		goto out;
-	}
-
-	len = snprintf(buf, PAGE_SIZE,
-			"%08x%08x%08x%08x\n",
-			cur_card->raw_cid[0], cur_card->raw_cid[1],
-			cur_card->raw_cid[2], cur_card->raw_cid[3]);
-out:
-	return len;
-}
-
-static ssize_t sd_health_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct dw_mci *host = dev_get_drvdata(dev);
-	struct mmc_card *cur_card = NULL;
-	struct mmc_card_error_log *err_log;
-	u64 total_c_cnt = 0;
-	u64 total_t_cnt = 0;
-	int len = 0;
-	int i = 0;
-
-	if (host->slot && host->slot->mmc && host->slot->mmc->card)
-		cur_card = host->slot->mmc->card;
-
-	if (!cur_card) {
-		//There should be no spaces in 'No Card'(Vold Team).
-		len = snprintf(buf, PAGE_SIZE, "NOCARD\n");
-		goto out;
-	}
-
-	err_log = cur_card->err_log;
-
-	for (i = 0; i < 6; i++) {
-		if (err_log[i].err_type == -EILSEQ && total_c_cnt < MAX_CNT_U64)
-			total_c_cnt += err_log[i].count;
-		if (err_log[i].err_type == -ETIMEDOUT && total_t_cnt < MAX_CNT_U64)
-			total_t_cnt += err_log[i].count;
-	}
-
-	if(err_log[0].ge_cnt > 100 || err_log[0].ecc_cnt > 0 || err_log[0].wp_cnt > 0 ||
-	   err_log[0].oor_cnt > 10 || total_t_cnt > 100 || total_c_cnt > 100)
-		len = snprintf(buf, PAGE_SIZE, "BAD\n");
-	else
-		len = snprintf(buf, PAGE_SIZE, "GOOD\n");
-
-out:
-	return len;
-}
-
 #ifdef CONFIG_SEC_FACTORY
 static ssize_t mmc_hwrst_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -1705,10 +1765,10 @@ static DEVICE_ATTR(cd_cnt, 0444, sd_detection_cnt_show, NULL);
 static DEVICE_ATTR(max_mode, 0444, sd_detection_maxmode_show, NULL);
 static DEVICE_ATTR(current_mode, 0444, sd_detection_curmode_show, NULL);
 static DEVICE_ATTR(sdcard_summary, 0444, sdcard_summary_show, NULL);
-static DEVICE_ATTR(sd_count, 0444, sd_count_show, NULL);
-static DEVICE_ATTR(sd_data, 0444, sd_data_show, NULL);
 static DEVICE_ATTR(mmc_data, S_IRUGO, mmc_data_show, NULL);
 static DEVICE_ATTR(mmc_summary, S_IRUGO, mmc_summary_show, NULL);
+static DEVICE_ATTR(sd_count, 0444, sd_count_show, NULL);
+static DEVICE_ATTR(sd_data, 0444, sd_data_show, NULL);
 static DEVICE_ATTR(data, 0444, sd_cid_show, NULL);
 static DEVICE_ATTR(fc, 0444, sd_health_show, NULL);
 
@@ -1816,6 +1876,7 @@ static void dw_mci_exynos_add_sysfs(struct dw_mci *host)
 						&dev_attr_sdcard_summary) < 0)
 				pr_err("Fail to create sdcard_summary sysfs file\n");
 		}
+
 		if (!sd_info_cmd_dev) {
 			sd_info_cmd_dev = sec_device_create(host, "sdinfo");
 			if (IS_ERR(sd_info_cmd_dev))
@@ -1823,7 +1884,6 @@ static void dw_mci_exynos_add_sysfs(struct dw_mci *host)
 			if (device_create_file(sd_info_cmd_dev,
 						&dev_attr_sd_count) < 0)
 				pr_err("Fail to create status sysfs file\n");
-
 			if (device_create_file(sd_info_cmd_dev,
 						&dev_attr_data) < 0)
 				pr_err("Fail to create status sysfs file\n");
@@ -1842,12 +1902,18 @@ static void dw_mci_exynos_add_sysfs(struct dw_mci *host)
 				pr_err("Fail to create status sysfs file\n");
 		}
 	}
+
 	/* For eMMC(dwmmc0) Case */
 	if (of_alias_get_id(host->dev->of_node, "mshc") == 0) {
 		if (!mmc_card_dev) {
 			mmc_card_dev = sec_device_create(host, "mmc");
 			if (IS_ERR(mmc_card_dev))
 				pr_err("Fail to create sysfs dev\n");
+
+			if (device_create_file(mmc_card_dev,
+					&dev_attr_un) < 0)
+				pr_err("%s : Failed to create device file(%s)!\n",
+					__func__, dev_attr_un.attr.name);
 
 			if (device_create_file(mmc_card_dev,
 					&dev_attr_mmc_data) < 0)
@@ -1946,7 +2012,7 @@ static int dw_mci_exynos_crypto_engine_cfg(struct dw_mci *host,
 	if (!bio)
 		return 0;
 
-	return exynos_fmp_crypt_cfg(bio, desc, page_index, sector_offset, cmdq_enabled);
+	return fmp_mmc_crypt_cfg(bio, desc, data, page_index, cmdq_enabled);
 }
 
 static int dw_mci_exynos_crypto_engine_clear(struct dw_mci *host,
@@ -1958,7 +2024,7 @@ static int dw_mci_exynos_crypto_engine_clear(struct dw_mci *host,
 	if (!bio)
 		return 0;
 
-	return exynos_fmp_crypt_clear(bio, desc);
+	return fmp_mmc_crypt_clear(bio, desc, data, cmdq_enabled);
 }
 
 static int dw_mci_exynos_crypto_sec_cfg(struct dw_mci *host, bool init)
@@ -1980,15 +2046,6 @@ static int dw_mci_exynos_access_control_abort(struct dw_mci *host)
 
 	return exynos_fmp_smu_abort(priv->smu);
 }
-#else
-static int dw_mci_exynos_crypto_sec_cfg(struct dw_mci *host, bool init)
-{
-        mci_writel(host, MPSBEGIN0, 0);
-        mci_writel(host, MPSEND0, 0xffffffff);
-        mci_writel(host, MPSLUN0, 0xff);
-        mci_writel(host, MPSCTRL0, DWMCI_MPSCTRL_BYPASS);
-	return 0;
-}
 #endif
 
 static const struct dw_mci_drv_data exynos_drv_data = {
@@ -2004,8 +2061,8 @@ static const struct dw_mci_drv_data exynos_drv_data = {
 	.crypto_engine_cfg = dw_mci_exynos_crypto_engine_cfg,
 	.crypto_engine_clear = dw_mci_exynos_crypto_engine_clear,
 	.access_control_abort = dw_mci_exynos_access_control_abort,
-#endif
 	.crypto_sec_cfg = dw_mci_exynos_crypto_sec_cfg,
+#endif
 	.ssclk_control = dw_mci_exynos_ssclk_control,
 	.cqe_swreset = dw_mci_exynos_cqe_swreset,
 	.runtime_pm_control = dw_mci_exynos_runtime_pm_control,

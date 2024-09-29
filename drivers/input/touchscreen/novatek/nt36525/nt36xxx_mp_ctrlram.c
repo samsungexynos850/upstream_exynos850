@@ -492,7 +492,7 @@ static int8_t nvt_switch_FreqHopEnDis(uint8_t FreqHopEnDis)
 	uint8_t retry = 0;
 	int8_t ret = 0;
 
-	input_info(true, &ts->client->dev,"%s  ++\n", __func__);
+	input_info(true, &ts->client->dev, "%s  ++\n", __func__);
 
 	for (retry = 0; retry < 20; retry++) {
 		//---set xdata index to EVENT BUF ADDR---
@@ -518,7 +518,7 @@ static int8_t nvt_switch_FreqHopEnDis(uint8_t FreqHopEnDis)
 		ret = -1;
 	}
 
-	input_info(true, &ts->client->dev,"%s  --\n", __func__);
+	input_info(true, &ts->client->dev, "%s  --\n", __func__);
 
 	return ret;
 }

@@ -28,6 +28,7 @@ enum is_crc32_check_list {
 	CRC32_CHECK_SETFILE	= 3,
 	CRC32_CHECK_FW		= 4,
 	CRC32_CHECK_FW_VER		= 5,
+	CRC32_CHECK_STANDARD_CAL	= 6,
 	CRC32_SCENARIO_MAX,
 };
 
@@ -45,6 +46,7 @@ struct rom_extend_cal_addr {
 /***** Extend data define of Calibration map(ROM address)  *****/
 #define EXTEND_OEM_CHECKSUM      "oem_checksum_base_addr"
 #define EXTEND_AE_CAL            "ae_cal_data"
+#define EXTEND_STANDARD_CAL      "standard_cal_data"
 
 struct rom_ae_cal_data {
 	int32_t		rom_header_main_ae_start_addr;
@@ -52,6 +54,30 @@ struct rom_ae_cal_data {
 	int32_t		rom_ae_module_info_start_addr;
 	int32_t		rom_ae_checksum_addr;
 	int32_t		rom_ae_checksum_len;
+};
+
+struct rom_standard_cal_data{
+	int32_t		rom_standard_cal_start_addr;
+	int32_t		rom_standard_cal_end_addr;
+	int32_t		rom_standard_cal_module_crc_addr;
+	int32_t		rom_standard_cal_module_checksum_len;
+	int32_t		rom_header_standard_cal_end_addr;
+	int32_t		rom_standard_cal_sec2lsi_end_addr;
+
+	int32_t		rom_awb_start_addr;
+	int32_t		rom_awb_end_addr;
+	int32_t		rom_shading_start_addr;
+	int32_t		rom_shading_end_addr;
+	
+	int32_t		rom_awb_sec2lsi_start_addr;
+	int32_t		rom_awb_sec2lsi_end_addr;
+	int32_t		rom_awb_sec2lsi_checksum_addr;
+	int32_t		rom_awb_sec2lsi_checksum_len;
+
+	int32_t		rom_shading_sec2lsi_start_addr;
+	int32_t		rom_shading_sec2lsi_end_addr;
+	int32_t		rom_shading_sec2lsi_checksum_addr;
+	int32_t		rom_shading_sec2lsi_checksum_len;
 };
 
 struct is_vender_rom_addr {
@@ -177,6 +203,10 @@ struct is_vender_specific {
 	struct is_rom_data				rom_data[SENSOR_POSITION_MAX];
 	struct is_rom_share				rom_share[SENSOR_POSITION_MAX];
 	const struct is_vender_rom_addr		*rom_cal_map_addr[SENSOR_POSITION_MAX];
+#ifdef USE_DUALIZED_OTPROM_SENSOR
+	struct i2c_client					*dualized_rom_client[SENSOR_POSITION_MAX];
+	const struct is_vender_rom_addr		*dualized_rom_cal_map_addr[SENSOR_POSITION_MAX];
+#endif
 
 	bool			running_camera[SENSOR_POSITION_MAX];
 
@@ -184,6 +214,9 @@ struct is_vender_specific {
 
 	/* dt */
 	u32			sensor_id[SENSOR_POSITION_MAX];
+#ifdef USE_DUALIZED_OTPROM_SENSOR
+	u32			dualized_sensor_id[SENSOR_POSITION_MAX];
+#endif
 #ifdef CONFIG_SECURE_CAMERA_USE
 	u32			secure_sensor_id;
 #endif

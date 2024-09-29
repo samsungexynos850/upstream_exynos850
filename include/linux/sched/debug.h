@@ -25,7 +25,7 @@ struct pt_regs;
 
 extern void show_regs(struct pt_regs *);
 #ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
-extern void show_regs_auto_comment(struct pt_regs * regs, bool comm);
+extern void show_regs_auto_comment(struct pt_regs *regs, bool comm);
 #endif
 
 /*

@@ -21,7 +21,6 @@
 extern unsigned int lpcharge;
 extern int charging_night_mode;
 extern int fg_reset;
-extern int factory_mode;
 
 void exynos5_universal5430_pmic_init(void);
 void exynos5_universal5430_power_init(void);

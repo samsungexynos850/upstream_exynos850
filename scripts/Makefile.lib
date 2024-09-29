@@ -168,9 +168,7 @@ DTC_INCLUDE    := $(srctree)/scripts/dtc/include-prefixes
 
 dtc_cpp_flags  = -Wp,-MD,$(depfile).pre.tmp -nostdinc                    \
 		 $(addprefix -I,$(DTC_INCLUDE))                          \
-		 -undef -D__DTS__                                        \
-		 -DANDROID_VERSION=$(ANDROID_VERSION)                    \
-		 -DANDROID_MAJOR_VERSION=$(ANDROID_MAJOR_VERSION)
+		 -undef -D__DTS__
 
 ifeq ($(CONFIG_SEC_FACTORY),y)
 dtc_cpp_flags += -DCONFIG_SEC_FACTORY
@@ -311,7 +309,7 @@ cmd_dtc = mkdir -p $(dir ${dtc-tmp}) ; \
 	$(DTC) -O dtb -o $@ -b 0 -a 4 \
 		$(addprefix -i,$(dir $<) $(DTC_INCLUDE)) $(DTC_FLAGS) \
 		-d $(depfile).dtc.tmp $(dtc-tmp) 2>$@.dtout || $(call show_dtc_error, $@.dtout) ; \
-	$(DTC) -O dts -I dtb -o $@.reverse.dts $(DTC_FLAGS) $@ ; \
+	$(DTC) -q -O dts -I dtb -o $@.reverse.dts $@ ; \
 	cat $(depfile).pre.tmp $(depfile).dtc.tmp > $(depfile)
 
 $(obj)/%.dtb: $(src)/%.dts $(DTC) FORCE

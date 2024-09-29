@@ -54,7 +54,11 @@
 
 #define NOTIFIER_PRIORITY 2
 
+#ifdef CONFIG_SEC_FACTORY
 #define RESPONSE_TIMEOUT_MS 3000
+#else
+#define RESPONSE_TIMEOUT_MS 1000
+#endif
 
 #define APP_STATUS_POLL_TIMEOUT_MS 1000
 
@@ -176,8 +180,9 @@ void sec_ts_print_info(struct syna_tcm_hcd *tcm_hcd)
 		tcm_hcd->print_info_cnt_release++;
 
 	input_info(true, tcm_hcd->pdev->dev.parent,
-		"tc:%d noise:%d Sensitivity:%d // v:%02X%02X // irq:%d //#%d %d\n", tcm_hcd->touch_count, tcm_hcd->noise,
-		tcm_hcd->sensitivity_mode, tcm_hcd->app_info.customer_config_id[2], tcm_hcd->app_info.customer_config_id[3],
+		"tc:%d noise:%d Sensitivity:%d sip:%d game:%d // v:%02X%02X // irq:%d //#%d %d\n",
+		tcm_hcd->touch_count, tcm_hcd->noise, tcm_hcd->sensitivity_mode, tcm_hcd->sip_mode,
+		tcm_hcd->game_mode, tcm_hcd->app_info.customer_config_id[2], tcm_hcd->app_info.customer_config_id[3],
 		gpio_get_value(tcm_hcd->hw_if->bdata->irq_gpio), tcm_hcd->print_info_cnt_open, tcm_hcd->print_info_cnt_release);
 }
 
@@ -2098,6 +2103,9 @@ static int syna_tcm_set_dynamic_config(struct syna_tcm_hcd *tcm_hcd,
 	resp_buf = NULL;
 	resp_buf_size = 0;
 
+	input_info(true, tcm_hcd->pdev->dev.parent,
+			"set dynamic cmd %s  id:%x,  value:%d\n", STR(CMD_SET_DYNAMIC_CONFIG), id, value);
+
 	out_buf[0] = (unsigned char)id;
 	out_buf[1] = (unsigned char)value;
 	out_buf[2] = (unsigned char)(value >> 8);
@@ -2108,6 +2116,43 @@ static int syna_tcm_set_dynamic_config(struct syna_tcm_hcd *tcm_hcd,
 	if (retval < 0) {
 		input_err(true, tcm_hcd->pdev->dev.parent,
 			"Failed to write command %s\n", STR(CMD_SET_DYNAMIC_CONFIG));
+		goto exit;
+	}
+
+	retval = 0;
+
+exit:
+	kfree(resp_buf);
+
+	return retval;
+}
+int syna_tcm_set_scan_start_stop_cmd(struct syna_tcm_hcd *tcm_hcd, unsigned char value)
+{
+	int retval;
+	unsigned char out_buf;
+	unsigned char *resp_buf;
+	unsigned int resp_buf_size;
+	unsigned int resp_length;
+
+	resp_buf = NULL;
+	resp_buf_size = 0;
+	
+	out_buf = 0x11;
+	if (value == 1) {
+		out_buf = 0x11;
+	} else if (value == 0) {
+		out_buf = 0x10;
+	}
+
+	input_err(true, tcm_hcd->pdev->dev.parent,
+			"set start stop cmd B0 %s value:%d\n", STR(CMD_SET_SCAN_START_STOP), out_buf);	
+
+	retval = tcm_hcd->write_message(tcm_hcd, CMD_SET_SCAN_START_STOP,
+				&out_buf, sizeof(out_buf), &resp_buf,
+				&resp_buf_size, &resp_length, NULL, 0);
+	if (retval < 0) {
+		input_err(true, tcm_hcd->pdev->dev.parent,
+			"Failed to write command %s\n", STR(CMD_SET_SCAN_START_STOP));
 		goto exit;
 	}
 
@@ -2511,18 +2556,15 @@ int syna_tcm_lcd_power_ctrl(struct syna_tcm_hcd *tcm_hcd, bool on)
 	int retval;
 	static bool enabled;
 
-	if (enabled == on)
+	if (enabled == on) {
+		input_err(true, tcm_hcd->pdev->dev.parent, "%s: skip: (%d/%d)\n", __func__, enabled, on);
 		return 0;
+	}
 
 	if (on) {
 		retval = regulator_enable(tcm_hcd->regulator_vdd);
 		if (retval) {
 			input_err(true, tcm_hcd->pdev->dev.parent, "%s: Failed to enable regulator_vdd: %d\n", __func__, retval);
-			return retval;
-		}
-		retval = regulator_enable(tcm_hcd->regulator_lcd_reset);
-		if (retval) {
-			input_err(true, tcm_hcd->pdev->dev.parent, "%s: Failed to enable regulator_lcd_reset: %d\n", __func__, retval);
 			return retval;
 		}
 		retval = regulator_enable(tcm_hcd->regulator_lcd_bl_en);
@@ -2532,8 +2574,33 @@ int syna_tcm_lcd_power_ctrl(struct syna_tcm_hcd *tcm_hcd, bool on)
 		}
 	} else {
 		regulator_disable(tcm_hcd->regulator_vdd);
-		regulator_disable(tcm_hcd->regulator_lcd_reset);
 		regulator_disable(tcm_hcd->regulator_lcd_bl_en);
+	}
+
+	enabled = on;
+
+	input_info(true, tcm_hcd->pdev->dev.parent, "%s %d done\n", __func__, on);
+
+	return 0;
+}
+int syna_tcm_lcd_reset_ctrl(struct syna_tcm_hcd *tcm_hcd, bool on)
+{
+	int retval;
+	static bool enabled;
+
+	if (enabled == on) {
+		input_err(true, tcm_hcd->pdev->dev.parent, "%s: skip: (%d/%d)\n", __func__, enabled, on);
+		return 0;
+	}
+
+	if (on) {
+		retval = regulator_enable(tcm_hcd->regulator_lcd_reset);
+		if (retval) {
+			input_err(true, tcm_hcd->pdev->dev.parent, "%s: Failed to enable regulator_lcd_reset: %d\n", __func__, retval);
+			return retval;
+		}
+	} else {
+		regulator_disable(tcm_hcd->regulator_lcd_reset);
 	}
 
 	enabled = on;
@@ -2574,16 +2641,33 @@ static int syna_tcm_early_resume(struct device *dev)
 	int retval = 0;
 	struct syna_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
 
-	if (tcm_hcd->wakeup_gesture_enabled) {
-		retval = tcm_hcd->set_dynamic_config(tcm_hcd, DC_IN_WAKEUP_GESTURE_MODE, 0);
-		if (retval < 0) {
-			input_err(true, tcm_hcd->pdev->dev.parent,
-					"Failed to disable wakeup gesture mode\n");
-			return retval;
-		}
+	input_info(true, tcm_hcd->pdev->dev.parent, "%s start(%d) (%d) (%d)\n",
+				__func__, tcm_hcd->lp_state, tcm_hcd->early_resume_cnt, tcm_hcd->boot_resume);
+
+	if (tcm_hcd->lp_state == PWR_ON && !tcm_hcd->boot_resume) {
+		input_info(true, tcm_hcd->pdev->dev.parent, "%s: abnormal call!\n", __func__);
+		return 0;
 	}
 
-	input_info(true, tcm_hcd->pdev->dev.parent, "%s\n", __func__);
+	tcm_hcd->early_resume_cnt++;
+
+	mutex_lock(&tcm_hcd->mode_change_mutex);
+	if (tcm_hcd->lp_state == LP_MODE){
+		if (tcm_hcd->irq_wake) {
+			disable_irq_wake(tcm_hcd->irq);
+			tcm_hcd->irq_wake = false;
+		}
+		retval = tcm_hcd->enable_irq(tcm_hcd, false, false);
+		if (retval < 0) {
+			input_err(true, tcm_hcd->pdev->dev.parent, "Failed to disable interrupt before \n");
+		}
+
+		syna_tcm_lcd_reset_ctrl(tcm_hcd, false);
+		msleep(10);
+	}
+	mutex_unlock(&tcm_hcd->mode_change_mutex);
+
+	input_info(true, tcm_hcd->pdev->dev.parent, "%s end\n", __func__);
 
 	return retval;
 }
@@ -2592,27 +2676,38 @@ static int syna_tcm_resume(struct device *dev)
 	int retval;
 	struct syna_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
 
-	if (tcm_hcd->lp_state == PWR_ON)
+	input_info(true, tcm_hcd->pdev->dev.parent, "%s start(%d) (%d)\n", __func__, tcm_hcd->lp_state, tcm_hcd->boot_resume);
+
+	if (tcm_hcd->lp_state == PWR_ON && !tcm_hcd->boot_resume) {
+		input_info(true, tcm_hcd->pdev->dev.parent, "%s: abnormal call!\n", __func__);
 		return 0;
+	}
+	if (tcm_hcd->boot_resume)
+		tcm_hcd->boot_resume = false;
+
+	mutex_lock(&tcm_hcd->mode_change_mutex);
 
 	pinctrl_configure(tcm_hcd, true);
 
+	if (tcm_hcd->lp_state == LP_MODE) {
+		msleep(20);
+		input_info(true, tcm_hcd->pdev->dev.parent, "%s: Add 20 ms LP->ON\n", __func__);
+	}
+
 	tcm_hcd->lp_state = PWR_ON;
 
+	tcm_hcd->prox_power_off = 0;
+	tcm_hcd->enable_irq(tcm_hcd, true, NULL);
+
 	if (tcm_hcd->in_hdl_mode) {
-		if (!tcm_hcd->wakeup_gesture_enabled) {
-			tcm_hcd->enable_irq(tcm_hcd, true, NULL);
-			retval = syna_tcm_wait_hdl(tcm_hcd);
-			if (retval < 0) {
-				input_err(true, tcm_hcd->pdev->dev.parent,
-					"Failed to wait for completion of host download\n");
-				goto exit;
-			}
-			goto mod_resume;
+		retval = syna_tcm_wait_hdl(tcm_hcd);
+		if (retval < 0) {
+			input_err(true, tcm_hcd->pdev->dev.parent,
+				"Failed to wait for completion of host download\n");
+			goto exit;
 		}
+		goto mod_resume;
 	} else {
-		if (!tcm_hcd->wakeup_gesture_enabled)
-			tcm_hcd->enable_irq(tcm_hcd, true, NULL);
 
 #ifdef RESET_ON_RESUME
 		msleep(RESET_ON_RESUME_DELAY_MS);
@@ -2643,6 +2738,8 @@ static int syna_tcm_resume(struct device *dev)
 #endif
 
 do_reset:
+	input_info(true, tcm_hcd->pdev->dev.parent, "%s : do_reset\n", __func__);
+
 	retval = tcm_hcd->reset_n_reinit(tcm_hcd, false, true);
 	if (retval < 0) {
 		input_err(true, tcm_hcd->pdev->dev.parent, "Failed to do reset and reinit\n");
@@ -2657,10 +2754,30 @@ do_reset:
 	}
 
 mod_resume:
-	touch_resume(tcm_hcd);
+	input_info(true, tcm_hcd->pdev->dev.parent, "%s : mod_resume\n", __func__);
 
-	if (tcm_hcd->wakeup_gesture_enabled)
+	if (tcm_hcd->ear_detect_enable) {
+		input_info(true, tcm_hcd->pdev->dev.parent, "%s : set ed(%d)\n",
+					__func__, tcm_hcd->ear_detect_enable);
+		retval = tcm_hcd->set_dynamic_config(tcm_hcd, DC_ENABLE_FACE_DETECT, tcm_hcd->ear_detect_enable);
+		if (retval < 0)
+			input_err(true, tcm_hcd->pdev->dev.parent,
+				"Failed to enable ear_detect mode\n");
+	}
+
+#ifdef CONFIG_SEC_FACTORY
+	retval = tcm_hcd->set_dynamic_config(tcm_hcd, DC_ENABLE_EDGE_REJECT, 1);
+	if (retval < 0)
+		input_err(true, tcm_hcd->pdev->dev.parent, "Failed to enable edge reject\n");
+	else
+		input_info(true, tcm_hcd->pdev->dev.parent, "enable edge reject\n");
+#endif
+
+	if (tcm_hcd->wakeup_gesture_enabled || tcm_hcd->ear_detect_enable)
 		syna_tcm_lcd_power_ctrl(tcm_hcd, false);
+	if(tcm_hcd->ear_detect_enable)
+		syna_tcm_lcd_reset_ctrl(tcm_hcd, false);
+
 
 #ifdef WATCHDOG_SW
 	tcm_hcd->update_watchdog(tcm_hcd, true);
@@ -2675,28 +2792,158 @@ mod_resume:
 	tcm_hcd->prox_power_off = 0;
 	retval = 0;
 
-	input_info(true, tcm_hcd->pdev->dev.parent, "%s done\n", __func__);
+	input_info(true, tcm_hcd->pdev->dev.parent, "%s end\n", __func__);
 
 exit:
+	tcm_hcd->early_resume_cnt = 0;
+	tcm_hcd->prox_lp_scan_cnt = 0;
+	mutex_unlock(&tcm_hcd->mode_change_mutex);
+
 	return retval;
+}
+
+
+static int syna_tcm_early_suspend(struct device *dev)
+{
+	int retval;
+	struct syna_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
+
+	input_info(true, tcm_hcd->pdev->dev.parent, "%s start(%d)\n", __func__, tcm_hcd->lp_state);
+
+	if (tcm_hcd->lp_state != PWR_ON) {
+		input_info(true, tcm_hcd->pdev->dev.parent, "%s: abnormal call!\n", __func__);
+		return 0;
+	}
+
+	mutex_lock(&tcm_hcd->mode_change_mutex);
+
+#ifdef WATCHDOG_SW
+	tcm_hcd->update_watchdog(tcm_hcd, false);
+#endif
+	if (tcm_hcd->aot_enable && tcm_hcd->prox_power_off)
+		tcm_hcd->wakeup_gesture_enabled = 0;
+
+	if (tcm_hcd->wakeup_gesture_enabled || tcm_hcd->lcdoff_test) {
+		input_info(true, tcm_hcd->pdev->dev.parent, "Enter lp mode(aot)\n");
+		syna_tcm_lcd_power_ctrl(tcm_hcd, true);
+		syna_tcm_lcd_reset_ctrl(tcm_hcd, true);
+
+	} else if (tcm_hcd->ear_detect_enable) {
+		input_info(true, tcm_hcd->pdev->dev.parent, "Enter lp mode(ed)\n");
+		syna_tcm_lcd_power_ctrl(tcm_hcd, true);
+		syna_tcm_lcd_reset_ctrl(tcm_hcd, true);
+
+	} else {
+		retval = tcm_hcd->enable_irq(tcm_hcd, false, false);
+		if (retval < 0) {
+			input_err(true, tcm_hcd->pdev->dev.parent, "Failed to disable interrupt before \n");
+		}
+		pinctrl_configure(tcm_hcd, false);
+	}
+
+	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode) || tcm_hcd->app_status != APP_STATUS_OK) {
+		input_info(true, tcm_hcd->pdev->dev.parent,
+				"Identifying mode = 0x%02x\n", tcm_hcd->id_info.mode);
+		mutex_unlock(&tcm_hcd->mode_change_mutex);
+		return 0;
+	}
+
+#ifdef USE_FLASH
+	if (!tcm_hcd->wakeup_gesture_enabled || tcm_hcd->lcdoff_test) {
+		retval = tcm_hcd->sleep(tcm_hcd, true);
+		if (retval < 0) {
+			input_err(true, tcm_hcd->pdev->dev.parent, "Failed to enter deep sleep\n");
+			mutex_unlock(&tcm_hcd->mode_change_mutex);
+			return retval;
+		}
+	}
+#endif
+
+	cancel_delayed_work(&tcm_hcd->work_print_info);
+	sec_ts_print_info(tcm_hcd);
+
+	touch_free_objects();
+	mutex_unlock(&tcm_hcd->mode_change_mutex);
+
+	input_info(true, tcm_hcd->pdev->dev.parent, "%s done\n", __func__);
+
+	return 0;
 }
 
 static int syna_tcm_suspend(struct device *dev)
 {
 	struct syna_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
+	int retval;
 
-	if (tcm_hcd->lp_state == PWR_OFF)
+	input_info(true, tcm_hcd->pdev->dev.parent, "%s start(%d) aot(%d/%d) ed(%d)\n",
+				__func__, tcm_hcd->lp_state, tcm_hcd->aot_enable, tcm_hcd->wakeup_gesture_enabled,
+				tcm_hcd->ear_detect_enable);
+
+	if (tcm_hcd->lp_state != PWR_ON) {
+		input_info(true, tcm_hcd->pdev->dev.parent, "%s: abnormal call!\n", __func__);
 		return 0;
+	}
 
-	touch_suspend(tcm_hcd);
+	mutex_lock(&tcm_hcd->mode_change_mutex);
 
-	if (tcm_hcd->wakeup_gesture_enabled) {
+	if (tcm_hcd->wakeup_gesture_enabled || tcm_hcd->lcdoff_test) {
+		input_info(true, tcm_hcd->pdev->dev.parent, "Enter lp mode(aot)\n");
 		tcm_hcd->lp_state = LP_MODE;
-		tcm_hcd->enable_irq(tcm_hcd, true, NULL);
+
+		if (!tcm_hcd->irq_wake) {
+			enable_irq_wake(tcm_hcd->irq);
+			tcm_hcd->irq_wake = true;
+		}
+
+		if (tcm_hcd->ear_detect_enable) {
+			input_info(true, tcm_hcd->pdev->dev.parent, "%s: ed off before aot set\n", __func__);
+			retval = tcm_hcd->set_dynamic_config(tcm_hcd, DC_ENABLE_FACE_DETECT, 0);
+			if (retval < 0) {
+				input_err(true, tcm_hcd->pdev->dev.parent,
+						"%s: Failed to enable ear detect mode\n", __func__);
+			}
+		}
+
+		retval = tcm_hcd->set_dynamic_config(tcm_hcd, DC_IN_WAKEUP_GESTURE_MODE, 1);
+		if (retval < 0) {
+			input_err(true, tcm_hcd->pdev->dev.parent,
+					"Failed to enable wakeup gesture mode\n");
+			touch_free_objects();
+			mutex_unlock(&tcm_hcd->mode_change_mutex);
+			return retval;
+		}
+
+	} else if (tcm_hcd->ear_detect_enable) {
+		input_info(true, tcm_hcd->pdev->dev.parent, "Enter lp mode(ed)\n");
+		tcm_hcd->lp_state = LP_MODE;
+
+		if (!tcm_hcd->irq_wake) {
+			enable_irq_wake(tcm_hcd->irq);
+			tcm_hcd->irq_wake = true;
+		}
+
 	} else {
+		retval = tcm_hcd->enable_irq(tcm_hcd, false, false);
+		if (retval < 0) {
+			input_err(true, tcm_hcd->pdev->dev.parent, "Failed to disable interrupt before \n");
+		}
+		input_info(true, tcm_hcd->pdev->dev.parent, "Enter power off\n");
 		tcm_hcd->lp_state = PWR_OFF;
 		pinctrl_configure(tcm_hcd, false);
 	}
+
+	touch_free_objects();
+
+	if(tcm_hcd->prox_lp_scan_cnt > 0) {
+		input_info(true, tcm_hcd->pdev->dev.parent, "%s: scan start!\n", __func__);
+		retval = syna_tcm_set_scan_start_stop_cmd(tcm_hcd, 1);
+		if (retval < 0) {
+			input_err(true, tcm_hcd->pdev->dev.parent,
+				"Failed to write command %s\n", STR(CMD_SET_SCAN_START_STOP));
+		}
+	}
+
+	mutex_unlock(&tcm_hcd->mode_change_mutex);
 
 	input_info(true, tcm_hcd->pdev->dev.parent, "%s done\n", __func__);
 
@@ -2721,55 +2968,6 @@ static int syna_tcm_pm_resume(struct device *dev)
 	return 0;
 }
 
-#endif
-
-#ifdef CONFIG_FB
-static int syna_tcm_early_suspend(struct device *dev)
-{
-#ifdef USE_FLASH
-	int retval;
-#endif
-	struct syna_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
-
-	if (tcm_hcd->lp_state == PWR_OFF)
-		return 0;
-
-#ifdef WATCHDOG_SW
-	tcm_hcd->update_watchdog(tcm_hcd, false);
-#endif
-	if (tcm_hcd->aot_enable && tcm_hcd->prox_power_off)
-		tcm_hcd->wakeup_gesture_enabled = 0;
-
-	if (!tcm_hcd->wakeup_gesture_enabled)
-		tcm_hcd->enable_irq(tcm_hcd, false, false);
-	else
-		syna_tcm_lcd_power_ctrl(tcm_hcd, true);
-
-	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode) || tcm_hcd->app_status != APP_STATUS_OK) {
-		input_info(true, tcm_hcd->pdev->dev.parent,
-				"Identifying mode = 0x%02x\n", tcm_hcd->id_info.mode);
-		return 0;
-	}
-
-#ifdef USE_FLASH
-	if (!tcm_hcd->wakeup_gesture_enabled) {
-		retval = tcm_hcd->sleep(tcm_hcd, true);
-		if (retval < 0) {
-			input_err(true, tcm_hcd->pdev->dev.parent, "Failed to enter deep sleep\n");
-			return retval;
-		}
-	}
-#endif
-
-	cancel_delayed_work(&tcm_hcd->work_print_info);
-	sec_ts_print_info(tcm_hcd);
-
-	touch_early_suspend(tcm_hcd);
-
-	input_info(true, tcm_hcd->pdev->dev.parent, "%s done\n", __func__);
-
-	return 0;
-}
 
 static int syna_tcm_fb_notifier_cb(struct notifier_block *nb,
 		unsigned long action, void *data)
@@ -2990,6 +3188,8 @@ static int syna_tcm_probe(struct platform_device *pdev)
 	tcm_hcd->rd_chunk_size = RD_CHUNK_SIZE;
 	tcm_hcd->wr_chunk_size = WR_CHUNK_SIZE;
 	tcm_hcd->is_detected = false;
+	tcm_hcd->lp_state = PWR_ON;
+	tcm_hcd->boot_resume = true;
 /*	tcm_hcd->wakeup_gesture_enabled = WAKEUP_GESTURE; */
 
 #ifdef PREDICTIVE_READING
@@ -3015,6 +3215,7 @@ static int syna_tcm_probe(struct platform_device *pdev)
 	mutex_init(&tcm_hcd->rw_ctrl_mutex);
 	mutex_init(&tcm_hcd->command_mutex);
 	mutex_init(&tcm_hcd->identify_mutex);
+	mutex_init(&tcm_hcd->mode_change_mutex);
 
 	INIT_BUFFER(tcm_hcd->in, false);
 	INIT_BUFFER(tcm_hcd->out, false);

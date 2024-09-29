@@ -59,7 +59,7 @@ struct sec_debug_ksyms {
 	uint64_t relative_base;
 	uint64_t offsets_pa;
 	uint64_t kimage_voffset;
-	uint64_t reserved[3];
+	uint64_t reserved[4];
 };
 
 /* kcnst has some kernel constant (offset) data for bootloader */
@@ -98,7 +98,10 @@ struct sec_debug_kcnst {
 
 	uint64_t pa_text;
 	uint64_t pa_start_rodata;
-	uint64_t reserved[4];
+
+	uint64_t target_dprm_mask;
+
+	uint64_t reserved[3];
 };
 
 struct member_type {
@@ -284,18 +287,18 @@ struct sec_debug_memtab {
 /* TODO: sdn needs extra info data structure to define it normally, but ... */
 /* SEC DEBUG EXTRA INFO */
 enum shared_buffer_slot {
-        SLOT_32,
-        SLOT_64,
-        SLOT_256,
-        SLOT_1024,
-        SLOT_MAIN_END = SLOT_1024,
-        NR_MAIN_SLOT = 4,
-        SLOT_BK_32 = NR_MAIN_SLOT,
-        SLOT_BK_64,
-        SLOT_BK_256,
-        SLOT_BK_1024,
-        SLOT_END = SLOT_BK_1024,
-        NR_SLOT = 8,
+		SLOT_32,
+		SLOT_64,
+		SLOT_256,
+		SLOT_1024,
+		SLOT_MAIN_END = SLOT_1024,
+		NR_MAIN_SLOT = 4,
+		SLOT_BK_32 = NR_MAIN_SLOT,
+		SLOT_BK_64,
+		SLOT_BK_256,
+		SLOT_BK_1024,
+		SLOT_END = SLOT_BK_1024,
+		NR_SLOT = 8,
 };
 
 struct sec_debug_sb_index {
@@ -386,6 +389,7 @@ enum sec_debug_reset_reason_t {
 };
 
 extern void *secdbg_base_get_debug_base(int type);
+extern void *secdbg_base_get_kcnst_base(void);
 extern unsigned long secdbg_base_get_buf_base(int type);
 extern unsigned long secdbg_base_get_buf_size(int type);
 

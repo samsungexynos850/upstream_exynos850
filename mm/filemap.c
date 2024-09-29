@@ -40,6 +40,10 @@
 #include <linux/psi.h>
 #include "internal.h"
 
+#ifdef CONFIG_PAGE_BOOST_RECORDING
+#include <linux/io_record.h>
+#endif
+
 #ifdef CONFIG_SDP
 #include <sdp/cache_cleanup.h>
 #endif
@@ -47,11 +51,6 @@
 #ifdef CONFIG_FSCRYPT_SDP
 #include <linux/fscrypto_sdp_cache.h>
 #endif
-
-#ifdef CONFIG_PAGE_BOOST_RECORDING
-#include <linux/io_record.h>
-#endif
-
 #define CREATE_TRACE_POINTS
 #include <trace/events/filemap.h>
 #include <trace/systrace_mark.h>
@@ -2437,6 +2436,7 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 #endif
 
 	retval = generic_file_buffered_read(iocb, iter, retval);
+
 #ifdef CONFIG_FSCRYPT_SDP
 	fscrypt_sdp_unset_file_io_ongoing(iocb->ki_filp);
 #endif
@@ -3099,6 +3099,9 @@ inline ssize_t generic_write_checks(struct kiocb *iocb, struct iov_iter *from)
 	struct inode *inode = file->f_mapping->host;
 	unsigned long limit = rlimit(RLIMIT_FSIZE);
 	loff_t pos;
+
+	if (IS_SWAPFILE(inode))
+		return -ETXTBSY;
 
 	if (!iov_iter_count(from))
 		return 0;

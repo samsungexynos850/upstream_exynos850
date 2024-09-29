@@ -315,7 +315,7 @@ static int32_t nvt_fw_version_open(struct inode *inode, struct file *file)
 		return -ERESTARTSYS;
 	}
 
-	input_info(true, &ts->client->dev,"%s  ++\n",__func__);
+	input_info(true, &ts->client->dev, "%s  ++\n", __func__);
 
 #if NVT_TOUCH_ESD_PROTECT
 	nvt_esd_check_enable(false);
@@ -328,7 +328,7 @@ static int32_t nvt_fw_version_open(struct inode *inode, struct file *file)
 
 	mutex_unlock(&ts->lock);
 
-	input_info(true, &ts->client->dev,"%s  --\n",__func__);
+	input_info(true, &ts->client->dev, "%s  --\n", __func__);
 
 	return seq_open(file, &nvt_fw_version_seq_ops);
 }
@@ -354,7 +354,7 @@ static int32_t nvt_baseline_open(struct inode *inode, struct file *file)
 		return -ERESTARTSYS;
 	}
 
-	input_info(true, &ts->client->dev,"%s  ++\n",__func__);
+	input_info(true, &ts->client->dev, "%s  ++\n", __func__);
 
 #if NVT_TOUCH_ESD_PROTECT
 	nvt_esd_check_enable(false);
@@ -383,7 +383,7 @@ static int32_t nvt_baseline_open(struct inode *inode, struct file *file)
 
 	mutex_unlock(&ts->lock);
 
-	input_info(true, &ts->client->dev,"%s  --\n",__func__);
+	input_info(true, &ts->client->dev, "%s  --\n", __func__);
 
 	return seq_open(file, &nvt_seq_ops);
 }
@@ -409,7 +409,7 @@ static int32_t nvt_raw_open(struct inode *inode, struct file *file)
 		return -ERESTARTSYS;
 	}
 
-	input_info(true, &ts->client->dev,"%s  ++\n",__func__);
+	input_info(true, &ts->client->dev, "%s  ++\n", __func__);
 
 #if NVT_TOUCH_ESD_PROTECT
 	nvt_esd_check_enable(false);
@@ -441,7 +441,7 @@ static int32_t nvt_raw_open(struct inode *inode, struct file *file)
 
 	mutex_unlock(&ts->lock);
 
-	input_info(true, &ts->client->dev,"%s  --\n",__func__);
+	input_info(true, &ts->client->dev, "%s  --\n", __func__);
 
 	return seq_open(file, &nvt_seq_ops);
 }
@@ -467,7 +467,7 @@ static int32_t nvt_diff_open(struct inode *inode, struct file *file)
 		return -ERESTARTSYS;
 	}
 
-	input_info(true, &ts->client->dev,"%s  ++\n",__func__);
+	input_info(true, &ts->client->dev, "%s  ++\n", __func__);
 
 #if NVT_TOUCH_ESD_PROTECT
 	nvt_esd_check_enable(false);
@@ -499,7 +499,7 @@ static int32_t nvt_diff_open(struct inode *inode, struct file *file)
 
 	mutex_unlock(&ts->lock);
 
-	input_info(true, &ts->client->dev,"%s  --\n",__func__);
+	input_info(true, &ts->client->dev, "%s  --\n", __func__);
 
 	return seq_open(file, &nvt_seq_ops);
 }
@@ -524,7 +524,7 @@ int32_t nvt_extra_proc_init(void)
 {
 	NVT_proc_fw_version_entry = proc_create(NVT_FW_VERSION, 0444, NULL,&nvt_fw_version_fops);
 	if (NVT_proc_fw_version_entry == NULL) {
-		input_err(true, &ts->client->dev,"%s : create proc/%s Failed!\n", __func__, NVT_FW_VERSION);
+		input_err(true, &ts->client->dev, "%s : create proc/%s Failed!\n", __func__, NVT_FW_VERSION);
 		return -ENOMEM;
 	} else {
 		input_info(true, &ts->client->dev, "%s: create proc/%s Succeeded!\n", __func__, NVT_FW_VERSION);
@@ -532,7 +532,7 @@ int32_t nvt_extra_proc_init(void)
 
 	NVT_proc_baseline_entry = proc_create(NVT_BASELINE, 0444, NULL,&nvt_baseline_fops);
 	if (NVT_proc_baseline_entry == NULL) {
-		input_err(true, &ts->client->dev,"%s : create proc/%s Failed!\n", __func__, NVT_BASELINE);
+		input_err(true, &ts->client->dev, "%s : create proc/%s Failed!\n", __func__, NVT_BASELINE);
 		return -ENOMEM;
 	} else {
 		input_info(true, &ts->client->dev, "%s: create proc/%s Succeeded!\n", __func__, NVT_BASELINE);
@@ -540,7 +540,7 @@ int32_t nvt_extra_proc_init(void)
 
 	NVT_proc_raw_entry = proc_create(NVT_RAW, 0444, NULL,&nvt_raw_fops);
 	if (NVT_proc_raw_entry == NULL) {
-		input_err(true, &ts->client->dev,"%s : create proc/%s Failed!\n", __func__, NVT_RAW);
+		input_err(true, &ts->client->dev, "%s : create proc/%s Failed!\n", __func__, NVT_RAW);
 		return -ENOMEM;
 	} else {
 		input_info(true, &ts->client->dev, "%s: create proc/%s Succeeded!\n", __func__, NVT_RAW);
@@ -548,7 +548,7 @@ int32_t nvt_extra_proc_init(void)
 
 	NVT_proc_diff_entry = proc_create(NVT_DIFF, 0444, NULL,&nvt_diff_fops);
 	if (NVT_proc_diff_entry == NULL) {
-		input_err(true, &ts->client->dev,"%s : create proc/%s Failed!\n", __func__, NVT_DIFF);
+		input_err(true, &ts->client->dev, "%s : create proc/%s Failed!\n", __func__, NVT_DIFF);
 		return -ENOMEM;
 	} else {
 		input_info(true, &ts->client->dev, "%s: create proc/%s Succeeded!\n", __func__, NVT_DIFF);

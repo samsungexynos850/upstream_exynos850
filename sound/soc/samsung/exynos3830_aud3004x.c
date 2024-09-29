@@ -47,6 +47,7 @@
 #define CLK_SRC_DAI 0
 #define CLK_SRC_CODEC 1
 
+#define AW8896_DAI_ID			0x8896
 #define MADERA_DAI_ID			0x4793
 #define CS35L41_DAI_ID			0x3541
 #define ABOX_BE_DAI_ID(c, i)		(0xbe00 | (c) << 4 | (i))
@@ -75,8 +76,10 @@ static unsigned int baserate = MADERA_BASECLK_48K;
 enum FLL_ID { FLL1, FLL2, FLL3, FLLAO };
 enum CLK_ID { SYSCLK, ASYNCCLK, DSPCLK, OPCLK, OUTCLK };
 
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 /* Used for debugging and test automation */
 static u32 voice_trigger_count;
+#endif
 
 /* Debugfs value overrides, default to 0 */
 static unsigned int forced_mclk1;
@@ -291,7 +294,7 @@ static int madera_set_clock(struct snd_soc_card *card,
 	dev_dbg(card->dev, "Setting %s freq to %u Hz\n", config->name, freq);
 
 	ret = snd_soc_component_set_sysclk(codec, config->id,
-				       config->source, freq, dir);
+						config->source, freq, dir);
 	if (ret)
 		dev_err(card->dev, "Failed to set %s to %u Hz\n",
 			config->name, freq);
@@ -354,7 +357,7 @@ static const struct snd_soc_ops wdma_ops = {
 };
 
 static int madera_hw_params(struct snd_pcm_substream *substream,
-			       struct snd_pcm_hw_params *params)
+					struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_card *card = rtd->card;
@@ -386,7 +389,7 @@ static const struct snd_soc_ops uaif0_ops = {
 };
 
 static int cs35l41_hw_params(struct snd_pcm_substream *substream,
-			       struct snd_pcm_hw_params *params)
+					struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_card *card = rtd->card;
@@ -486,8 +489,8 @@ static int madera_set_bias_level(struct snd_soc_card *card,
 }
 
 static int madera_set_bias_level_post(struct snd_soc_card *card,
-					 struct snd_soc_dapm_context *dapm,
-					 enum snd_soc_bias_level level)
+					struct snd_soc_dapm_context *dapm,
+					enum snd_soc_bias_level level)
 {
 	struct snd_soc_dai *codec_dai;
 	struct madera_drvdata *drvdata = card->drvdata;
@@ -536,7 +539,7 @@ static int madera_set_bias_level_post(struct snd_soc_card *card,
 
 #if IS_ENABLED(CONFIG_SND_SOC_MADERA)
 static int madera_notify(struct notifier_block *nb,
-				   unsigned long event, void *data)
+				unsigned long event, void *data)
 {
 	const struct madera_hpdet_notify_data *hp_inf;
 	const struct madera_micdet_notify_data *md_inf;
@@ -574,13 +577,13 @@ static int madera_notify(struct notifier_block *nb,
 }
 #else
 static int madera_notify(struct notifier_block *nb,
-				   unsigned long event, void *data)
+				unsigned long event, void *data)
 {
 	return 0;
 }
 
 static int madera_register_notifier(struct snd_soc_component *component,
-                                           struct notifier_block *nb)
+					struct notifier_block *nb)
 {
 	return 0;
 }
@@ -627,7 +630,7 @@ static void madera_init_debugfs(struct snd_soc_card *card)
 	debugfs_create_u32("forced_dspclk", 0664, root, &forced_dspclk);
 
 	debugfs_create_file("force_fll1_enable", 0664, root, card,
-			    &madera_force_fll1_enable_fops);
+				&madera_force_fll1_enable_fops);
 }
 #else
 static void madera_init_debugfs(struct snd_soc_card *card)
@@ -661,14 +664,14 @@ static int madera_amp_late_probe(struct snd_soc_card *card, int dai)
 		dev_err(card->dev, "Failed to set TDM: %d\n", ret);
 
 	ret = snd_soc_component_set_sysclk(amp, 0, 0, drvdata->opclk.rate,
-				       SND_SOC_CLOCK_IN);
+					SND_SOC_CLOCK_IN);
 	if (ret != 0) {
 		dev_err(card->dev, "Failed to set amp SYSCLK: %d\n", ret);
 		return ret;
 	}
 
 	ret = snd_soc_dai_set_sysclk(amp_dai, 0, MADERA_AMP_BCLK,
-				     SND_SOC_CLOCK_IN);
+						SND_SOC_CLOCK_IN);
 	if (ret != 0) {
 		dev_err(card->dev, "Failed to set amp DAI clock: %d\n", ret);
 		return ret;
@@ -761,6 +764,18 @@ static int exynos3830_late_probe(struct snd_soc_card *card)
 
 		drvdata->nb.notifier_call = madera_notify;
 		madera_register_notifier(codec, &drvdata->nb);
+	}
+
+	if (IS_ENABLED(CONFIG_SND_SMARTPA_AW8896)) {
+		struct snd_soc_component *amp;
+		aif_dai = get_rtd(card, AW8896_DAI_ID)->codec_dai;
+
+		amp = aif_dai->component;
+
+		dapm = snd_soc_component_get_dapm(amp);
+		snd_soc_dapm_ignore_suspend(dapm, "Speaker_Playback");
+		snd_soc_dapm_ignore_suspend(dapm, "SPK");
+		snd_soc_dapm_sync(dapm);
 	}
 
 	list_for_each_entry(link, &card->dai_link_list, list) {
@@ -1192,6 +1207,9 @@ static struct snd_soc_dai_link exynos3830_dai[100] = {
 		.ops = &uaif_ops,
 		.dpcm_playback = 1,
 		.dpcm_capture = 1,
+#if IS_ENABLED(CONFIG_SND_SMARTPA_AW8896)
+		.id = AW8896_DAI_ID,
+#endif
 	},
 	{
 		.name = "UAIF2",
@@ -1763,7 +1781,7 @@ static int read_clk_conf(struct device_node *np,
 }
 
 static int read_platform(struct device_node *np, const char * const prop,
-			      struct device_node **dai)
+						struct device_node **dai)
 {
 	int ret = 0;
 
@@ -1874,41 +1892,41 @@ static int exynos3830_audio_probe(struct platform_device *pdev)
 	}
 
 	ret = read_clk_conf(np, "cirrus,sysclk",
-				      &drvdata->sysclk, false);
+						&drvdata->sysclk, false);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse sysclk: %d\n", ret);
 	ret = read_clk_conf(np, "cirrus,asyncclk",
-				      &drvdata->asyncclk, false);
+						&drvdata->asyncclk, false);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse asyncclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,dspclk",
-				      &drvdata->dspclk, false);
+						&drvdata->dspclk, false);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse dspclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,opclk",
-				      &drvdata->opclk, false);
+						&drvdata->opclk, false);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse opclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,fll1-refclk",
-				      &drvdata->fll1_refclk, true);
+						&drvdata->fll1_refclk, true);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse fll1-refclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,fll2-refclk",
-				      &drvdata->fll2_refclk, true);
+						&drvdata->fll2_refclk, true);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse fll2-refclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,fllao-refclk",
-				      &drvdata->fllao_refclk, true);
+						&drvdata->fllao_refclk, true);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse fllao-refclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,outclk",
-				      &drvdata->outclk, false);
+						&drvdata->outclk, false);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse outclk: %d\n", ret);
 

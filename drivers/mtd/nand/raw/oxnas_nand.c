@@ -123,7 +123,7 @@ static int oxnas_nand_probe(struct platform_device *pdev)
 				    GFP_KERNEL);
 		if (!chip) {
 			err = -ENOMEM;
-			goto err_release_child;
+			goto err_clk_unprepare;
 		}
 
 		chip->controller = &oxnas->base;
@@ -142,13 +142,15 @@ static int oxnas_nand_probe(struct platform_device *pdev)
 		chip->chip_delay = 30;
 
 		/* Scan to find existence of the device */
-		err = nand_scan(chip, 1);
+		err = nand_scan(mtd, 1);
 		if (err)
-			goto err_release_child;
+			goto err_clk_unprepare;
 
 		err = mtd_device_register(mtd, NULL, 0);
-		if (err)
-			goto err_cleanup_nand;
+		if (err) {
+			nand_release(mtd);
+			goto err_clk_unprepare;
+		}
 
 		oxnas->chips[nchips] = chip;
 		++nchips;
@@ -164,10 +166,6 @@ static int oxnas_nand_probe(struct platform_device *pdev)
 
 	return 0;
 
-err_cleanup_nand:
-	nand_cleanup(chip);
-err_release_child:
-	of_node_put(nand_np);
 err_clk_unprepare:
 	clk_disable_unprepare(oxnas->clk);
 	return err;
@@ -178,7 +176,7 @@ static int oxnas_nand_remove(struct platform_device *pdev)
 	struct oxnas_nand_ctrl *oxnas = platform_get_drvdata(pdev);
 
 	if (oxnas->chips[0])
-		nand_release(oxnas->chips[0]);
+		nand_release(nand_to_mtd(oxnas->chips[0]));
 
 	clk_disable_unprepare(oxnas->clk);
 

@@ -459,7 +459,7 @@ static int find_group_orlov(struct super_block *sb, struct inode *parent,
 		if (qstr) {
 			hinfo.hash_version = DX_HASH_HALF_MD4;
 			hinfo.seed = sbi->s_hash_seed;
-			ext4fs_dirhash(qstr->name, qstr->len, &hinfo);
+			ext4fs_dirhash(parent, qstr->name, qstr->len, &hinfo);
 			grp = hinfo.hash;
 		} else
 			grp = prandom_u32();
@@ -666,7 +666,7 @@ static int find_group_other(struct super_block *sb, struct inode *parent,
  * block has been written back to disk.  (Yes, these values are
  * somewhat arbitrary...)
  */
-#define RECENTCY_MIN	60
+#define RECENTCY_MIN	5
 #define RECENTCY_DIRTY	300
 
 static int recently_deleted(struct super_block *sb, ext4_group_t group, int ino)
@@ -734,28 +734,6 @@ next:
 }
 
 /*
- * ext4_has_free_inodes()
- * @sbi: in-core super block structure.
- *
- * Check if filesystem has inodes available for allocation.
- * On success return 1, return 0 on failure.
- */
-static inline int ext4_has_free_inodes(struct ext4_sb_info *sbi)
-{
-	if (likely(percpu_counter_read_positive(&sbi->s_freeinodes_counter) >
-				sbi->s_r_inodes_count))
-		return 1;
-
-	/* Hm, nope.  Are (enough) root reserved inodes available? */
-	if (uid_eq(sbi->s_resuid, current_fsuid()) ||
-			(!gid_eq(sbi->s_resgid, GLOBAL_ROOT_GID) &&
-			 in_group_p(sbi->s_resgid)) ||
-			capable(CAP_SYS_RESOURCE))
-		return 1;
-	return 0;
-}
-
-/*
  * There are two policies for allocating an inode.  If the new inode is
  * a directory, then a forward search is made for a block group with both
  * free space and a low directory-to-inode ratio; if that fails, then of
@@ -797,7 +775,7 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
 	if (unlikely(ext4_forced_shutdown(sbi)))
 		return ERR_PTR(-EIO);
 
-	if ((ext4_encrypted_inode(dir) || DUMMY_ENCRYPTION_ENABLED(sbi)) &&
+	if ((IS_ENCRYPTED(dir) || DUMMY_ENCRYPTION_ENABLED(sbi)) &&
 	    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)) &&
 	    !(i_flags & EXT4_EA_INODE_FL)) {
 		err = fscrypt_get_encryption_info(dir);
@@ -882,11 +860,6 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
 	err = dquot_initialize(inode);
 	if (err)
 		goto out;
-
-	if (!ext4_has_free_inodes(sbi)) {
-		err = -ENOSPC;
-		goto out;
-	}
 
 	if (!goal)
 		goal = sbi->s_inode_goal;
@@ -1225,11 +1198,6 @@ fail_drop:
 	clear_nlink(inode);
 	unlock_new_inode(inode);
 out:
-	if (err == -ENOSPC) {
-		printk_ratelimited(KERN_INFO "Return ENOSPC: ifree=%d, inodes=%u\n",
-			(int) percpu_counter_read_positive(&sbi->s_freeinodes_counter),
-			le32_to_cpu(sbi->s_es->s_inodes_count));
-	}
 	dquot_drop(inode);
 	inode->i_flags |= S_NOQUOTA;
 	iput(inode);

@@ -143,9 +143,9 @@ static int gpu_set_dvfs_using_calapi(struct exynos_context *platform, int clk)
 		return ret;
 	}
 
-#ifdef CONFIG_DEBUG_SNAPSHOT_FREQ
+#ifdef CONFIG_DEBUG_SNAPSHOT
 	if (platform->gpu_dss_freq_id)
-#ifdef CONFIG_SOC_EXYNOS9820
+#ifdef CONFIG_SOC_EXYNOS3830
 		dbg_snapshot_freq_misc(platform->gpu_dss_freq_id, platform->cur_clock, clk, DSS_FLAG_IN);
 #else
 		dbg_snapshot_freq(platform->gpu_dss_freq_id, platform->cur_clock, clk, DSS_FLAG_IN);
@@ -154,9 +154,9 @@ static int gpu_set_dvfs_using_calapi(struct exynos_context *platform, int clk)
 
 	cal_dfs_set_rate(platform->g3d_cmu_cal_id, clk);
 
-#ifdef CONFIG_DEBUG_SNAPSHOT_FREQ
+#ifdef CONFIG_DEBUG_SNAPSHOT
 	if (platform->gpu_dss_freq_id)
-#ifdef CONFIG_SOC_EXYNOS9820
+#ifdef CONFIG_SOC_EXYNOS3830
 		dbg_snapshot_freq_misc(platform->gpu_dss_freq_id, platform->cur_clock, clk, DSS_FLAG_OUT);
 #else
 		dbg_snapshot_freq(platform->gpu_dss_freq_id, platform->cur_clock, clk, DSS_FLAG_OUT);

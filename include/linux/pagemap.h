@@ -539,7 +539,7 @@ static inline int lock_page_or_retry(struct page *page, struct mm_struct *mm,
 extern void wait_on_page_bit(struct page *page, int bit_nr);
 extern int wait_on_page_bit_killable(struct page *page, int bit_nr);
 
-/*
+/* 
  * Wait for a page to be unlocked.
  *
  * This must be called with the caller "holding" the page,
@@ -559,7 +559,7 @@ static inline int wait_on_page_locked_killable(struct page *page)
 	return wait_on_page_bit_killable(compound_head(page), PG_locked);
 }
 
-/*
+/* 
  * Wait for a page to complete writeback
  */
 static inline void wait_on_page_writeback(struct page *page)

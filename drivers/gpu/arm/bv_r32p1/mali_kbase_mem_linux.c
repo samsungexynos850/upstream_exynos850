@@ -1727,11 +1727,7 @@ unwind_dma_map:
         * in the future.
         */
 	while (i--) {
-		dma_addr_t dma_addr;
-		dma_unmap_page(kctx->kbdev->dev,
-				user_buf->dma_addrs[i],
-				PAGE_SIZE, DMA_BIDIRECTIONAL);
-        dma_addr = user_buf->dma_addrs[i];
+        dma_addr_t dma_addr = user_buf->dma_addrs[i];
                dma_sync_single_for_device(dev, dma_addr, PAGE_SIZE, DMA_BIDIRECTIONAL);
         #if (KERNEL_VERSION(4, 10, 0) > LINUX_VERSION_CODE)
                dma_unmap_page_attrs(dev, dma_addr, PAGE_SIZE, DMA_BIDIRECTIONAL);
@@ -1758,7 +1754,6 @@ no_alloc_obj:
 no_region:
 bad_size:
 	return NULL;
-
 }
 
 

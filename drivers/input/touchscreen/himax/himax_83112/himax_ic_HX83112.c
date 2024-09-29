@@ -92,11 +92,6 @@ static bool hx83112_sense_off(bool check_en)
 	uint8_t tmp_data[DATA_LEN_4];
 
 	do {
-		if (atomic_read(&g_ts->suspend_mode) == HIMAX_STATE_POWER_OFF) {
-				input_info(true, g_ts->dev,
-					"%s %s,It had power-off-suspended!\n", HIMAX_LOG_TAG, __func__);
-				break;
-		}
 		if (cnt == 0 || (tmp_data[0] != 0xA5
 			&& tmp_data[0] != 0x00 && tmp_data[0] != 0x87)) {
 			g_core_fp.fp_register_write(pfw_op->addr_ctrl_fw_isr,
@@ -122,11 +117,6 @@ static bool hx83112_sense_off(bool check_en)
 	cnt = 0;
 
 	do {
-		if (atomic_read(&g_ts->suspend_mode) == HIMAX_STATE_POWER_OFF) {
-			input_info(true, g_ts->dev,
-				"%s %s,It had power-off-suspended!\n", HIMAX_LOG_TAG, __func__);
-			break;
-		}
 		/*===========================================
 		I2C_password[7:0] set Enter safe mode : 0x31 ==> 0x27
 		===========================================*/

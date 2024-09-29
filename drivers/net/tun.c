@@ -85,6 +85,7 @@
 #define META_MARK_BASE_UPPER 500
 
 // SEC_PRODUCT_FEATURE_KNOX_SUPPORT_VPN }
+
 #include <linux/bpf.h>
 #include <linux/bpf_trace.h>
 #include <linux/mutex.h>
@@ -1909,11 +1910,8 @@ drop:
 		skb->dev = tun->dev;
 		break;
 	case IFF_TAP:
-		if (frags && !pskb_may_pull(skb, ETH_HLEN)) {
-			err = -ENOMEM;
-			goto drop;
-		}
-		skb->protocol = eth_type_trans(skb, tun->dev);
+		if (!frags)
+			skb->protocol = eth_type_trans(skb, tun->dev);
 		break;
 	}
 
@@ -1969,11 +1967,8 @@ drop:
 	}
 
 	if (frags) {
-		u32 headlen;
-
 		/* Exercise flow dissector code path. */
-		skb_push(skb, ETH_HLEN);
-		headlen = eth_get_headlen(skb->data, skb_headlen(skb));
+		u32 headlen = eth_get_headlen(skb->data, skb_headlen(skb));
 
 		if (unlikely(headlen > skb_headlen(skb))) {
 			this_cpu_inc(tun->pcpu_stats->rx_dropped);
@@ -2039,8 +2034,7 @@ static ssize_t tun_chr_write_iter(struct kiocb *iocb, struct iov_iter *from)
 }
 
 // SEC_PRODUCT_FEATURE_KNOX_SUPPORT_VPN {
-static int get_meta_param_values(struct sk_buff *skb, 
-				 struct knox_meta_param *metalocal) {
+static int get_meta_param_values(struct sk_buff *skb, struct knox_meta_param *metalocal) {
 
 	struct skb_shared_info *knox_shinfo = NULL;
 
@@ -2058,7 +2052,7 @@ static int get_meta_param_values(struct sk_buff *skb,
 		pr_err("KNOX: knox_shinfo value is null");
 #endif
 		return 1;
-	}	
+	}
 
 	if (knox_shinfo->knox_mark >= META_MARK_BASE_LOWER && knox_shinfo->knox_mark <= META_MARK_BASE_UPPER) {
 		metalocal->uid = knox_shinfo->uid;
@@ -2073,6 +2067,7 @@ static int get_meta_param_values(struct sk_buff *skb,
 	return 0;
 }
 // SEC_PRODUCT_FEATURE_KNOX_SUPPORT_VPN }
+
 static ssize_t tun_put_user_xdp(struct tun_struct *tun,
 				struct tun_file *tfile,
 				struct xdp_frame *xdp_frame,
@@ -2148,13 +2143,13 @@ static ssize_t tun_put_user(struct tun_struct *tun,
 
 // SEC_PRODUCT_FEATURE_KNOX_SUPPORT_VPN {
 	meta_param_get_status = get_meta_param_values(skb, &metalocal);
-	if(meta_param_get_status == 1) {
+	if (meta_param_get_status == 1) {
 #ifdef TUN_DEBUG
 		pr_err("KNOX: Error obtaining meta param values");
 #endif
 	} else {
 
-		if (tun->flags & TUN_META_HDR) {	
+		if (tun->flags & TUN_META_HDR) {
 #ifdef TUN_DEBUG
 			pr_err("KNOX: Appending uid: %d and pid: %d", metalocal.uid,
 			       metalocal.pid);
@@ -2164,9 +2159,8 @@ static ssize_t tun_put_user(struct tun_struct *tun,
 			}
 
 			total += sizeof(struct knox_meta_param);
-			if (copy_to_iter(&metalocal, sizeof(struct knox_meta_param), iter) != sizeof(struct knox_meta_param)) {
+			if (copy_to_iter(&metalocal, sizeof(struct knox_meta_param), iter) != sizeof(struct knox_meta_param))
 				return -EFAULT;
-			}
 		}
 	}
 // SEC_PRODUCT_FEATURE_KNOX_SUPPORT_VPN }
@@ -3003,7 +2997,7 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 		 */
 		// SEC_PRODUCT_FEATURE_KNOX_SUPPORT_VPN {
 		knox_flag |= IFF_META_HDR;
-		return put_user(IFF_TUN | IFF_TAP | TUN_FEATURES| knox_flag,
+		return put_user(IFF_TUN | IFF_TAP | TUN_FEATURES | knox_flag,
 				(unsigned int __user*)argp);
 		// SEC_PRODUCT_FEATURE_KNOX_SUPPORT_VPN }
 	} else if (cmd == TUNSETQUEUE) {

@@ -1,5 +1,5 @@
 #include "himax_inspection.h"
-#include <linux/spu-verify.h>
+//#include <linux/spu-verify.h>
 
 extern int g_ts_dbg;
 
@@ -2324,7 +2324,7 @@ static void fw_update(void *dev_data)
 	struct sec_cmd_data *sec = (struct sec_cmd_data *)dev_data;
 	struct himax_ts_data *data = container_of(sec, struct himax_ts_data, sec);
 
-#if defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+#if 0//defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 	const char *file_path = TSP_PATH_EXTERNAL_FW_SIGNED;
 	long ori_size = 0, spu_ret = 0;
 #else
@@ -2356,9 +2356,6 @@ static void fw_update(void *dev_data)
 		g_core_fp.fp_0f_operation_dirly();
 		g_core_fp.fp_reload_disable(0);
 		g_core_fp.fp_sense_on(0x00);
-#if defined(CONFIG_SEC_FACTORY)
-		g_core_fp.set_bending_algo_for_factory(FW_SET_FACTORY_ON);
-#endif
 
 		himax_int_enable(1);
 
@@ -2394,7 +2391,7 @@ static void fw_update(void *dev_data)
 				goto fail_vfs_read;
 			}
 
-#if defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+#if 0 //defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
 			ori_size = fw_size - SPU_METADATA_SIZE(TSP);
 
 			spu_ret = spu_firmware_signature_verify("TSP", fw_data, fw_size);
@@ -2434,9 +2431,6 @@ static void fw_update(void *dev_data)
 		g_core_fp.fp_0f_operation_dirly();
 		g_core_fp.fp_reload_disable(0);
 		g_core_fp.fp_sense_on(0x00);
-#if defined(CONFIG_SEC_FACTORY)
-		g_core_fp.set_bending_algo_for_factory(FW_SET_FACTORY_ON);
-#endif
 
 		himax_int_enable(1);
 
@@ -4372,56 +4366,6 @@ void himax_run_rawdata_all(struct himax_ts_data *data)
 	input_raw_info(true, data->dev, "%s: done!\n", __func__);
 }
 
-#ifdef HX_SMART_WAKEUP
-static void aot_enable(void *dev_data)
-{
-	struct sec_cmd_data *sec = (struct sec_cmd_data *)dev_data;
-	struct himax_ts_data *ts = container_of(sec, struct himax_ts_data, sec);
-	char buf[16] = { 0 };
-
-	sec_cmd_set_default_result(sec);
-
-	if (!ts->pdata->enable_settings_aot) {
-		sec->cmd_state = SEC_CMD_STATUS_FAIL;
-		goto out;
-	}
-
-	switch (sec->cmd_param[0]) {
-	case 0:
-		sec->cmd_state = SEC_CMD_STATUS_OK;
-		input_info(true, ts->dev, "%s: Unset AOT Mode\n", __func__);
-		ts->gesture_cust_en[0] = 0;
-		ts->SMWP_enable = 0;
-		ts->aot_enabled = 0;
-		g_core_fp.fp_set_SMWP_enable(ts->SMWP_enable, ts->suspended);
-		break;
-	case 1:
-		sec->cmd_state = SEC_CMD_STATUS_OK;
-		input_info(true, ts->dev, "%s: Set AOT Mode\n", __func__);
-		ts->gesture_cust_en[0] = 1;
-		ts->SMWP_enable = 1;
-		ts->aot_enabled = 1;
-		g_core_fp.fp_set_SMWP_enable(ts->SMWP_enable, ts->suspended);
-		break;
-	default:
-		sec->cmd_state = SEC_CMD_STATUS_FAIL;
-		input_err(true, ts->dev, "%s: Invalid Argument\n", __func__);
-		break;
-	}
-
-out:
-	if (sec->cmd_state == SEC_CMD_STATUS_OK)
-		snprintf(buf, sizeof(buf), "OK");
-	else
-		snprintf(buf, sizeof(buf), "NG");
-
-	sec_cmd_set_cmd_result(sec, buf, strnlen(buf, sizeof(buf)));
-	sec_cmd_set_cmd_exit(sec);
-
-	input_info(true, ts->dev, "%s: %s\n", __func__, buf);
-}
-#endif
-
 static void factory_cmd_result_all(void *dev_data)
 {
 	struct sec_cmd_data *sec = (struct sec_cmd_data *)dev_data;
@@ -4502,9 +4446,6 @@ struct sec_cmd sec_cmds[] = {
 #if 0	// not support a21s
 	{SEC_CMD("glove_mode", glove_mode),},
 #endif
-#ifdef HX_SMART_WAKEUP
-	{SEC_CMD("aot_enable", aot_enable),},
-#endif
 	{SEC_CMD("set_grip_data", set_grip_data),},
 	{SEC_CMD("factory_cmd_result_all", factory_cmd_result_all),},
 	{SEC_CMD("not_support_cmd", not_support_cmd),},
@@ -4513,21 +4454,6 @@ struct sec_cmd sec_cmds[] = {
 /* sensitivity mode test */
 //extern int hx_set_sram_raw(int set_val);
 extern int hx_set_stack_raw(int set_val);
-
-static ssize_t read_support_feature(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	u32 feature = 0;
-
-	if (g_ts->pdata->enable_settings_aot)
-		feature |= INPUT_FEATURE_ENABLE_SETTINGS_AOT;
-
-	input_info(true, g_ts->dev, "%s: %d%s\n",
-				__func__, feature,
-				feature & INPUT_FEATURE_ENABLE_SETTINGS_AOT ? " aot" : "");
-
-	return snprintf(buf, SEC_CMD_BUF_SIZE, "%d", feature);
-}
 
 static ssize_t sensitivity_mode_show(struct device *dev,
 					struct device_attribute *attr, char *buf)
@@ -4580,43 +4506,13 @@ static ssize_t sensitivity_mode_store(struct device *dev,
 	return count;
 }
 
-static ssize_t prox_power_off_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	input_info(true, g_ts->dev, "%s: %d\n", __func__, g_ts->prox_power_off);
-
-	return snprintf(buf, SEC_CMD_BUF_SIZE, "%ld", g_ts->prox_power_off);
-}
-
-static ssize_t prox_power_off_store(struct device *dev,
-		struct device_attribute *attr,
-		const char *buf, size_t count)
-{
-	long data;
-	int ret;
-
-	ret = kstrtol(buf, 10, &data);
-	if (ret < 0)
-		return ret;
-
-	g_ts->prox_power_off = data;
-
-	input_info(true, g_ts->dev, "%s: %ld\n", __func__, g_ts->prox_power_off);
-
-	return count;
-}
-
 static DEVICE_ATTR(sensitivity_mode, S_IRUGO | S_IWUSR | S_IWGRP,
 			sensitivity_mode_show, sensitivity_mode_store);
 static DEVICE_ATTR(close_tsp_test, S_IRUGO, show_close_tsp_test, NULL);
-static DEVICE_ATTR(support_feature, 0444, read_support_feature, NULL);
-static DEVICE_ATTR(prox_power_off, 0644, prox_power_off_show, prox_power_off_store);
 
 static struct attribute *sec_touch_factory_attributes[] = {
 	&dev_attr_sensitivity_mode.attr,
 	&dev_attr_close_tsp_test.attr,
-	&dev_attr_support_feature.attr,
-	&dev_attr_prox_power_off.attr,
 	NULL,
 };
 

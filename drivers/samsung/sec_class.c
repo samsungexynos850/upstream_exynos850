@@ -62,4 +62,4 @@ static int __init sec_class_create(void)
 	return 0;
 }
 
-arch_initcall_sync(sec_class_create);
+postcore_initcall_sync(sec_class_create);

@@ -620,9 +620,8 @@ static void simulate_TASK_HARD_LATENCY(char **argv, int argc)
 
 	if (argc) {
 		cpu = str_to_num(argv[0]);
-		if (argc >= 2) {
+		if (argc >= 2)
 			kstrtoul(argv[1], 10, &sec_latency);
-		}
 	}
 
 	if (!argc || cpu < 0 || cpu >= NR_CPUS) {
@@ -648,9 +647,8 @@ static void simulate_IRQ_HARD_LATENCY(char **argv, int argc)
 
 	if (argc) {
 		cpu = str_to_num(argv[0]);
-		if (argc == 2) {
+		if (argc == 2)
 			kstrtoul(argv[1], 10, &sec_latency);
-		}
 	}
 
 	if (!argc || cpu < 0 || cpu >= NR_CPUS) {
@@ -1113,7 +1111,7 @@ static void simulate_FREQ_SKEW(char **argv, int argc)
 
 	if (argc >= 2) {
 		ret = kstrtoint(argv[0], 0, &type);
- 		pr_crit("%s() 1st parameter: %d (ret=%d)\n", __func__, type, ret);
+		pr_crit("%s() 1st parameter: %d (ret=%d)\n", __func__, type, ret);
 		if (ret == 0) {
 			ret = kstrtoul(argv[1], 0, &freq);
 			pr_crit("%s() 2nd parameter: %lu (ret=%d)\n", __func__, freq, ret);

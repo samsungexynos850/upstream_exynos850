@@ -314,7 +314,9 @@ void secdbg_base_panic_handler(void *buf, bool dump)
 
 void secdbg_base_post_panic_handler(void)
 {
+#if 0
 	hard_reset_delay();
+#endif
 
 	/* reset */
 	pr_emerg("sec_debug: %s\n", linux_banner);
@@ -386,6 +388,16 @@ void *secdbg_base_get_debug_base(int type)
 		else if (type == SDN_MAP_EXTRA_INFO)
 			return &(sdn->extra_info);
 	}
+
+	pr_crit("%s: return NULL\n", __func__);
+
+	return NULL;
+}
+
+void *secdbg_base_get_kcnst_base(void)
+{
+	if (sdn)
+		return &(sdn->kcnst);
 
 	pr_crit("%s: return NULL\n", __func__);
 
@@ -741,7 +753,7 @@ static int __init secdbg_base_next_init(void)
 		return -1;
 	}
 
-	pr_info("%s: start %lx\n", __func__, (unsigned long)sdn);
+	pr_info("%s: start %lx (FROM LEGO)\n", __func__, (unsigned long)sdn);
 	pr_info("%s: BUF_0: %lx\n", __func__, secdbg_base_get_buf_base(0));
 
 	/* set magic */

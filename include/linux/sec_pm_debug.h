@@ -15,7 +15,4 @@
 extern u8 pmic_onsrc;
 extern u8 pmic_offsrc;
 
-extern unsigned long long sleep_time_sec;
-extern unsigned int sleep_count;
-
 #endif /* __LINUX_SEC_PM_DEBUG_H */

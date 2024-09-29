@@ -690,9 +690,6 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 	struct usb_ep		*in;
 	u16			cdc_filter;
 	unsigned long	tx_timeout;
-	bool eth_multi_pkt_xfer = 0;
-	bool eth_supports_multi_frame = 0;
-	bool eth_is_fixed = 0;
 
 	if (dev->en_timer) {
 		hrtimer_cancel(&dev->tx_timer);
@@ -703,9 +700,6 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 	if (dev->port_usb) {
 		in = dev->port_usb->in_ep;
 		cdc_filter = dev->port_usb->cdc_filter;
-		eth_multi_pkt_xfer = dev->port_usb->multi_pkt_xfer;
-		eth_supports_multi_frame = dev->port_usb->supports_multi_frame;
-		eth_is_fixed = dev->port_usb->is_fixed;
 	} else {
 		in = NULL;
 		cdc_filter = 0;
@@ -721,7 +715,7 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 
 #if 0
 	/* Allocate memory for tx_reqs to support multi packet transfer */
-	if (eth_multi_pkt_xfer && !dev->tx_req_bufsize)
+	if (dev->port_usb->multi_pkt_xfer && !dev->tx_req_bufsize)
 		alloc_tx_buffer(dev);
 #endif
 
@@ -762,7 +756,7 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 	list_del(&req->list);
 
 	/* temporarily stop TX queue when the freelist empties */
-	if (list_empty(&dev->tx_reqs) && (dev->tx_skb_hold_count >= (dev->dl_max_pkts_per_xfer -1)))
+	if (list_empty(&dev->tx_reqs))
 		netif_stop_queue(net);
 
 	spin_unlock_irqrestore(&dev->tx_req_lock, flags);
@@ -782,34 +776,27 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 			/* Multi frame CDC protocols may store the frame for
 			 * later which is not a dropped frame.
 			 */
-			if (eth_supports_multi_frame)
+			if (dev->port_usb->supports_multi_frame)
 				goto multiframe;
 			goto drop;
 		}
 	}
 
-	spin_lock_irqsave(&dev->tx_req_lock, flags);
-	dev->tx_skb_hold_count++;
-	spin_unlock_irqrestore(&dev->tx_req_lock, flags);
-	if (eth_multi_pkt_xfer) {
+	if (dev->port_usb->multi_pkt_xfer) {
 		/* Add RNDIS Header */
-		if (dev->port_usb)
-			memcpy(req->buf + req->length, dev->port_usb->header,
+		memcpy(req->buf + req->length, dev->port_usb->header,
 						dev->header_len);
-		else
-			goto success;
-		
 		/* Increment req length by header size */
 		req->length += dev->header_len;
 		/* Copy received IP data from SKB */
 		memcpy(req->buf + req->length, skb->data, skb->len);
 		/* Increment req length by skb data length */
-		req->length = req->length + skb->len;		
+		req->length = req->length + skb->len;
 		dev_kfree_skb_any(skb);
 		req->context = NULL;
 
 		spin_lock_irqsave(&dev->tx_req_lock, flags);
-		if (dev->tx_skb_hold_count < dev->dl_max_pkts_per_xfer) {
+		if (req->length < (dev->tx_req_bufsize - (dev->net->mtu + 80)) ) {
 			list_add(&req->list, &dev->tx_reqs);
 			spin_unlock_irqrestore(&dev->tx_req_lock, flags);
 
@@ -822,22 +809,11 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 			goto success;
 		}
 
-		dev->tx_skb_hold_count = 0;
 		spin_unlock_irqrestore(&dev->tx_req_lock, flags);
 	} else {
-		if (eth_is_fixed) { /* ncm case */
-			req->length = skb->len;
-			req->buf = skb->data;
-			req->context = skb;
-		} else { /* rndis case : multipacket not used */
-			req->length = skb->len;
-			/* copy skb data */
-			memcpy(req->buf, skb->data,
-				skb->len);
-			dev_kfree_skb_any(skb);
-			req->context = NULL;
-		}
-
+		req->length = skb->len;
+		req->buf = skb->data;
+		req->context = skb;
 	}
 
 	retval = tx_task(dev, req);
@@ -852,9 +828,10 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 	}
 
 	if (retval) {
-		if (!eth_multi_pkt_xfer)
+		if (!dev->port_usb->multi_pkt_xfer)
 			dev_kfree_skb_any(skb);
 drop:
+		req->length = 0;
 		dev->net->stats.tx_dropped++;
 multiframe:
 		spin_lock_irqsave(&dev->tx_req_lock, flags);
@@ -873,12 +850,8 @@ static void eth_start(struct eth_dev *dev, gfp_t gfp_flags)
 {
 	DBG(dev, "%s\n", __func__);
 
-	if (dev->port_usb) {
-		/* fill the rx queue */
-		rx_fill(dev, gfp_flags);
-	} else {
-		pr_err("%s, port_usb is NULL\n", __func__);
-	}
+	/* fill the rx queue */
+	rx_fill(dev, gfp_flags);
 
 	dev->occured_timeout = 1;
 	/* and open the tx floodgates */
@@ -966,9 +939,7 @@ static int eth_stop(struct net_device *net)
 }
 
 /*-------------------------------------------------------------------------*/
-#ifndef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-static u8 host_ethaddr[ETH_ALEN];
-#endif
+
 static int get_ether_addr(const char *str, u8 *dev_addr)
 {
 	if (str) {
@@ -998,32 +969,6 @@ static int get_ether_addr_str(u8 dev_addr[ETH_ALEN], char *str, int len)
 	snprintf(str, len, "%pM", dev_addr);
 	return 18;
 }
-#ifndef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-static int get_host_ether_addr(u8 *str, u8 *dev_addr)
-{
-	memcpy(dev_addr, str, ETH_ALEN);
-	if (is_valid_ether_addr(dev_addr))
-		return 0;
-
-	random_ether_addr(dev_addr);
-	memcpy(str, dev_addr, ETH_ALEN);
-	return 1;
-}
-#endif
-
-#ifdef CONFIG_USB_F_NCM
-const struct net_device_ops eth_netdev_ops_ncm = {
-	.ndo_open		= eth_open,
-	.ndo_stop		= eth_stop,
-#ifndef NCM_WITH_TIMER
-	.ndo_start_xmit		= eth_start_xmit_ncm,
-#else
-	.ndo_start_xmit		= eth_start_xmit_ncm_timer,
-#endif
-	.ndo_set_mac_address 	= eth_mac_addr,
-	.ndo_validate_addr	= eth_validate_addr,
-};
-#endif
 
 static const struct net_device_ops eth_netdev_ops = {
 	.ndo_open		= eth_open,
@@ -1033,6 +978,40 @@ static const struct net_device_ops eth_netdev_ops = {
 	.ndo_validate_addr	= eth_validate_addr,
 };
 
+#ifdef CONFIG_USB_F_NCM
+/* NETWORK DRIVER HOOKUP (to the layer above this driver) */
+static int ueth_change_mtu(struct net_device *net, int new_mtu)
+{
+	struct eth_dev	*dev = netdev_priv(net);
+	unsigned long	flags;
+	int		status = 0;
+
+	/* don't change MTU on "live" link (peer won't know) */
+	spin_lock_irqsave(&dev->lock, flags);
+	if (dev->port_usb)
+		status = -EBUSY;
+	else if (new_mtu <= ETH_HLEN || new_mtu > GETHER_MAX_ETH_FRAME_LEN)
+		status = -ERANGE;
+	else
+		net->mtu = new_mtu;
+	spin_unlock_irqrestore(&dev->lock, flags);
+
+	return status;
+}
+
+const struct net_device_ops eth_netdev_ops_ncm = {
+	.ndo_open		= eth_open,
+	.ndo_stop		= eth_stop,
+#ifndef NCM_WITH_TIMER
+	.ndo_start_xmit		= eth_start_xmit_ncm,
+#else
+	.ndo_start_xmit		= eth_start_xmit_ncm_timer,
+#endif
+	.ndo_change_mtu		= ueth_change_mtu,
+	.ndo_set_mac_address 	= eth_mac_addr,
+	.ndo_validate_addr	= eth_validate_addr,
+};
+#endif
 
 static struct device_type gadget_type = {
 	.name	= "gadget",
@@ -1083,19 +1062,14 @@ struct eth_dev *gether_setup_name(struct usb_gadget *g,
 	if (get_ether_addr(dev_addr, net->dev_addr))
 		dev_warn(&g->dev,
 			"using random %s ethernet address\n", "self");
-#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
-	memcpy(dev->host_mac, ethaddr, ETH_ALEN);
-	printk(KERN_DEBUG "usb: set unique host mac\n");
-#else
 	if (get_ether_addr(host_addr, dev->host_mac))
 		dev_warn(&g->dev,
 			"using random %s ethernet address\n", "host");
 
 	if (ethaddr)
 		memcpy(ethaddr, dev->host_mac, ETH_ALEN);
-#endif
-#if 0
-//#ifdef CONFIG_USB_F_NCM
+
+#ifdef CONFIG_USB_F_NCM
 	if (!strcmp(netname, "ncm")) {
 		net->netdev_ops = &eth_netdev_ops_ncm;
 #ifdef NCM_WITH_TIMER
@@ -1172,8 +1146,8 @@ struct net_device *gether_setup_name_default(const char *netname)
 	pr_warn("using random %s ethernet address\n", "self");
 	eth_random_addr(dev->host_mac);
 	pr_warn("using random %s ethernet address\n", "host");
-#if 0
-//#ifdef CONFIG_USB_F_NCM
+
+#ifdef CONFIG_USB_F_NCM
 	if (!strcmp(netname, "ncm")) {
 		net->netdev_ops = &eth_netdev_ops_ncm;
 #ifdef NCM_WITH_TIMER
@@ -1210,6 +1184,7 @@ int gether_register_netdev(struct net_device *net)
 		return status;
 	} else {
 		DBG(dev, "HOST MAC %pM\n", dev->host_mac);
+		DBG(dev, "MAC %pM\n", dev->dev_mac);
 
 		/* two kinds of host-initiated state changes:
 		 *  - iff DATA transfer is active, carrier is "on"
@@ -1542,11 +1517,6 @@ void gether_disconnect(struct gether *link)
 	 * and forget about the endpoints.
 	 */
 	usb_ep_disable(link->in_ep);
-
-	spin_lock(&dev->lock);
-	dev->port_usb = NULL;
-	spin_unlock(&dev->lock);
-
 	link->in_ep->desc = NULL;
 
 	usb_ep_disable(link->out_ep);
@@ -1594,6 +1564,11 @@ void gether_disconnect(struct gether *link)
 	dev->header_len = 0;
 	dev->unwrap = NULL;
 	dev->wrap = NULL;
+
+	spin_lock(&dev->lock);
+	dev->port_usb = NULL;
+	spin_unlock(&dev->lock);
+
 	if (dev->en_timer) {
 		hrtimer_cancel(&dev->tx_timer);
 		dev->en_timer = 0;

@@ -307,8 +307,6 @@ static int mfc_enc_start_streaming(struct vb2_queue *q, unsigned int count)
 		MFC_TRACE_CTX("** ENC streamon, state: %d\n", ctx->state);
 	}
 
-	mfc_update_real_time(ctx);
-
 	/* If context is ready then dev = work->data;schedule it to run */
 	mfc_ctx_ready_set_bit(ctx, &dev->work_bits);
 	mfc_try_run(dev);

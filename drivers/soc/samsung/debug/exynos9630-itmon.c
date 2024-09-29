@@ -23,7 +23,6 @@
 #include <soc/samsung/exynos-itmon.h>
 #include <soc/samsung/exynos-debug.h>
 #include <linux/debug-snapshot.h>
-#include <linux/sec_debug.h>
 
 //#define MULTI_IRQ_SUPPORT_ITMON
 
@@ -904,14 +903,11 @@ static void itmon_report_traceinfo(struct itmon_dev *itmon,
 	struct itmon_platdata *pdata = itmon->pdata;
 	struct itmon_traceinfo *traceinfo = &pdata->traceinfo[trans_type];
 	struct itmon_nodegroup *group = NULL;
-#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
-	char temp_buf[SZ_128];
-#endif
 
 	if (!traceinfo->dirty)
 		return;
 
-	dev_auto(ASL3, itmon->dev,
+	dev_err(itmon->dev,
 		"\n--------------------------------------------------------------------------\n"
 		"      Transaction Information\n\n"
 		"      > Master         : %s %s\n"
@@ -926,22 +922,11 @@ static void itmon_report_traceinfo(struct itmon_dev *itmon,
 		"(BAAW Remapped address)" : "",
 		trans_type == TRANS_TYPE_READ ? "READ" : "WRITE",
 		itmon_errcode[traceinfo->errcode]);
-#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
-	snprintf(temp_buf, SZ_128, "%s %s/ %s/ 0x%zx %s/ %s/ %s",
-		traceinfo->port, traceinfo->master ? traceinfo->master : "",
-		traceinfo->dest ? traceinfo->dest : NOT_AVAILABLE_STR,
-		traceinfo->target_addr,
-		traceinfo->target_addr == INVALID_REMAPPING ?
-		"(by CP maybe)" : "",
-		trans_type == TRANS_TYPE_READ ? "READ" : "WRITE",
-		itmon_errcode[traceinfo->errcode]);
-	secdbg_exin_set_busmon(temp_buf);
-#endif
 
 	if (node) {
 		struct itmon_tracedata *tracedata = &node->tracedata;
 
-		dev_auto(ASL3, itmon->dev,
+		dev_err(itmon->dev,
 			"\n      > Size           : %u bytes x %u burst => %u bytes\n"
 			"      > Burst Type     : %u (0:FIXED, 1:INCR, 2:WRAP)\n"
 			"      > Level          : %s\n"
@@ -973,7 +958,7 @@ static void itmon_report_pathinfo(struct itmon_dev *itmon,
 	struct itmon_traceinfo *traceinfo = &pdata->traceinfo[trans_type];
 
 	if (!traceinfo->path_dirty) {
-		dev_auto(ASL3, itmon->dev,
+		dev_err(itmon->dev,
 			"\n--------------------------------------------------------------------------\n"
 			"      ITMON Report (%s)\n"
 			"--------------------------------------------------------------------------\n"
@@ -983,22 +968,22 @@ static void itmon_report_pathinfo(struct itmon_dev *itmon,
 	}
 	switch (node->type) {
 	case M_NODE:
-		dev_auto(ASL3, itmon->dev,
+		dev_err(itmon->dev,
 			"\n      > %14s, %8s(0x%08X)\n",
 			node->name, "M_NODE", node->phy_regs + tracedata->offset);
 		break;
 	case T_S_NODE:
-		dev_auto(ASL3, itmon->dev,
+		dev_err(itmon->dev,
 			"\n      > %14s, %8s(0x%08X)\n",
 			node->name, "T_S_NODE", node->phy_regs + tracedata->offset);
 		break;
 	case T_M_NODE:
-		dev_auto(ASL3, itmon->dev,
+		dev_err(itmon->dev,
 			"\n      > %14s, %8s(0x%08X)\n",
 			node->name, "T_M_NODE", node->phy_regs + tracedata->offset);
 		break;
 	case S_NODE:
-		dev_auto(ASL3, itmon->dev,
+		dev_err(itmon->dev,
 			"\n      > %14s, %8s(0x%08X)\n",
 			node->name, "S_NODE", node->phy_regs + tracedata->offset);
 		break;
@@ -1195,7 +1180,7 @@ static void itmon_route_tracedata(struct itmon_dev *itmon)
 
 	if (pdata->traceinfo[TRANS_TYPE_READ].dirty ||
 		pdata->traceinfo[TRANS_TYPE_WRITE].dirty)
-		dev_auto(ASL3, itmon->dev,
+		dev_err(itmon->dev,
 			"\n      Raw Register Information(ITMON Internal Information)\n\n");
 
 	for (trans_type = 0; trans_type < TRANS_TYPE_NUM; trans_type++) {
@@ -1261,7 +1246,7 @@ static void itmon_trace_data(struct itmon_dev *itmon,
 		/* Only NOT S-Node is able to make log to registers */
 		break;
 	default:
-		dev_auto(ASL3, itmon->dev,
+		dev_err(itmon->dev,
 			"Unknown Error - node:%s offset:%u\n", node->name, offset);
 		break;
 	}
@@ -1289,7 +1274,7 @@ static void itmon_trace_data(struct itmon_dev *itmon,
 
 		list_add(&new_node->list, &pdata->tracelist[read]);
 	} else {
-		dev_auto(ASL3, itmon->dev,
+		dev_err(itmon->dev,
 			"failed to kmalloc for %s node %x offset\n",
 			node->name, offset);
 	}

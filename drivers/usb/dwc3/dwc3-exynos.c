@@ -633,14 +633,10 @@ static int dwc3_exynos_suspend(struct device *dev)
 {
 	struct dwc3_exynos *exynos = dev_get_drvdata(dev);
 
-	dev_info(dev, "%s\n", __func__);
-#ifdef CONFIG_PM
-	dev_info(dev, "exynos RPM Usage Count: %d\n", dev->power.usage_count);
-#endif
-	if (pm_runtime_suspended(dev)) {
-		dev_info(dev, "%s, already suspended\n", __func__);
+	dev_dbg(dev, "%s\n", __func__);
+
+	if (pm_runtime_suspended(dev))
 		return 0;
-	}
 
 	dwc3_exynos_clk_disable(exynos);
 
@@ -661,12 +657,6 @@ static int dwc3_exynos_resume(struct device *dev)
 	int ret;
 
 	dev_info(dev, "%s\n", __func__);
-
-#ifdef CONFIG_PM
-	dev_info(dev, "exynos RPM Usage Count: %d\n", dev->power.usage_count);
-#endif
-	if (!exynos)
-		return 0;
 
 	/* inform what USB state is not idle to IDLE_IP */
 	/* exynos_update_ip_idle_status(exynos->idle_ip_index, 0); */

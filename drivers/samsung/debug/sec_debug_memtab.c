@@ -58,5 +58,10 @@ DEFINE_MEMBER_TYPE(task_struct_se__ftt_mark, task_struct, se.ftt_mark);
 DEFINE_MEMBER_TYPE(task_struct_se__vruntime, task_struct, se.vruntime);
 DEFINE_MEMBER_TYPE(task_struct_se__avg__load_avg, task_struct, se.avg.load_avg);
 DEFINE_MEMBER_TYPE(task_struct_se__avg__util_avg, task_struct, se.avg.util_avg);
+#ifdef CONFIG_SMP
+#ifdef CONFIG_SCHED_USE_FLUID_RT
 DEFINE_MEMBER_TYPE(task_struct_rt__avg__load_avg, task_struct, rt.avg.load_avg);
 DEFINE_MEMBER_TYPE(task_struct_rt__avg__util_avg, task_struct, rt.avg.util_avg);
+#endif
+#endif
+

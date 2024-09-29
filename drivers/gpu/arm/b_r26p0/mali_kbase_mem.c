@@ -4548,7 +4548,7 @@ static void kbase_jd_user_buf_unmap(struct kbase_context *kctx, struct kbase_mem
 {
 	long i;
 	struct page **pages;
-        unsigned long offset_within_page = alloc->imported.user_buf.address & ~PAGE_MASK;
+		unsigned long offset_within_page = alloc->imported.user_buf.address & ~PAGE_MASK;
 	unsigned long size = alloc->imported.user_buf.size;
 	lockdep_assert_held(&kctx->reg_lock);
 

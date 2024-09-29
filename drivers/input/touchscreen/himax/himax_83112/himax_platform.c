@@ -143,7 +143,7 @@ int himax_parse_dt(struct himax_ts_data *ts, struct himax_i2c_platform_data *pda
 	}
 	input_info(true, ts->dev, "%s: lcdtype : 0x%08X, panel type : 0x%08X\n", __func__, lcdtype, paneltype);
 
-	if (paneltype != 0x00 && (paneltype != (lcdtype & 0x0000FF00))) {
+	if (paneltype != 0x00 && paneltype != lcdtype) {
 		input_err(true, ts->dev, "%s: panel mismatched, unload driver\n", __func__);
 		return -EINVAL;
 	}
@@ -201,6 +201,7 @@ int himax_parse_dt(struct himax_ts_data *ts, struct himax_i2c_platform_data *pda
 	if (!gpio_is_valid(pdata->gpio_irq)) {
 		input_info(true, ts->dev, "DT:gpio_irq value is not valid\n");
 	}
+
 	pdata->lcd_gpio_reset = of_get_named_gpio(dt, "himax,lcd-rst-gpio", 0);
 
 	if (!gpio_is_valid(pdata->lcd_gpio_reset))
@@ -251,26 +252,6 @@ int himax_parse_dt(struct himax_ts_data *ts, struct himax_i2c_platform_data *pda
 		of_property_read_string(dt, "himax,firmware_name", &pdata->i_CTPM_firmware_name);
 	}
 	input_info(true, ts->dev, "DT:firmware_name=%s\n", pdata->i_CTPM_firmware_name);
-
-	pdata->enable_settings_aot = of_property_read_bool(dt, "himax,enable_settings_aot");
-	input_info(true, ts->dev, "%s : supprot: %s\n",
-				__func__, pdata->enable_settings_aot ? " AOT" : "");
-
-	if (of_property_read_string(dt, "himax,lcd_regulators_pwr1", &pdata->regulator_lcd_pwr1)) {
-		input_err(true, ts->dev, "%s: Failed to get regulator_lcd_pwr1 name property\n", __func__);
-	} else {
-		input_info(true, ts->dev, "%s: regulator_lcd_pwr1(%s) \n", __func__, pdata->regulator_lcd_pwr1);
-	}
-	if (of_property_read_string(dt, "himax,lcd_regulators_pwr2", &pdata->regulator_lcd_pwr2)) {
-		input_err(true, ts->dev, "%s: Failed to get regulator_lcd_pwr2 name property\n", __func__);
-	} else {
-		input_info(true, ts->dev, "%s: regulator_lcd_pwr2(%s) \n", __func__, pdata->regulator_lcd_pwr2);
-	}
-	if (of_property_read_string(dt, "himax,lcd_regulators_reset", &pdata->regulator_lcd_reset)) {
-		input_err(true, ts->dev, "%s: Failed to get regulator_lcd_reset name property\n", __func__);
-	} else {
-		input_info(true, ts->dev, "%s: regulator_lcd_reset(%s) \n", __func__, pdata->regulator_lcd_reset);
-	}
 
 	pdata->pinctrl = devm_pinctrl_get(ts->dev);
 	if (IS_ERR(pdata->pinctrl))
@@ -826,26 +807,6 @@ static int himax_common_resume(struct device *dev)
 	return 0;
 }
 
-static int himax_pm_suspend(struct device *dev)
-{
-	struct himax_ts_data *ts = dev_get_drvdata(dev);
-
-	input_info(true, ts->dev, "%s: called!\n", __func__);
-	reinit_completion(&ts->resume_done);
-
-	return 0;
-}
-
-static int himax_pm_resume(struct device *dev)
-{
-	struct himax_ts_data *ts = dev_get_drvdata(dev);
-
-	input_info(true, ts->dev, "%s: called!\n", __func__);
-	complete_all(&ts->resume_done);
-
-	return 0;
-}
-
 #if defined(CONFIG_FB)
 int fb_notifier_callback(struct notifier_block *self,
 							unsigned long event, void *data)
@@ -856,25 +817,21 @@ int fb_notifier_callback(struct notifier_block *self,
 	    container_of(self, struct himax_ts_data, fb_notif);
 	I(" %s\n", __func__);
 
-	if (evdata && evdata->data && ts != NULL && ts->dev != NULL) {
+	if (evdata && evdata->data && event == FB_EVENT_BLANK && ts != NULL &&
+	    ts->dev != NULL) {
 		blank = evdata->data;
-		input_dbg(false, g_ts->dev, "%s: called! event(%d) *blank(%d)\n", __func__, event, *blank);
 
-		if (event == FB_EVENT_BLANK) {
-			switch (*blank) {
-			case FB_BLANK_UNBLANK:
-				himax_common_resume(ts->dev);
-				break;
+		switch (*blank) {
+		case FB_BLANK_UNBLANK:
+			himax_common_resume(ts->dev);
+			break;
 
-			case FB_BLANK_POWERDOWN:
-			case FB_BLANK_HSYNC_SUSPEND:
-			case FB_BLANK_VSYNC_SUSPEND:
-			case FB_BLANK_NORMAL:
-				himax_common_suspend(ts->dev);
-				break;
-			}
-		} else if (event == FB_EARLY_EVENT_BLANK && *blank == FB_BLANK_POWERDOWN) {
+		case FB_BLANK_POWERDOWN:
+		case FB_BLANK_HSYNC_SUSPEND:
+		case FB_BLANK_VSYNC_SUSPEND:
+		case FB_BLANK_NORMAL:
 			himax_common_suspend(ts->dev);
+			break;
 		}
 	}
 
@@ -959,9 +916,6 @@ static const struct dev_pm_ops himax_common_pm_ops = {
 #if (!defined(CONFIG_FB))
 	.suspend = himax_common_suspend,
 	.resume  = himax_common_resume,
-#else
-	.suspend = himax_pm_suspend,
-	.resume  = himax_pm_resume,
 #endif
 };
 
@@ -979,10 +933,6 @@ static struct spi_driver himax_common_driver = {
 		.name =		HIMAX_common_NAME,
 		.owner =	THIS_MODULE,
 		.of_match_table = himax_match_table,
-#if defined(CONFIG_FB)
-		.pm = &himax_common_pm_ops,
-
-#endif
 	},
 	.probe =	himax_chip_common_probe,
 	.remove =	himax_chip_common_remove,

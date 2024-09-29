@@ -327,7 +327,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
 	unsigned int cpu, shift = (gic_irq(d) % 4) * 8;
 	u32 val, mask, bit;
-        unsigned long flags;
+	unsigned long flags;
 
 	gic_lock_irqsave(flags);
 	if (unlikely(d->common->state_use_accessors & IRQD_GIC_MULTI_TARGET)) {
@@ -358,9 +358,9 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 		bit = gic_cpu_map[cpu] << shift;
 	}
 	mask = 0xff << shift;
-        val = readl_relaxed_no_log(reg) & ~mask;
-        writel_relaxed_no_log(val | bit, reg);
-        gic_unlock_irqrestore(flags);
+	val = readl_relaxed_no_log(reg) & ~mask;
+	writel_relaxed_no_log(val | bit, reg);
+	gic_unlock_irqrestore(flags);
 
 	irq_data_update_effective_affinity(d, cpumask_of(cpu));
 

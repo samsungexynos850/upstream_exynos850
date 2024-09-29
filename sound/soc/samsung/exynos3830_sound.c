@@ -73,8 +73,10 @@ static unsigned int baserate = MADERA_BASECLK_48K;
 enum FLL_ID { FLL1, FLL2, FLL3, FLLAO };
 enum CLK_ID { SYSCLK, ASYNCCLK, DSPCLK, OPCLK, OUTCLK };
 
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 /* Used for debugging and test automation */
 static u32 voice_trigger_count;
+#endif
 
 /* Debugfs value overrides, default to 0 */
 static unsigned int forced_mclk1;
@@ -538,7 +540,9 @@ static int madera_notify(struct notifier_block *nb,
 		vt_inf = data;
 		dev_info(drvdata->dev, "Voice Triggered (core_num=%d)\n",
 			 vt_inf->core_num);
+#if IS_ENABLED(CONFIG_DEBUG_FS)
 		++voice_trigger_count;
+#endif
 		break;
 	case MADERA_NOTIFY_HPDET:
 		hp_inf = data;

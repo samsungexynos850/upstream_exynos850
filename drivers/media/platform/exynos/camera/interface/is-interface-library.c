@@ -28,7 +28,7 @@
 #include "../is-device-ischain.h"
 #include "is-vender.h"
 #include "votf/camerapp-votf.h"
-#ifdef CONFIG_UH_RKP
+#ifdef CONFIG_RKP
 #include <linux/rkp.h>
 #endif
 
@@ -2498,7 +2498,7 @@ int __nocfi is_load_ddk_bin(int loadType)
 	struct device *device = &gPtr_lib_support.pdev->dev;
 	/* fixup the memory attribute for every region */
 	ulong lib_addr;
-#ifdef CONFIG_UH_RKP
+#ifdef CONFIG_RKP
 	rkp_dynamic_load_t rkp_dyn;
 	static rkp_dynamic_load_t rkp_dyn_before = {0};
 #endif
@@ -2547,7 +2547,7 @@ int __nocfi is_load_ddk_bin(int loadType)
 #endif
 
 	if (loadType == BINARY_LOAD_ALL) {
-#ifdef CONFIG_UH_RKP
+#ifdef CONFIG_RKP
 		memset(&rkp_dyn, 0, sizeof(rkp_dyn));
 		rkp_dyn.binary_base = lib_addr;
 		rkp_dyn.binary_size = bin.size;
@@ -2591,7 +2591,7 @@ int __nocfi is_load_ddk_bin(int loadType)
 			goto fail;
 		}
 
-#ifdef CONFIG_UH_RKP
+#ifdef CONFIG_RKP
 		ret = uh_call(UH_APP_RKP, RKP_DYNAMIC_LOAD, RKP_DYN_COMMAND_INS, (u64)&rkp_dyn, 0, 0);
 		if (ret) {
 			err_lib("fail to load verify FIMC in EL2");
@@ -2731,7 +2731,7 @@ int __nocfi is_load_rta_bin(int loadType)
 	os_system_func_t os_system_funcs[100];
 	ulong lib_rta = RTA_LIB_ADDR;
 
-#ifdef CONFIG_UH_RKP
+#ifdef CONFIG_RKP
 	rkp_dynamic_load_t rkp_dyn;
 	static rkp_dynamic_load_t rkp_dyn_before = {0};
 #endif
@@ -2755,7 +2755,7 @@ int __nocfi is_load_rta_bin(int loadType)
 	}
 
 	if (loadType == BINARY_LOAD_ALL) {
-#ifdef CONFIG_UH_RKP
+#ifdef CONFIG_RKP
 		memset(&rkp_dyn, 0, sizeof(rkp_dyn));
 		rkp_dyn.binary_base = lib_rta;
 		rkp_dyn.binary_size = bin.size;
@@ -2783,7 +2783,7 @@ int __nocfi is_load_rta_bin(int loadType)
 			ret = -EBADF;
 			goto fail;
 		}
-#ifdef CONFIG_UH_RKP
+#ifdef CONFIG_RKP
 		ret = uh_call(UH_APP_RKP, RKP_DYNAMIC_LOAD, RKP_DYN_COMMAND_INS,(u64)&rkp_dyn, 0, 0);
 		if (ret) {
 			err_lib("fail to load verify FIMC in EL2");

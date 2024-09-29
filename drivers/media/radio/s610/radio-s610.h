@@ -1,8 +1,31 @@
+/*
+ * drivers/media/radio/s610/radio-s610.h
+ *
+ * V4L2 driver header for SAMSUNG S610 chip
+ *
+ * Copyright (c) 2017 Samsung Electronics Co., Ltd.
+ *		http://www.samsung.com
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ */
 #ifndef RADIO_S610_H
 #define RADIO_S610_H
 
+#if defined(CONFIG_RADIO_S610)
 #define DRIVER_NAME "s610-radio"
 #define DRIVER_CARD "S610 FM Receiver"
+#elif defined(CONFIG_RADIO_S621)
+#define DRIVER_NAME "s621-radio"
+#define DRIVER_CARD "S621 FM Receiver"
+#endif /* defined(CONFIG_RADIO_S610) */
 
 #define	ENABLE_RDS_WORK_QUEUE
 #undef	ENABLE_RDS_WORK_QUEUE
@@ -16,6 +39,7 @@
 #define	RDS_POLLING_ENABLE
 
 #define IDLE_POLLING_ENABLE
+#undef IDLE_POLLING_ENABLE
 
 #define USE_AUDIO_PM
 
@@ -27,8 +51,8 @@
 
 #ifdef	SUPPORT_FM_DEBUG
 #define FDEBUG(fm, fmt, args...) dev_info(fm->dev, fmt, ##args)
-#define FUNC_ENTRY(fm) dev_info(fm->dev, "+ %s(): entry\n", __func__)
-#define FUNC_EXIT(fm) dev_info(fm->dev, "- %s(): exit\n", __func__)
+#define FUNC_ENTRY(fm) dev_info(fm->dev, "+ FM: %s(): entry\n", __func__)
+#define FUNC_EXIT(fm) dev_info(fm->dev, "- FM: %s(): exit\n", __func__)
 #else
 #define FDEBUG(fm, fmt, args...)
 #define FUNC_ENTRY(fm)
@@ -58,6 +82,18 @@
 #define RDS_EXIT(fm)
 #endif /*SUPPORT_RDS_DEBUG*/
 
+#define  SUPPORT_SPEEDY_DEBUG
+#undef	SUPPORT_SPEEDY_DEBUG
+
+#ifdef	SUPPORT_SPEEDY_DEBUG
+#define SPEEDYEBUG(fm, fmt, args...) dev_info(fm->dev, fmt, ##args)
+#define SPEEDY_ENTRY(fm) dev_info(fm->dev, "> SPEEDY: %s(): entry\n", __func__)
+#define SPEEDY_EXIT(fm) dev_info(fm->dev, "< SPEEDY: %s(): exit\n", __func__)
+#else
+#define SPEEDYEBUG(fm, fmt, args...)
+#define SPEEDY_ENTRY(fm)
+#define SPEEDY_EXIT(fm)
+#endif /*SUPPORT_SPEEDY_DEBUG*/
 
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
@@ -429,7 +465,7 @@ struct s610_radio {
 	u16 tune_fniarg;
 
 	u16 freq_step;
-	u8 speedy_error;
+	int speedy_error;
 	u16 seek_mode;
 	u32 seek_freq;	/* seek start frquency */
 	u32 seek_status;
@@ -467,7 +503,7 @@ struct s610_radio {
 /*	debug print counter */
 	int idle_cnt_mod;
 	int rds_cnt_mod;
-	fm_rds_block_type_enum block_seq;
+	enum fm_rds_block_type_enum block_seq;
 
 /* Test RDS log */
 	bool invalid_rssi;
@@ -552,5 +588,7 @@ extern void fm_ds_set(u32 data);
 extern void fm_get_version_number(void);
 extern int ringbuf_bytes_used(const struct ringbuf_t *rb);
 extern void fm_rds_parser_reset(struct fm_rds_parser_info *pi);
+extern struct fm_conf_ini_values low_fm_conf_init;
+signed int exynos_get_fm_open_status(void);
 #endif /* RADIO_S610_H */
 

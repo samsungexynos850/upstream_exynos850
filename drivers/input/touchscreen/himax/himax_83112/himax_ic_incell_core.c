@@ -398,11 +398,6 @@ static void himax_mcu_sense_on(uint8_t FlashMode)
 #endif
 	} else {
 		do {
-			if (atomic_read(&g_ts->suspend_mode) == HIMAX_STATE_POWER_OFF) {
-				input_info(true, g_ts->dev,
-					"%s %s,It had power-off-suspended!\n", HIMAX_LOG_TAG, __func__);
-				break;
-			}
 			g_core_fp.fp_register_write(pfw_op->addr_safe_mode_release_pw,
 						sizeof(pfw_op->data_safe_mode_release_pw_active),
 						pfw_op->data_safe_mode_release_pw_active, 0);
@@ -466,11 +461,6 @@ static bool himax_mcu_sense_off(bool check_en)
 	uint8_t tmp_data[DATA_LEN_4];
 
 	do {
-		if (atomic_read(&g_ts->suspend_mode) == HIMAX_STATE_POWER_OFF) {
-			input_info(true, g_ts->dev,
-				"%s %s,It had power-off-suspended!\n", HIMAX_LOG_TAG, __func__);
-			break;
-		}
 		tmp_data[0] = pic_op->data_i2c_psw_lb[0];
 
 		if (himax_bus_write(pic_op->adr_i2c_psw_lb[0], tmp_data, 1,
@@ -977,9 +967,7 @@ static void himax_mcu_set_SMWP_enable(uint8_t SMWP_enable, bool suspended)
 
 		g_core_fp.fp_register_read(pfw_op->addr_smwp_enable, DATA_LEN_4,
 						tmp_data, 0);
-
-		input_info(true, g_ts->dev, "%s: tmp_data[0]=%d, SMWP_enable=%d, retry_cnt=%d\n",
-					__func__, tmp_data[0], SMWP_enable, retry_cnt);
+/*input_info(true, g_ts->dev, "%s: tmp_data[0]=%d, SMWP_enable=%d, retry_cnt=%d \n", __func__, tmp_data[0],SMWP_enable,retry_cnt);*/
 		retry_cnt++;
 	} while ((tmp_data[3] != back_data[3] || tmp_data[2] != back_data[2]
 			|| tmp_data[1] != back_data[1] || tmp_data[0] != back_data[0])
@@ -3263,11 +3251,6 @@ void himax_mcu_write_sram_0f(u8 *data, uint8_t * addr, int start_index, uint32_t
 	}
 
 	for (i = 0; i < (total_read_times); i++) {
-		if (atomic_read(&g_ts->suspend_mode) == HIMAX_STATE_POWER_OFF) {
-			input_info(true, g_ts->dev,
-				"%s %s,It had power-off-suspended!\n", HIMAX_LOG_TAG, __func__);
-			break;
-		}
 		/*input_info(true, g_ts->dev, "[log]write %d time start!\n", i);
 		input_info(true, g_ts->dev, "[log]addr[3]=0x%02X, addr[2]=0x%02X, addr[1]=0x%02X, addr[0]=0x%02X!\n", tmp_addr[3], tmp_addr[2], tmp_addr[1], tmp_addr[0]);*/
 
@@ -3316,11 +3299,6 @@ int himax_sram_write_crc_check(u8 *data, uint8_t * addr, int strt_idx, uint32_t 
 	int crc = -1;
 
 	do {
-		if (atomic_read(&g_ts->suspend_mode) == HIMAX_STATE_POWER_OFF) {
-			input_info(true, g_ts->dev,
-				"%s %s,It had power-off-suspended!\n", HIMAX_LOG_TAG, __func__);
-			break;
-		}
 		g_core_fp.fp_write_sram_0f(data, addr, strt_idx, len);
 		crc = g_core_fp.fp_check_CRC(addr, len);
 		retry++;
@@ -3373,11 +3351,6 @@ int himax_zf_part_info(u8 *data)
 	}
 
 	for (i = 0; i < part_num; i++) {
-		if (atomic_read(&g_ts->suspend_mode) == HIMAX_STATE_POWER_OFF) {
-			input_info(true, g_ts->dev,
-				"%s %s,It had power-off-suspended!\n", HIMAX_LOG_TAG, __func__);
-			break;
-		}
 		/*3. get all partition*/
 		memcpy(buf, &data[i * 0x10 + HX64K + offset], 16);
 		memcpy(zf_info_arr[i].sram_addr, buf, 4);
@@ -3639,9 +3612,6 @@ void himax_mcu_0f_operation(struct work_struct *work)
 	msleep(10);
 	g_core_fp.fp_sense_on(0x00);
 	msleep(10);
-#if defined(CONFIG_SEC_FACTORY)
-	g_core_fp.set_bending_algo_for_factory(FW_SET_FACTORY_ON);
-#endif
 	himax_int_enable(1);
 	g_f_0f_updat = 0;
 

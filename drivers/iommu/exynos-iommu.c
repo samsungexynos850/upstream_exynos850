@@ -741,8 +741,7 @@ static int sysmmu_enable_from_master(struct device *master,
 			break;
 		}
 		if (drvdata->hold_rpm_on_boot) {
-			//pm_runtime_put(drvdata->sysmmu);
-			printk(KERN_CRIT "%s Keep sysmmu Always ON \n",__func__ );
+			pm_runtime_put(drvdata->sysmmu);
 			drvdata->hold_rpm_on_boot = false;
 		}
 	}

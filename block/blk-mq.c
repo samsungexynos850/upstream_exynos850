@@ -112,8 +112,8 @@ static void blk_mq_check_inflight(struct blk_mq_hw_ctx *hctx,
 }
 
 static void blk_mq_check_disk_inflight(struct blk_mq_hw_ctx *hctx,
-		struct request *rq, void *priv,
-		bool reserved)
+			       struct request *rq, void *priv,
+			       bool reserved)
 {
 	struct mq_inflight *mi = priv;
 
@@ -125,6 +125,7 @@ static void blk_mq_check_disk_inflight(struct blk_mq_hw_ctx *hctx,
 	 */
 	mi->inflight[0]++;
 }
+
 
 void blk_mq_in_flight(struct request_queue *q, struct hd_struct *part,
 		      unsigned int inflight[2])
@@ -149,8 +150,8 @@ static void blk_mq_check_inflight_rw(struct blk_mq_hw_ctx *hctx,
 }
 
 static void blk_mq_check_disk_inflight_rw(struct blk_mq_hw_ctx *hctx,
-		struct request *rq, void *priv,
-		bool reserved)
+				  struct request *rq, void *priv,
+				  bool reserved)
 {
 	struct mq_inflight *mi = priv;
 
@@ -614,10 +615,12 @@ static void __blk_mq_complete_request(struct request *rq)
 		rq->csd.func = __blk_mq_complete_request_remote;
 		rq->csd.info = rq;
 		rq->csd.flags = 0;
-		smp_call_function_single_async(ctx->cpu, &rq->csd);
-	} else {
-		rq->q->softirq_done_fn(rq);
+		if (!smp_call_function_single_async(ctx->cpu, &rq->csd))
+			goto out;
 	}
+	rq->q->softirq_done_fn(rq);
+
+out:
 	put_cpu();
 }
 

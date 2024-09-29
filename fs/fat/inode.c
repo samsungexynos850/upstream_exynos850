@@ -10,6 +10,8 @@
  *	Max Cohan: Fixed invalid FSINFO offset when info_sector is 0
  */
 
+/* @fs.sec -- d2cd60d3eb699151b0b559b61dfe9103 -- */
+
 #include <linux/module.h>
 #include <linux/pagemap.h>
 #include <linux/mpage.h>
@@ -699,7 +701,7 @@ static void fat_set_state(struct super_block *sb,
 			b->fat16.state &= ~FAT_STATE_DIRTY;
 	}
 
-	mark_buffer_dirty_sync(bh);
+	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
 	brelse(bh);
 }
@@ -900,7 +902,7 @@ retry:
 				  &raw_entry->adate, NULL);
 	}
 	spin_unlock(&sbi->inode_hash_lock);
-	mark_buffer_dirty_sync(bh);
+	mark_buffer_dirty(bh);
 	err = 0;
 	if (wait)
 		err = sync_dirty_buffer(bh);
@@ -1525,12 +1527,6 @@ static int fat_read_bpb(struct super_block *sb, struct fat_boot_sector *b,
 		goto out;
 	}
 
-	if (bpb->fat_fat_length == 0 && bpb->fat32_length == 0) {
-		if (!silent)
-			fat_msg(sb, KERN_ERR, "bogus number of FAT sectors");
-		goto out;
-	}
-
 	error = 0;
 
 out:
@@ -1647,8 +1643,6 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	error = parse_options(sb, data, isvfat, silent, &debug, &sbi->options);
 	if (error)
 		goto out_fail;
-
-	setup_fat_xattr_handler(sb);
 
 	setup(sb); /* flavour-specific stuff that needs options */
 

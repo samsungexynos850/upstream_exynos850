@@ -788,12 +788,13 @@ static int dwc3_ep0_std_request(struct dwc3 *dwc, struct usb_ctrlrequest *ctrl)
 		ret = dwc3_ep0_set_address(dwc, ctrl);
 		break;
 	case USB_REQ_SET_CONFIGURATION:
+#if IS_ENABLED(CONFIG_BATTERY_SAMSUNG)
 		if (dwc->gadget.speed == USB_SPEED_SUPER)
 			dwc->vbus_current = USB_CURRENT_SUPER_SPEED;
 		else
 			dwc->vbus_current = USB_CURRENT_HIGH_SPEED;
 		schedule_work(&dwc->set_vbus_current_work);
-
+#endif
 		ret = dwc3_ep0_set_config(dwc, ctrl);
 		break;
 	case USB_REQ_SET_SEL:

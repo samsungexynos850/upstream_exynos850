@@ -1301,5 +1301,6 @@ config TOUCHSCREEN_ROHM_BU21023
 
 source "drivers/input/touchscreen/himax/himax_83112/Kconfig"
 source "drivers/input/touchscreen/synaptics/td4150/Kconfig"
+source "drivers/input/touchscreen/ili9881x/Kconfig"
 source "drivers/input/touchscreen/novatek/nt36525/Kconfig"
 endif

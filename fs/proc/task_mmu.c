@@ -1728,7 +1728,6 @@ cont:
 		if (is_lru_wb && ptep_test_and_clear_young(vma, addr, pte))
 			continue;
 #endif
-
 		if (isolate_lru_page(page))
 			continue;
 

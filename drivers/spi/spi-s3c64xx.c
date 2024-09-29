@@ -170,6 +170,47 @@ struct s3c64xx_spi_port_config {
 	bool	clk_from_cmu;
 };
 
+#ifdef CONFIG_SAMSUNG_TUI
+int stui_spi_lock(struct spi_master *spi)
+{
+	int ret = 0;
+#ifdef CONFIG_PM
+	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
+#endif
+	(void)ret;
+
+	spi_bus_lock(spi);
+
+#ifdef CONFIG_PM
+	ret = pm_runtime_get_sync(&sdd->pdev->dev);
+#endif
+	if (ret < 0)
+		spi_bus_unlock(spi);
+
+	return ret;
+}
+
+int stui_spi_unlock(struct spi_master *spi)
+{
+#ifdef CONFIG_PM
+	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
+	int ret;
+#endif
+	spi_bus_unlock(spi);
+
+#ifdef CONFIG_PM
+	pm_runtime_mark_last_busy(&sdd->pdev->dev);
+	ret = pm_runtime_put_autosuspend(&sdd->pdev->dev);
+	if (ret < 0) {
+		dev_err(&sdd->pdev->dev, "pm_runtime_put_autosuspend fails. ret: %d", ret);
+		return ret;
+	}
+#endif
+
+	return 0;
+}
+#endif
+
 static ssize_t
 spi_dbg_show(struct device *dev, struct device_attribute *attr, char *buf)
 {

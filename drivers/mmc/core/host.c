@@ -27,6 +27,7 @@
 #include <linux/mmc/slot-gpio.h>
 
 #include "core.h"
+#include "crypto.h"
 #include "host.h"
 #include "slot-gpio.h"
 #include "pwrseq.h"
@@ -326,6 +327,8 @@ int mmc_of_parse(struct mmc_host *host)
 		host->caps2 |= MMC_CAP2_SKIP_INIT_NOT_TRAY;
 	if (device_property_read_bool(dev, "skip-init-mmc-scan"))
 		host->caps2 |= MMC_CAP2_SKIP_INIT_SCAN;
+	if (device_property_read_bool(dev, "mmc-inline-crypt"))
+		host->caps2 |= MMC_CAP2_CRYPTO;
 
 	/* Must be after "non-removable" check */
 	if (device_property_read_u32(dev, "fixed-emmc-driver-type", &drv_type) == 0) {
@@ -487,6 +490,7 @@ EXPORT_SYMBOL(mmc_remove_host);
  */
 void mmc_free_host(struct mmc_host *host)
 {
+	mmc_crypto_free_host(host);
 	mmc_pwrseq_free(host);
 	wake_lock_destroy(&host->detect_wake_lock);
 	put_device(&host->class_dev);

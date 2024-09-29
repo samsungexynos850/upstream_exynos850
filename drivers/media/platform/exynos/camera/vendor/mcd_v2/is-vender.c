@@ -40,6 +40,9 @@
 #if defined(CONFIG_LEDS_SM5713)
 #include <linux/mfd/sm5713.h>
 #endif
+#if defined(CONFIG_LEDS_S2MU106_FLASH)
+#include <linux/leds-s2mu106.h>
+#endif
 
 extern int is_create_sysfs(struct is_core *core);
 extern bool crc32_check_list[SENSOR_POSITION_MAX][CRC32_SCENARIO_MAX];
@@ -57,6 +60,7 @@ static u32  rear4_sensor_id;
 static u32  front4_sensor_id;
 static u32  rear_tof_sensor_id;
 static u32  front_tof_sensor_id;
+
 #ifdef CONFIG_SECURE_CAMERA_USE
 static u32  secure_sensor_id;
 #endif
@@ -319,6 +323,20 @@ int is_vender_probe(struct is_vender *vender)
 	specific->sensor_id[SENSOR_POSITION_FRONT4] = front4_sensor_id;
 	specific->sensor_id[SENSOR_POSITION_REAR_TOF] = rear_tof_sensor_id;
 	specific->sensor_id[SENSOR_POSITION_FRONT_TOF] = front_tof_sensor_id;
+
+#ifdef USE_DUALIZED_OTPROM_SENSOR
+	specific->dualized_sensor_id[SENSOR_POSITION_REAR] = -1;
+	specific->dualized_sensor_id[SENSOR_POSITION_FRONT] = -1;
+	specific->dualized_sensor_id[SENSOR_POSITION_REAR2] = -1;
+	specific->dualized_sensor_id[SENSOR_POSITION_FRONT2] = -1;
+	specific->dualized_sensor_id[SENSOR_POSITION_REAR3] = -1;
+	specific->dualized_sensor_id[SENSOR_POSITION_FRONT3] = -1;
+	specific->dualized_sensor_id[SENSOR_POSITION_REAR4] = -1;
+	specific->dualized_sensor_id[SENSOR_POSITION_FRONT4] = -1;
+	specific->dualized_sensor_id[SENSOR_POSITION_REAR_TOF] = -1;
+	specific->dualized_sensor_id[SENSOR_POSITION_FRONT_TOF] = -1;
+#endif
+
 #ifdef CONFIG_SECURE_CAMERA_USE
 	specific->secure_sensor_id = secure_sensor_id;
 #endif
@@ -346,6 +364,10 @@ int is_vender_probe(struct is_vender *vender)
 		specific->rom_share[i].share_position = i;
 
 		specific->running_camera[i] = false;
+#ifdef USE_DUALIZED_OTPROM_SENSOR
+		specific->dualized_rom_client[i] = NULL;
+		specific->dualized_rom_cal_map_addr[i] = NULL;
+#endif
 	}
 
 	vender->private_data = specific;
@@ -786,7 +808,8 @@ static int is_ischain_loadcalb_eeprom(struct is_core *core,
 		position, finfo->header_ver, pinfo->header_ver, loaded_fw_ver);
 
 	/* CRC check */
-	if (crc32_check_list[position][CRC32_CHECK] == true) {
+	if (crc32_check_list[position][CRC32_CHECK] == true
+		&& crc32_check_list[position][CRC32_CHECK_STANDARD_CAL] == true) {
 		memcpy((void *)(cal_ptr), (void *)cal_buf, cal_size);
 		info("Camera[%d]: The dumped Cal data was applied success.\n", position);
 	} else {
@@ -1088,6 +1111,9 @@ extern int sky81296_torch_ctrl(int state);
 #if defined(CONFIG_TORCH_CURRENT_CHANGE_SUPPORT) && defined(CONFIG_LEDS_S2MPB02)
 extern int s2mpb02_set_torch_current(bool movie);
 #endif
+#if defined(CONFIG_LEDS_S2MU106_FLASH)
+extern void s2mu106_set_torch_current(enum s2mu106_fled_mode state);
+#endif
 
 #ifdef CONFIG_LEDS_SUPPORT_FRONT_FLASH_AUTO
 int is_vender_set_torch(u32 aeflashMode, u32 frontFlashMode)
@@ -1136,6 +1162,8 @@ int is_vender_set_torch(struct camera2_shot *shot)
 		s2mpb02_set_torch_current(true);
 #elif defined(CONFIG_LEDS_S2MU005_FLASH)
 		s2mu005_led_mode_ctrl(S2MU005_FLED_MODE_MOVIE);
+#elif defined(CONFIG_LEDS_S2MU106_FLASH)
+		s2mu106_set_torch_current(S2MU106_FLED_MODE_MOVIE);
 /*
 #elif defined(CONFIG_LEDS_SM5713)
 		sm5713_fled_mode_ctrl(SM5713_FLED_INDEX_1, SM5713_FLED_MODE_TORCH_FLASH);
@@ -1147,6 +1175,8 @@ int is_vender_set_torch(struct camera2_shot *shot)
 		lm3560_reg_update_export(0xE0, 0xFF, 0xEF);
 #elif defined(CONFIG_LEDS_SKY81296)
 		sky81296_torch_ctrl(1);
+#elif defined(CONFIG_LEDS_S2MU106_FLASH)
+		s2mu106_set_torch_current(S2MU106_FLED_MODE_TORCH);
 #endif
 #if defined(CONFIG_TORCH_CURRENT_CHANGE_SUPPORT) && defined(CONFIG_LEDS_S2MPB02)
 		s2mpb02_set_torch_current(false);

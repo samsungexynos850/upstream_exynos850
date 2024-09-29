@@ -1,3 +1,21 @@
+/*
+ * drivers/media/radio/s610/fm_low_struc.h
+ *
+ * Property and FM data define for SAMSUNG S610 chip
+ *
+ * Copyright (c) 2017 Samsung Electronics Co., Ltd.
+ *		http://www.samsung.com
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ */
 #ifndef FM_LOW_STRUC_H
 #define FM_LOW_STRUC_H
 
@@ -7,8 +25,10 @@
 #include <linux/slab.h>
 #include <linux/io.h>
 
-#define S612_REV_1	(0x030100)
-#define S620_REV_0	(0x100000)
+#define S612_REV_1	(0x0030100)
+#define S612_REV_X	(0x0030000)
+#define S620_REV_0	(0x0100000)
+#define S621_REV_0	(0x1000000)
 
 #define USE_SPUR_CANCEL
 #undef USE_SPUR_CANCEL
@@ -24,7 +44,6 @@
 #define USE_FILTER_SELECT_BY_FREQ
 #define MAX_FILTER_FREQ_NUM	6
 
-#define USE_NEW_SCAN
 #define	USE_RDS_HW_DECODER
 #undef	USE_RDS_HW_DECODER
 
@@ -50,11 +69,7 @@ typedef u32 TIME;
 #define	RDS_POLL_DELAY_MS	(150)
 #define	TUNE_TIME_FAST_MS	(30)
 #define	TUNE_TIME_SLOW_MS	(60)
-#ifdef USE_NEW_SCAN
 #define	SEARCH_DELAY_MS	(16)
-#else
-#define	SEARCH_DELAY_MS	(15)
-#endif
 
 #define RSSI_REF_ENABLE 0x01
 #define FM_RDS_MEM_SIZE_PARSER	2000
@@ -114,13 +129,12 @@ typedef u32 TIME;
 #define FMSPDY_RANDOM          (1<<16)
 
 #define write32(addr, data) __raw_writel(data, addr)
-#define read32(addr) __raw_readl((volatile void __iomem *)addr)
+#define read32(addr) __raw_readl(addr)
 #define SetBits(uAddr, uBaseBit, uMaskValue, uSetValue) \
 		write32(uAddr, (read32(uAddr) & ~((uMaskValue)<<(uBaseBit))) | \
 				(((uMaskValue)&(uSetValue))<<(uBaseBit)))
 #define GetBits(uAddr, uBaseBit, uMaskValue) \
 		((read32(uAddr)>>(uBaseBit))&(uMaskValue))
-
 
 enum flags_enum {
 	FLAG_TUNED		= (1 << 0),
@@ -183,12 +197,12 @@ enum fm_deemph_mode_mask_enum {
 	MODE_MASK_DEEMPH = (1 << 0)
 };
 
-typedef enum {
+enum fm_host_rds_errors_enum {
 	HOST_RDS_ERRS_NONE		= 0,
 	HOST_RDS_ERRS_2CORR		= 1,
 	HOST_RDS_ERRS_5CORR		= 2,
 	HOST_RDS_ERRS_UNCORR	= 3
-} fm_host_rds_errors_enum;
+};
 
 #define RDS_MEM_MAX_THRESH	(48)
 #define RDS_MEM_MAX_THRESH_PARSER	(100)
@@ -236,15 +250,14 @@ enum fm_audio_gain_enum {
 
 /***************************************************************************/
 
-typedef struct {
+struct soft_muffle_conf {
 	u16 muffle_coeffs;
 	u16 lpf_en;
 	u16 lpf_auto;
 	u16 lpf_bw;
-} soft_muffle_conf;
+};
 
-typedef struct {
-#ifdef USE_NEW_SCAN
+struct search_config {
 	u16 weak_ifca_l;
 	u16 weak_ifca_m;
 	u16 weak_ifca_h;
@@ -252,29 +265,24 @@ typedef struct {
 	u16 normal_ifca_m;
 	u16 normal_ifca_h;
 	bool weak_sig;
-#else
-	u16 ifca_l;
-	u16 ifca_m;
-	u16 ifca_h;
-#endif
-} search_config;
+};
 
 #ifdef MONO_SWITCH_INTERF
-typedef struct {
+struct interf_snr_thres {
 	s16 lo;
 	s16 hi;
-} interf_rssi_thres;
+};
 
-typedef struct {
+struct interf_snr_thres {
 	u16 lo;
 	u16 hi;
-} interf_snr_thres;
+};
 #endif /* MONO_SWITCH_INTERF */
 
-typedef struct {
+struct fm_conf_ini_values {
 	u32 demod_conf_ini;
 	u16 rssi_adj_ini;
-	soft_muffle_conf soft_muffle_conf_ini;
+	struct soft_muffle_conf soft_muffle_conf_ini;
 	u16 soft_mute_atten_max_ini;
 	u16 stereo_thres_ini;
 	u16 narrow_thres_ini;
@@ -286,19 +294,19 @@ typedef struct {
 	u16 blend_coeffs_switch;
 	u16 blend_coeffs_dis;
 	u16 rds_int_byte_count;
-	search_config search_conf;
+	struct search_config search_conf;
 #ifdef MONO_SWITCH_INTERF
 	interf_rssi_thres interf_rssi;
-	interf_snr_thres interf_snr;
+	struct interf_snr_thres interf_snr;
 #endif
 	u16 rds_error_limit;
-} fm_conf_ini_values;
+};
 
 /***************************************************************************/
 
-typedef struct {
+struct fm_state_s {
 	bool rds_rx_enabled;
-	bool fm_pwr_on;
+	u8 fm_pwr_on;
 	bool rds_pwr_on;
 	bool force_mono;
 	bool use_switched_blend;
@@ -330,38 +338,38 @@ typedef struct {
 	u8 rds_unsync_uncorr_weight;
 	u8 rds_unsync_blk_cnt;
 	u16 rds_unsync_bit_cnt;
-} fm_state_s;
+};
 
-typedef enum {
+enum fm_tuner_state_low {
 	TUNER_OFF,
 	TUNER_NOTTUNED,
 	TUNER_IDLE,
 	TUNER_PRESET,
 	TUNER_SEARCH
-} fm_tuner_state;
+};
 
 /***************************************************************************/
 
-typedef struct {
-	fm_tuner_state tuner_state;
+struct fm_tuner_state_s {
+	enum fm_tuner_state_low tuner_state;
 	bool curr_search_down;
 	bool hit_band_limit;
 	bool tune_done;
 	u16 freq_step;
 	u32 band_limit_lo;
 	u32 band_limit_hi;
-} fm_tuner_state_s;
+};
 
-typedef enum {
+enum fm_rds_rm_align_enum {
 	RDS_RM_ALIGN_0 = 0,
 	RDS_RM_ALIGN_1 = 1,
 	RDS_RM_ALIGN_2 = 2,
 	RDS_RM_ALIGN_3 = 3,
 	RDS_RM_ALIGN_NONE = 4
-} fm_rds_rm_align_enum;
+};
 
 #ifdef	USE_RDS_HW_DECODER
-typedef enum {
+enum fm_rds_block_type_enum {
 	RDS_BLKTYPE_A	= 0,
 	RDS_BLKTYPE_B	= 1,
 	RDS_BLKTYPE_C	= 2,
@@ -369,25 +377,25 @@ typedef enum {
 	RDS_BLKTYPE_D	= 4,
 	RDS_BLKTYPE_E	= 5,
 	RDS_NUM_BLOCK_TYPES = 6
-} fm_rds_block_type_enum;
+};
 
-typedef enum {
+enum fm_rds_state_enum {
 	RDS_STATE_INIT,
 	RDS_STATE_HAVE_DATA,
 	RDS_STATE_PRE_SYNC,
 	RDS_STATE_FULL_SYNC
-} fm_rds_state_enum;
+};
 #else
-typedef enum {
+enum fm_rds_block_type_enum {
 	RDS_BLKTYPE_A   = 0,
 	RDS_BLKTYPE_B   = 1,
 	RDS_BLKTYPE_C   = 2,
 	RDS_BLKTYPE_D   = 3,
 	RDS_BLKTYPE_E   = 4,
 	RDS_NUM_BLOCK_TYPES = 5
-} fm_rds_block_type_enum;
+};
 
-typedef enum {
+enum fm_rds_state_enum {
 	RDS_STATE_FOUND_BL_A,
 	RDS_STATE_FOUND_BL_B,
 	RDS_STATE_FOUND_BL_C,
@@ -396,69 +404,68 @@ typedef enum {
 	RDS_STATE_PRE_SYNC,
 	RDS_STATE_FULL_SYNC,
 	RDS_STATE_INIT,
-} fm_rds_state_enum;
+};
 #endif	/*USE_RDS_HW_DECODER*/
 
-typedef struct {
+struct fm_rds_state_s {
 	unsigned current_state :3;
 	u16 error_bits;
 	u8 error_blks;
-} fm_rds_state_s;
+};
 
-typedef struct rds_buf_conf {
+struct rds_buf_conf {
 	u8 *base;
 	u16 index;
 	u16 outdex;
 	u16 size;
-} rds_buf_conf;
-
+};
 
 /****************************************************************************/
 
-typedef struct struct_fm_rx_setup {
+struct fm_rx_setup {
 	u32 fm_freq_hz;
 	u32 fm_freq_khz;
 	u16 demod_if;
 	s16 lna_cdac;
 	u16 spur_ctrl;
 	s16 spur_freq;
-} struct_fm_rx_setup;
+};
 
-typedef struct struct_fm_lo_setup {
+struct fm_lo_setup {
 	u32 rx_lo_req_freq;
 	u32 n_mmdiv;
 	u32 frac_b1;
 	u32 frac_b0;
 	u32 n_lodiv;
-} struct_fm_lo_setup;
+};
 
- typedef struct struct_fm_rx_tune_info {
-	struct_fm_rx_setup rx_setup;
-	struct_fm_lo_setup lo_setup;
-} struct_fm_rx_tune_info;
+struct fm_rx_tune_info {
+	struct fm_rx_setup rx_setup;
+	struct fm_lo_setup lo_setup;
+};
 
 /**********************************************/
 /* FM low struct
  **********************************************/
-typedef struct {
+struct fm_band_s {
 	u32 lo;
 	u32 hi;
-} fm_band_s;
+};
 
 struct s610_low {
 	/* fm low level struct - start */
-	fm_conf_ini_values fm_config;
-	fm_state_s fm_state;
-	fm_tuner_state_s fm_tuner_state;
-	fm_rds_state_s fm_rds_state;
+	struct fm_conf_ini_values fm_config;
+	struct fm_state_s fm_state;
+	struct fm_tuner_state_s fm_tuner_state;
+	struct fm_rds_state_s fm_rds_state;
 
 	u8 *rds_buffer_mem;
-	rds_buf_conf rds_buffer_config;
-	rds_buf_conf *rds_buffer;
+	struct rds_buf_conf rds_buffer_config;
+	struct rds_buf_conf *rds_buffer;
 
-	struct_fm_rx_tune_info fm_tune_info;
+	struct fm_rx_tune_info fm_tune_info;
 
-	fm_band_s fm_bands[3];
+	struct fm_band_s fm_bands[3];
 
 	u16 fm_freq_steps[3];
 
@@ -475,7 +482,6 @@ struct s610_low {
 };
 
 typedef void fm_callback_t(unsigned long);
-typedef struct timer_list fm_timer_t;
 typedef void fm_linux_callback_t(u_long);
 
 #define fm_set_flag_bits(radio, value) \
@@ -484,6 +490,5 @@ typedef void fm_linux_callback_t(u_long);
 		fm_set_flags(radio, radio->low->fm_state.flags & ~(value))
 #define fm_get_band(radio) (radio->low->fm_state.band)
 #define fm_get_freq_step(radio) (radio->low->fm_tuner_state.freq_step)
-
 
 #endif	/*FM_LOW_STRUC_H*/

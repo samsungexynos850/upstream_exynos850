@@ -123,7 +123,7 @@ struct abox_compr_data {
 };
 
 struct abox_dma_dump {
-	struct dentry *file;
+	struct proc_dir_entry *file;
 	wait_queue_head_t waitqueue;
 	void *area;
 	phys_addr_t addr;

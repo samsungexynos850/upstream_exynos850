@@ -430,7 +430,7 @@ static int init_mmc_srpmb(struct platform_device *pdev, struct _mmc_rpmb_ctx *ct
 
 get_irq_fail:
 	dma_free_coherent(dev, sizeof(struct _mmc_rpmb_req) + RPMB_BUF_MAX_SIZE, ctx->wsm_virtaddr,
- 				ctx->wsm_phyaddr);
+				ctx->wsm_phyaddr);
 alloc_wsm_fail:
 	ret = -ENOMEM;
 	return ret;
@@ -441,8 +441,8 @@ static int mmc_srpmb_probe(struct platform_device *pdev)
 	int ret;
 	struct _mmc_rpmb_ctx *ctx;
 	struct device *dev = &pdev->dev;
-	struct irq_data *rpmb_irqd;
-	irq_hw_number_t hwirq;
+        struct irq_data *rpmb_irqd;
+        irq_hw_number_t hwirq;
 
 	dma_set_mask(&pdev->dev, DMA_BIT_MASK(36));
 	/* allocation for rpmb context */
@@ -459,25 +459,26 @@ static int mmc_srpmb_probe(struct platform_device *pdev)
 		goto ctx_kfree;
 	}
 
-	/* Get irq_data from irq number */
-	rpmb_irqd = irq_get_irq_data(ctx->irq);
-	if (!rpmb_irqd) {
-		dev_err(dev, "Fail to get irq_data from irq number\n");
-		goto dma_free;
-	}
-	/* Get hwirq from irq_data */
-	hwirq = irqd_to_hwirq(rpmb_irqd);
+        /* Get irq_data from irq number */
+        rpmb_irqd = irq_get_irq_data(ctx->irq);
+        if (!rpmb_irqd) {
+                dev_err(dev, "Fail to get irq_data from irq number\n");
+                goto dma_free;
+        }
 
-	/* initialize workqueue for mmc rpmb handler */
-	ctx->dev = dev;
-	INIT_WORK(&ctx->work, mmc_rpmb_worker);
+        /* Get hwirq from irq_data */
+        hwirq = irqd_to_hwirq(rpmb_irqd);
 
-	ctx->srpmb_queue = alloc_workqueue("srpmb_wq",
-		WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_HIGHPRI, 1);
-	if (!ctx->srpmb_queue) {
-		dev_err(dev, "Fail to alloc workqueue for mmc srpmb\n");
-		goto dma_free;
-	}
+        ctx->dev = dev;
+        INIT_WORK(&ctx->work, mmc_rpmb_worker);
+
+        /* initialize workqueue for mmc rpmb handler */
+        ctx->srpmb_queue = alloc_workqueue("srpmb_wq",
+                WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_HIGHPRI, 1);
+        if (!ctx->srpmb_queue) {
+                dev_err(dev, "Fail to alloc workqueue for mmc srpmb\n");
+                goto dma_free;
+        }
 
 	/* request irq for mmc rpmb handler */
 	ret = request_irq(ctx->irq, mmc_rpmb_interrupt,
@@ -491,7 +492,7 @@ static int mmc_srpmb_probe(struct platform_device *pdev)
 	ret = register_pm_notifier(&ctx->pm_notifier);
 	if (ret) {
 		dev_err(dev, "Fail to setup pm notifier\n");
-		goto free_irq;
+		goto workqueue_free;
 	}
 
 	platform_set_drvdata(pdev, ctx);
@@ -499,24 +500,18 @@ static int mmc_srpmb_probe(struct platform_device *pdev)
 	spin_lock_init(&ctx->lock);
 
 	/* Smc call to transfer wsm address to secure world */
-	ret = exynos_smc(SMC_SRPMB_WSM, ctx->wsm_phyaddr, hwirq, 0);
-	if (ret){
-		dev_err(dev, "Fail to smc call to initial wsm buffer\n");
-		goto destroy_wakelock;
+        ret = exynos_smc(SMC_SRPMB_WSM, ctx->wsm_phyaddr, hwirq, 0);
+        if (ret){
+                dev_err(dev, "Fail to smc call to initial wsm buffer\n");
+		goto workqueue_free;
 	}
-
 	return 0;
 
-destroy_wakelock:
-	wake_lock_destroy(&ctx->wakelock);
-	unregister_pm_notifier(&ctx->pm_notifier);
-free_irq:
-	free_irq(ctx->irq, ctx);
 workqueue_free:
-	destroy_workqueue(ctx->srpmb_queue);
+        destroy_workqueue(ctx->srpmb_queue);
 dma_free:
 	dma_free_coherent(dev, sizeof(struct _mmc_rpmb_req) + RPMB_BUF_MAX_SIZE, ctx->wsm_virtaddr,
- 				ctx->wsm_phyaddr);
+				ctx->wsm_phyaddr);
 ctx_kfree:
 	kfree(ctx);
 	return -1;

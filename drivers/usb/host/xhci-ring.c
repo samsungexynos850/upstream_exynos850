@@ -306,7 +306,7 @@ static void xhci_handle_stopped_cmd_ring(struct xhci_hcd *xhci,
 {
 	struct xhci_command *i_cmd;
 
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 	xhci_info(xhci, "%s \n", __func__);
 #endif
 	/* Turn all aborted commands in list to no-ops, then restart */
@@ -316,7 +316,7 @@ static void xhci_handle_stopped_cmd_ring(struct xhci_hcd *xhci,
 			continue;
 
 		i_cmd->status = COMP_COMMAND_RING_STOPPED;
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 		xhci_info(xhci, "Turn aborted command %p to no-op\n",
 			 i_cmd->command_trb);
 #else
@@ -348,7 +348,7 @@ static int xhci_abort_cmd_ring(struct xhci_hcd *xhci, unsigned long flags)
 	u64 temp_64;
 	int ret;
 
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 	xhci_info(xhci, "Abort command ring\n");
 #else
 	xhci_dbg(xhci, "Abort command ring\n");
@@ -365,7 +365,7 @@ static int xhci_abort_cmd_ring(struct xhci_hcd *xhci, unsigned long flags)
 	 * In the future we should distinguish between -ENODEV and -ETIMEDOUT
 	 * and try to recover a -ETIMEDOUT with a host controller reset.
 	 */
-#if defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
+#if IS_ENABLED(CONFIG_USB_HOST_SAMSUNG_FEATURE)
 		ret = xhci_handshake(&xhci->op_regs->cmd_ring,
 			CMD_RING_RUNNING, 0, 5 * 100 * 1000);
 #else
@@ -389,19 +389,19 @@ static int xhci_abort_cmd_ring(struct xhci_hcd *xhci, unsigned long flags)
 					  msecs_to_jiffies(2000));
 	spin_lock_irqsave(&xhci->lock, flags);
 	if (!ret) {
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 		xhci_info(xhci, "No stop event for abort, ring start fail?\n");
 #else
 		xhci_dbg(xhci, "No stop event for abort, ring start fail?\n");
 #endif
-#if defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
+#if IS_ENABLED(CONFIG_USB_HOST_SAMSUNG_FEATURE)
 		cancel_delayed_work(&xhci->cmd_timer);
 #endif
 		xhci_cleanup_command_queue(xhci);
-#if defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
+#if IS_ENABLED(CONFIG_USB_HOST_SAMSUNG_FEATURE)
 		xhci->current_cmd = NULL;
 #endif
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 		xhci_info(xhci, "xhci->xhc_state 0x%x\n", xhci->xhc_state);
 #endif
 	} else {
@@ -646,7 +646,7 @@ static void td_to_noop(struct xhci_hcd *xhci, struct xhci_ring *ep_ring,
 static void xhci_stop_watchdog_timer_in_irq(struct xhci_hcd *xhci,
 		struct xhci_virt_ep *ep)
 {
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 	xhci_info(xhci, "%s", __func__);
 #endif
 	ep->ep_state &= ~EP_STOP_CMD_PENDING;
@@ -981,7 +981,7 @@ void xhci_stop_endpoint_command_watchdog(struct timer_list *t)
 	if (!(ep->ep_state & EP_STOP_CMD_PENDING) ||
 	    timer_pending(&ep->stop_cmd_timer)) {
 		spin_unlock_irqrestore(&xhci->lock, flags);
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 		xhci_err(xhci, "Stop EP timer raced with cmd completion, exit");
 #else
 		xhci_dbg(xhci, "Stop EP timer raced with cmd completion, exit");
@@ -1345,7 +1345,7 @@ void xhci_handle_command_timeout(struct work_struct *work)
 	u64 hw_ring_state;
 
 	xhci = container_of(to_delayed_work(work), struct xhci_hcd, cmd_timer);
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 	xhci_err(xhci, "+ %s\n", __func__);
 #endif
 	spin_lock_irqsave(&xhci->lock, flags);
@@ -1391,7 +1391,7 @@ void xhci_handle_command_timeout(struct work_struct *work)
 
 time_out_completed:
 	spin_unlock_irqrestore(&xhci->lock, flags);
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 	xhci_err(xhci, "- %s\n", __func__);
 #endif
 	return;
@@ -3374,8 +3374,8 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 			/* New sg entry */
 			--num_sgs;
 			sent_len -= block_len;
-			sg = sg_next(sg);
-			if (num_sgs != 0 && sg) {
+			if (num_sgs != 0) {
+				sg = sg_next(sg);
 				block_len = sg_dma_len(sg);
 				addr = (u64) sg_dma_address(sg);
 				addr += sent_len;

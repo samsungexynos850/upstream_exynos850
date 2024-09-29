@@ -23,7 +23,9 @@ static struct ect_info ect_list[];
 
 static char ect_signature[] = "PARA";
 
+#ifdef CONFIG_DEBUG_FS
 static struct class *ect_class;
+#endif
 
 static phys_addr_t ect_address;
 static phys_addr_t ect_size;
@@ -2074,6 +2076,7 @@ static int dump_open(struct inode *inode, struct file *file)
 	return single_open(file, info->dump, inode->i_private);
 }
 
+#ifdef CONFIG_DEBUG_FS
 static int ect_dump_all(struct seq_file *s, void *data)
 {
 	int i, j, ret;
@@ -2150,9 +2153,11 @@ static ssize_t create_binary_store(struct class *class,
 
 static CLASS_ATTR_WO(create_binary);
 
+#endif
 
 static int ect_dump_init(void)
 {
+#ifdef CONFIG_DEBUG_FS
 	int i;
 	struct dentry *root, *d;
 
@@ -2193,6 +2198,7 @@ static int ect_dump_init(void)
 		return -EINVAL;
 	}
 
+#endif
 	return 0;
 }
 late_initcall_sync(ect_dump_init);

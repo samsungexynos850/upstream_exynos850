@@ -244,11 +244,13 @@ static int exynos_seclog_probe(struct platform_device *pdev)
 	INIT_WORK(&slog_ctx.work, exynos_seclog_worker);
 	slog_ctx.enabled = true;
 
+#ifdef CONFIG_DEBUG_FS
 	/* Create debugfs for Secure log */
 	slog_ctx.debug_dir = debugfs_create_dir("seclog", NULL);
 	debugfs_create_bool("seclog_debug", 0600, slog_ctx.debug_dir,
 			&slog_ctx.enabled);
 
+#endif
 	/* Send message buffer information to EL3 Monitor */
 	dev_dbg(&pdev->dev,
 		"SMC arguments(%#x, %#lx, %#lx, %ld)\n",

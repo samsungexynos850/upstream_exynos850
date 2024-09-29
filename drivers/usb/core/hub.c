@@ -18,6 +18,7 @@
 #include <linux/sched/mm.h>
 #include <linux/list.h>
 #include <linux/slab.h>
+#include <linux/kcov.h>
 #include <linux/ioctl.h>
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
@@ -34,13 +35,12 @@
 
 #include "hub.h"
 #include "otg_whitelist.h"
-#if defined(CONFIG_USB_NOTIFY_LAYER)
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
 #include <linux/usb_notify.h>
 #endif
 
 #define USB_VENDOR_GENESYS_LOGIC		0x05e3
 #define USB_VENDOR_SMSC				0x0424
-#define USB_PRODUCT_USB5534B			0x5534
 #define HUB_QUIRK_CHECK_PORT_AUTOSUSPEND	0x01
 #define HUB_QUIRK_DISABLE_AUTOSUSPEND		0x02
 
@@ -934,7 +934,7 @@ static int hub_set_port_link_state(struct usb_hub *hub, int port1,
  */
 static void hub_port_logical_disconnect(struct usb_hub *hub, int port1)
 {
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 	dev_info(&hub->ports[port1 - 1]->dev, "logical disconnect\n");
 #else
 	dev_dbg(&hub->ports[port1 - 1]->dev, "logical disconnect\n");
@@ -1205,11 +1205,6 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 #ifdef CONFIG_PM
 			udev->reset_resume = 1;
 #endif
-			/* Don't set the change_bits when the device
-			 * was powered off.
-			 */
-			if (test_bit(port1, hub->power_bits))
-				set_bit(port1, hub->change_bits);
 
 		} else {
 			/* The power session is gone; tell hub_wq */
@@ -2240,7 +2235,7 @@ void usb_disconnect(struct usb_device **pdev)
 	put_device(&udev->dev);
 }
 
-#ifdef CONFIG_USB_ANNOUNCE_NEW_DEVICES
+#if IS_ENABLED(CONFIG_USB_ANNOUNCE_NEW_DEVICES)
 static void show_string(struct usb_device *udev, char *id, char *string)
 {
 	if (!string)
@@ -2396,20 +2391,20 @@ static int usb_enumerate_device(struct usb_device *udev)
 		}
 		return -ENOTSUPP;
 	}
-#if defined(CONFIG_USB_NOTIFY_LAYER)
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
 	if (!usb_check_whitelist_for_mdm(udev)) {
 		if (IS_ENABLED(CONFIG_USB_OTG) && (udev->bus->b_hnp_enable
 			|| udev->bus->is_b_host)) {
 			err = usb_port_suspend(udev, PMSG_AUTO_SUSPEND);
 			if (err < 0)
-				dev_dbg(&udev->dev, "HNP fail, %d\n", err);
+				dev_err(&udev->dev, "HNP fail, %d\n", err);
 		}
 		return -ENOTSUPP;
 	}
 #endif
 	usb_detect_interface_quirks(udev);
 
-#ifdef CONFIG_USB_INTERFACE_LPM_LIST
+#if IS_ENABLED(CONFIG_USB_INTERFACE_LPM_LIST)
 		if (usb_detect_interface_lpm(udev)) {
 			dev_info(&udev->dev, "L1 enable");
 			hub_set_initial_usb2_lpm_policy(udev);
@@ -3095,15 +3090,6 @@ static int check_port_resume_type(struct usb_device *udev,
 		if (portchange & USB_PORT_STAT_C_ENABLE)
 			usb_clear_port_feature(hub->hdev, port1,
 					USB_PORT_FEAT_C_ENABLE);
-
-		/*
-		 * Whatever made this reset-resume necessary may have
-		 * turned on the port1 bit in hub->change_bits.  But after
-		 * a successful reset-resume we want the bit to be clear;
-		 * if it was on it would indicate that something happened
-		 * following the reset-resume.
-		 */
-		clear_bit(port1, hub->change_bits);
 	}
 
 	return status;
@@ -3542,7 +3528,7 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 	if (!test_and_set_bit(port1, hub->child_usage_bits)) {
 		status = pm_runtime_get_sync(&port_dev->dev);
 		if (status < 0) {
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 			dev_err(&udev->dev, "can't resume usb port, status %d\n",
 					status);
 #else
@@ -3570,7 +3556,7 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 		status = usb_clear_port_feature(hub->hdev,
 				port1, USB_PORT_FEAT_SUSPEND);
 	if (status) {
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 		dev_err(&port_dev->dev, "can't resume, status %d\n", status);
 #else
 		dev_dbg(&port_dev->dev, "can't resume, status %d\n", status);
@@ -3614,7 +3600,7 @@ int usb_port_resume(struct usb_device *udev, pm_message_t msg)
 	if (status == 0)
 		status = finish_port_resume(udev);
 	if (status < 0) {
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 		dev_err(&udev->dev, "can't resume, status %d\n", status);
 #else
 		dev_dbg(&udev->dev, "can't resume, status %d\n", status);
@@ -4887,7 +4873,7 @@ hub_port_init(struct usb_hub *hub, struct usb_device *udev, int port1,
 		}
 	}
 
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 	dev_info(&udev->dev, "udev->lpm_capable=%d\n", udev->lpm_capable);
 #endif
 
@@ -4895,7 +4881,7 @@ hub_port_init(struct usb_hub *hub, struct usb_device *udev, int port1,
 	/* notify HCD that we have a device connected and addressed */
 	if (hcd->driver->update_device)
 		hcd->driver->update_device(hcd, udev);
-#ifndef CONFIG_USB_INTERFACE_LPM_LIST
+#if !IS_ENABLED(CONFIG_USB_INTERFACE_LPM_LIST)
 	hub_set_initial_usb2_lpm_policy(udev);
 #endif
 fail:
@@ -4993,7 +4979,7 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 	struct usb_port *port_dev = hub->ports[port1 - 1];
 	struct usb_device *udev = port_dev->child;
 	static int unreliable_port = -1;
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 	dev_info(&port_dev->dev,
 		"port %d, status %04x, change %04x, %s\n",
 		port1, portstatus, portchange, portspeed(hub, portstatus));
@@ -5056,11 +5042,6 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 
 	status = 0;
 	for (i = 0; i < SET_CONFIG_TRIES; i++) {
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
-		dev_err(&port_dev->dev,
-			"%s : before usb_alloc_dev() port %d, status %04x, change %04x, %s\n",
-			__func__, port1, portstatus, portchange, portspeed(hub, portstatus));
-#endif
 		/* reallocate for each attempt, since references
 		 * to the previous one can escape in various ways
 		 */
@@ -5070,11 +5051,6 @@ static void hub_port_connect(struct usb_hub *hub, int port1, u16 portstatus,
 					"couldn't allocate usb_device\n");
 			goto done;
 		}
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
-		dev_err(&port_dev->dev,
-			"%s : after usb_alloc_dev() port %d, status %04x, change %04x, %s\n",
-			__func__, port1, portstatus, portchange, portspeed(hub, portstatus));
-#endif
 		usb_set_device_state(udev, USB_STATE_POWERED);
 		udev->bus_mA = hub->mA_per_port;
 		udev->level = hdev->level + 1;
@@ -5405,6 +5381,8 @@ static void hub_event(struct work_struct *work)
 	hcd = bus_to_hcd(hdev->bus);
 	intf = to_usb_interface(hub_dev);
 
+	kcov_remote_start_usb((u64)hdev->bus->busnum);
+
 	dev_dbg(hub_dev, "state %d ports %d chg %04x evt %04x\n",
 			hdev->state, hdev->maxchild,
 			/* NOTE: expects max 15 ports... */
@@ -5513,14 +5491,13 @@ out_hdev_lock:
 	/* Balance the stuff in kick_hub_wq() and allow autosuspend */
 	usb_autopm_put_interface(intf);
 	kref_put(&hub->kref, hub_release);
+
+	kcov_remote_stop();
 }
 
 static const struct usb_device_id hub_id_table[] = {
-    { .match_flags = USB_DEVICE_ID_MATCH_VENDOR
-                   | USB_DEVICE_ID_MATCH_PRODUCT
-                   | USB_DEVICE_ID_MATCH_INT_CLASS,
+    { .match_flags = USB_DEVICE_ID_MATCH_VENDOR | USB_DEVICE_ID_MATCH_INT_CLASS,
       .idVendor = USB_VENDOR_SMSC,
-      .idProduct = USB_PRODUCT_USB5534B,
       .bInterfaceClass = USB_CLASS_HUB,
       .driver_info = HUB_QUIRK_DISABLE_AUTOSUSPEND},
     { .match_flags = USB_DEVICE_ID_MATCH_VENDOR

@@ -32,14 +32,13 @@ void complete(struct completion *x)
 
 	spin_lock_irqsave(&x->wait.lock, flags);
 
-	if (x->done != UINT_MAX) {
+	if (x->done != UINT_MAX)
 		x->done++;
+	__wake_up_locked(&x->wait, TASK_NORMAL, 1);
+	spin_unlock_irqrestore(&x->wait.lock, flags);
 #ifdef CONFIG_SEC_DEBUG_COMPLETE_HINT
 		secdbg_hint_save_complete_hint(&x->hint);
 #endif
-	}
-	__wake_up_locked(&x->wait, TASK_NORMAL, 1);
-	spin_unlock_irqrestore(&x->wait.lock, flags);
 }
 EXPORT_SYMBOL(complete);
 

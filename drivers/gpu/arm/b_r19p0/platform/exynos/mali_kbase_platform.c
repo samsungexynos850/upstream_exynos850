@@ -354,9 +354,9 @@ static int gpu_dvfs_update_config_data_from_dt(struct kbase_device *kbdev)
 	if (of_string)
 		strncpy(platform->g3d_genpd_name, of_string, sizeof(platform->g3d_genpd_name));
 #endif
-	platform->gpu_dss_freq_id = 0;
-	gpu_update_config_data_int(np, "gpu_ess_id_type", &platform->gpu_dss_freq_id);
-
+#ifdef CONFIG_DEBUG_SNAPSHOT
+	platform->gpu_dss_freq_id = DSS_FLAG_G3D;
+#endif
 	return 0;
 }
 

@@ -1548,8 +1548,6 @@ static int __init samsung_pinctrl_drv_register(void)
 postcore_initcall(samsung_pinctrl_drv_register);
 
 
-
-
 #if defined(CONFIG_SEC_GPIO_DVS)
 
 #define GET_RESULT_GPIO(a, b, c)	\

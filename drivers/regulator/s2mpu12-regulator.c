@@ -951,7 +951,7 @@ static int s2mpu12_pmic_probe(struct platform_device *pdev)
 	static_info = s2mpu12;
 
 	platform_set_drvdata(pdev, s2mpu12);
-
+	
 #ifdef CONFIG_SEC_PM_DEBUG
 	ret = s2mpu12_read_reg(s2mpu12->i2c, S2MPU12_PMIC_PWRONSRC,
 			&pmic_onsrc);

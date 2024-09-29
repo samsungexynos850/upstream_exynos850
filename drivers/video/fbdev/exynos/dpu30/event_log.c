@@ -1633,6 +1633,7 @@ static const struct file_operations decon_trivial_fops = {
        .release = seq_release,
 };
 
+#ifdef CONFIG_DEBUG_FS
 int decon_create_debugfs(struct decon_device *decon)
 {
 	char name[MAX_NAME_SIZE];
@@ -1839,3 +1840,12 @@ void decon_destroy_debugfs(struct decon_device *decon)
 	if (decon->d.debug_event)
 		debugfs_remove(decon->d.debug_event);
 }
+#else
+int decon_create_debugfs(struct decon_device *decon)
+{
+	return 0;
+}
+void decon_destroy_debugfs(struct decon_device *decon)
+{
+}
+#endif

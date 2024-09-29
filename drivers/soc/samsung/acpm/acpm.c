@@ -28,7 +28,9 @@
 
 static int ipc_done;
 static unsigned long long ipc_time_start;
+#ifdef CONFIG_DEBUG_FS
 static unsigned long long ipc_time_end;
+#endif
 
 static struct acpm_info *exynos_acpm;
 
@@ -174,6 +176,7 @@ static int plugins_init(void)
 	return ret;
 }
 
+#ifdef CONFIG_DEBUG_FS
 static int debug_log_level_get(void *data, unsigned long long *val)
 {
 
@@ -233,6 +236,7 @@ static void acpm_debugfs_init(struct acpm_info *acpm)
 	debugfs_create_file("ipc_loopback_test", 0644, den, acpm, &debug_ipc_loopback_test_fops);
 	debugfs_create_file("log_level", 0644, den, NULL, &debug_log_level_fops);
 }
+#endif
 
 void *memcpy_align_4(void *dest, const void *src, unsigned int n)
 {
@@ -317,24 +321,6 @@ void exynos_acpm_ps_hold_down(void)
 	pr_err("PS HOLD down fail. (ret: %d)\n", ret);
 }
 
-void exynos_acpm_force_apm_wdt_reset(void)
-{
-	struct ipc_config config;
-	int ret = 0;
-	unsigned int cmd[4] = {0, };
-
-	acpm_ipc_set_waiting_mode(BUSY_WAIT);
-
-	config.cmd = cmd;
-	config.response = true;
-	config.indirection = false;
-	config.cmd[0] = (1 << ACPM_IPC_PROTOCOL_STOP_WDT);
-
-	ret = acpm_send_data(exynos_acpm->dev->of_node, ACPM_IPC_PROTOCOL_STOP_WDT, &config);
-
-	pr_err("ACPM force WDT reset. (ret: %d)\n", ret);
-}
-
 static int acpm_send_data(struct device_node *node, unsigned int check_id,
 		struct ipc_config *config)
 {
@@ -416,7 +402,9 @@ static int acpm_probe(struct platform_device *pdev)
 
 	exynos_acpm = acpm;
 
+#ifdef CONFIG_DEBUG_FS
 	acpm_debugfs_init(acpm);
+#endif
 
 	exynos_acpm_timer_clear();
 	return ret;

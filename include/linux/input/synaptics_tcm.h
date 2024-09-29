@@ -73,6 +73,8 @@ struct syna_tcm_board_data {
 	u32	area_navigation;
 	u32	area_edge;
 	bool enable_settings_aot;
+	bool support_ear_detect;
+	bool prox_lp_scan_enabled;
 };
 
 #endif

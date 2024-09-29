@@ -119,6 +119,7 @@ struct s3c24xx_uart_port {
 
 #define wr_regb(port, reg, val) writeb_relaxed(val, portaddr(port, reg))
 #define wr_regl(port, reg, val) writel_relaxed(val, portaddr(port, reg))
+
 static void uart_copy_to_local_buf(int dir, struct uart_local_buf *local_buf, unsigned char *trace_buf, int len);
 #define SS_UART_LOG(dir, local_buf, trace_buf) uart_copy_to_local_buf(dir, local_buf, trace_buf, sizeof(trace_buf))
 

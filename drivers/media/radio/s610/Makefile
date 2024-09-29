@@ -1,9 +1,15 @@
 #
-# Makefile for SAMSUNG Radio driver based s610
+# Makefile for SAMSUNG Radio driver based s6xx
 # FM radio.
 #
-obj-$(CONFIG_RADIO_S610)	+= fm_s5e3830.o
-fm_s5e3830-objs		:= radio-s610.o \
+obj-$(CONFIG_RADIO_S610)	+= fm_s5exxxx.o
+fm_s5exxxx-objs		:= radio-s610.o \
+				fm_low.o \
+				fm_ctrl.o \
+				fm_rds.o
+
+obj-$(CONFIG_RADIO_S621)	+= fm_s5exxxx.o
+fm_s5exxxx-objs		:= radio-s610.o \
 				fm_low.o \
 				fm_ctrl.o \
 				fm_rds.o

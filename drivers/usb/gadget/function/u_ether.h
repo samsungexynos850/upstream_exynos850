@@ -27,7 +27,7 @@
 #define NCM_MAX_DATAGRAM	(42)
 
 #ifdef CONFIG_USB_RNDIS_MULTIPACKET
-#define QMULT_DEFAULT 10
+#define QMULT_DEFAULT 50
 #else
 #define QMULT_DEFAULT 5
 #endif
@@ -334,7 +334,7 @@ static inline void ncm_add_header(u32 packet_start_offset,
 						void *buf, u32 data_len) {}
 #endif
 
-//#define NCM_WITH_TIMER
+#define NCM_WITH_TIMER
 #ifdef NCM_WITH_TIMER
 enum hrtimer_restart tx_timeout_ncm(struct hrtimer *data);
 netdev_tx_t eth_start_xmit_ncm_timer(struct sk_buff *skb,

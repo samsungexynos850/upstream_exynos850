@@ -1,5 +1,4 @@
 # Makefile of modem_v1
-ccflags-y += -Wformat
 
 EXTRA_CFLAGS += -Idrivers/soc/samsung/cpif \
 		-DCONFIG_OPTION_REGION=\"$(PROJECT_REGION)\"

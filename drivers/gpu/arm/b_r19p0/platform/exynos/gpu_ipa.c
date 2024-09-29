@@ -66,9 +66,9 @@ static unsigned int gpu_ipa_dvfs_max_allowed_freq(struct kbase_device *kbdev)
 	max_step = gpu_dvfs_get_level(platform->gpu_max_clock);
 
 	/* Account for Throttling Lock */
-#ifdef CONFIG_EXYNOS_THERMAL
+#ifdef CONFIG_EXYNOS_THERMAL_V2
 	max_thermal_step = gpu_dvfs_get_level(platform->gpu_max_clock);
-#endif /* CONFIG_EXYNOS_THERMAL */
+#endif /* CONFIG_EXYNOS_THERMAL_V2 */
 	if (max_thermal_step <= gpu_dvfs_get_level(platform->gpu_min_clock) && max_thermal_step > max_step)
 		max_step = max_thermal_step;
 

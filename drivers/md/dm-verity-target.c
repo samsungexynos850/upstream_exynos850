@@ -320,8 +320,8 @@ static int verity_verify_level(struct dm_verity *v, struct dm_verity_io *io,
 		}
 #ifdef SEC_HEX_DEBUG
 		else if (verity_handle_err_hex_debug(v,
-					   DM_VERITY_BLOCK_TYPE_METADATA,
-					   hash_block, io, NULL)) {
+					DM_VERITY_BLOCK_TYPE_METADATA,
+					hash_block, io, NULL)) {
 			add_corrupted_blks();
 #else
 		else if (verity_handle_err(v,
@@ -497,7 +497,8 @@ static int verity_verify_io(struct dm_verity_io *io)
 		sector_t cur_block = io->block + b;
 		struct ahash_request *req = verity_io_hash_req(v, io);
 
-		if (v->validated_blocks &&
+		/* verify data block if bio->bi_status != BLK_STS_OK */
+		if (v->validated_blocks && bio->bi_status == BLK_STS_OK &&
 		    likely(test_bit(cur_block, v->validated_blocks))) {
 			verity_bv_skip_block(v, io, &io->iter);
 #ifdef SEC_HEX_DEBUG
@@ -603,7 +604,9 @@ static void verity_end_io(struct bio *bio)
 {
 	struct dm_verity_io *io = bio->bi_private;
 
-	if (bio->bi_status && !verity_fec_is_enabled(io->v)) {
+	/* SEC: Do not verify RAHEAD bio if status is not OK */
+	if (bio->bi_status &&
+		(!verity_fec_is_enabled(io->v) || (bio->bi_opf & REQ_RAHEAD))) {
 		verity_finish_io(io, bio->bi_status);
 		return;
 	}
@@ -1245,7 +1248,7 @@ static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 
 #ifdef SEC_HEX_DEBUG
 	if (!verity_fec_is_enabled(v))
-		add_fec_off_cnt(v->data_dev->name);
+	    add_fec_off_cnt(v->data_dev->name);
 #endif
 
 	return 0;

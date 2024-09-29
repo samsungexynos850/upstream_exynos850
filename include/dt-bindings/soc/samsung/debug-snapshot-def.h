@@ -61,7 +61,7 @@
 #define DSS_LOG_ARRAYPANIC_SIZE		(0 * SZ_1M)
 #define DSS_LOG_ETM_SIZE		(0)
 #define DSS_LOG_BCM_SIZE		(4 * SZ_1M)
-#define DSS_LOG_LLC_SIZE		(4 * SZ_1M)
+#define DSS_LOG_LLC_SIZE		(0 * SZ_1M)
 #define DSS_LOG_DBGC_SIZE		(0 * SZ_1M)
 #define DSS_LOG_PSTORE_SIZE		SZ_32K
 #define DSS_LOG_KEVENTS_SIZE		(8 * SZ_1M)

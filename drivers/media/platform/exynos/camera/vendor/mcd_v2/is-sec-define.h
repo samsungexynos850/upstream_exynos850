@@ -68,6 +68,7 @@
 #define FW_ISP_COMPANY_STE		'S'
 #define FW_ISP_COMPANY_TI		'T'
 #define FW_ISP_COMPANY_DMC		'D'
+#define FW_ISP_COMPANY_LSI_STANDARD_CAL		'E'
 
 #define FW_SENSOR_MAKER_SF		'F'
 #define FW_SENSOR_MAKER_SLSI		'L'
@@ -232,6 +233,10 @@ struct is_rom_info {
 	char		ae_cal_ver[IS_AE_CAL_VER_SIZE+1];
 #endif
 
+	u32		standard_cal_section_crc_addr;
+	u32		standard_cal_start_addr;
+	u32		standard_cal_end_addr;
+
 	unsigned long		fw_size;
 	unsigned long		setfile_size;
 	u8		sensor_version;
@@ -249,6 +254,7 @@ int is_sec_set_force_caldata_dump(bool fcd);
 
 int is_sec_get_max_cal_size(struct is_core *core, int position);
 int is_sec_get_cal_buf(int position, char **buf);
+int is_sec_get_cal_buf_rom_data(int position, char **buf);
 int is_sec_get_sysfs_finfo_by_position(int position, struct is_rom_info **finfo);
 int is_sec_get_sysfs_finfo(struct is_rom_info **finfo);
 int is_sec_get_sysfs_finfo_front(struct is_rom_info **finfo);
@@ -277,6 +283,11 @@ bool is_sec_check_rom_ver(struct is_core *core, int position);
 bool is_sec_check_fw_crc32(char *buf, u32 checksum_seed, unsigned long size);
 bool is_sec_check_cal_crc32(char *buf, int id);
 void is_sec_make_crc32_table(u32 *table, u32 id);
+bool is_sec_check_awb_lsc_crc32_post_sec2lsi(char* buf, int position, int awb_length, int lsc_length);
+bool is_sec_readcal_dump_post_sec2lsi(struct is_core *core, char *buf, int position);
+#ifdef USES_STANDARD_CAL_RELOAD
+bool is_sec_sec2lsi_check_cal_reload(void);
+#endif
 
 int is_sec_ldo_enable(struct device *dev, char *name, bool on);
 int is_sec_rom_power_on(struct is_core *core, int position);

@@ -68,6 +68,7 @@ static __always_inline int queued_spin_is_contended(struct qspinlock *lock)
 static __always_inline u8 __queued_spin_get_locked_val(void)
 {
 	int cpu = raw_smp_processor_id();
+
 	return (cpu << _Q_OWNER_OFFSET) | _Q_DBGEN_VAL | _Q_LOCKED_VAL;
 }
 #endif

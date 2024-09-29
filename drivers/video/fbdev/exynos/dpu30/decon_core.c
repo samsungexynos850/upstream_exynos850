@@ -1667,6 +1667,7 @@ static bool is_decon_win_state_vrr(struct decon_device *decon,
 		(state == DECON_WIN_STATE_VRR_PASSIVEMODE));
 }
 
+
 static int decon_set_win_buffer(struct decon_device *decon,
 		struct decon_win_config *config,
 		struct decon_reg_data *regs, int idx)
@@ -2498,10 +2499,12 @@ static void decon_update_regs(struct decon_device *decon,
 			req_no_buffers = 1;
 			if (decon->lcd_info->fps != regs->fps)
 				dpu_update_fps(decon, regs->fps);
-		}
-
-		if (!req_no_buffers)
-			decon_save_cur_buf_info(decon, regs);
+			
+			decon_wait_for_vsync(decon, VSYNC_TIMEOUT_MSEC);
+			goto end_fps;
+		}		
+		
+		decon_save_cur_buf_info(decon, regs);
 		decon_wait_for_vsync(decon, VSYNC_TIMEOUT_MSEC);
 		goto end;
 	}
@@ -2556,11 +2559,6 @@ static void decon_update_regs(struct decon_device *decon,
 		}
 	}
 end:
-#if defined(CONFIG_EXYNOS_BTS)
-	/* add update bw : cur < prev */
-	decon->bts.ops->bts_update_bw(decon, regs, 1);
-#endif
-
 	/*
 	 * After shadow update, changed PLL is applied and
 	 * target M value is stored
@@ -2568,6 +2566,12 @@ end:
 	dpu_set_freq_hop(decon, false);
 
 	decon_dpp_stop(decon, false);
+
+end_fps:
+#if defined(CONFIG_EXYNOS_BTS)
+	/* add update bw : cur < prev */
+	decon->bts.ops->bts_update_bw(decon, regs, 1);
+#endif
 
 #ifdef CONFIG_SUPPORT_INDISPLAY
 	decon_set_indisplay_post(decon, regs);

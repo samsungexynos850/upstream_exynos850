@@ -1678,7 +1678,6 @@ KERNEL_VERSION(4, 5, 0) > LINUX_VERSION_CODE
 			pa[i] = as_tagged(page_to_phys(pages[i]));
 
 			dma_sync_single_for_device(dev, dma_addr, PAGE_SIZE, DMA_BIDIRECTIONAL);
-
 		}
 
 		reg->gpu_alloc->nents = faulted_pages;

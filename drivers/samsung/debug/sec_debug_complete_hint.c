@@ -38,15 +38,14 @@ void secdbg_hint_save_complete_hint(struct secdbg_hint *hint)
 	if (hardirq_count()) {
 		hint->hint[hint->hint_idx].fn = (void *)secdbg_snapshot_get_hardlatency_info(smp_processor_id());
 		hint->hint[hint->hint_idx].type = COMPLETE_IN_IRQ;
-	}
-	else {
+	} else {
 		hint->hint[hint->hint_idx].p = current;
 		hint->hint[hint->hint_idx].type = COMPLETE_IN_TASK;
 	}
 	hint->hint_idx++;
 }
 
-void secdbg_hint_display_complete_hint()
+void secdbg_hint_display_complete_hint(void)
 {
 	int i, j;
 	char buf[LOG_LINE_MAX];
@@ -64,10 +63,10 @@ void secdbg_hint_display_complete_hint()
 			continue;
 
 		pr_info("# %d %s %lx %lx\n", p->pid, p->comm, (unsigned long)p, (unsigned long)p->x);
-	
-		for(i = 0; i < MAX_HINT; i++) {
+
+		for (i = 0; i < MAX_HINT; i++) {
 			ssize_t offset = 0;
-			struct complete_hint * hint = &p->x->hint.hint[i];
+			struct complete_hint *hint = &p->x->hint.hint[i];
 
 			if (hint->magic != HINT_MAGIC)
 				continue;
@@ -79,7 +78,7 @@ void secdbg_hint_display_complete_hint()
 			else
 				offset += snprintf(buf + offset, LOG_LINE_MAX, "%pF ", hint->fn);
 			for (j = 0; j < CALLSTACK_MAX_NUM; j++) {
-				offset += snprintf(buf + offset, LOG_LINE_MAX, "%c %pF ", (j==0) ? ' ' : '<', hint->addrs[j]);
+				offset += snprintf(buf + offset, LOG_LINE_MAX, "%c %pF ", (j == 0) ? ' ' : '<', hint->addrs[j]);
 			}
 			pr_info("%s\n", buf);
 		}

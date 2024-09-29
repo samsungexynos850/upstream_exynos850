@@ -84,6 +84,7 @@ static int rtc_suspend(struct device *dev)
 	old_rtc.tv_sec = rtc_tm_to_time64(&tm);
 #endif
 
+
 	/*
 	 * To avoid drift caused by repeated suspend/resumes,
 	 * which each can add ~1 second drift error,
@@ -136,7 +137,6 @@ static int rtc_resume(struct device *dev)
 		pr_debug("%s:  fail to read rtc time\n", dev_name(&rtc->dev));
 		return 0;
 	}
-
 #ifdef CONFIG_RTC_HIGH_RES
 	new_rtc.tv_sec = rtc_hrtm_to_time64(&tm);
 	new_rtc.tv_nsec = tm.tm_msec * NSEC_PER_MSEC;

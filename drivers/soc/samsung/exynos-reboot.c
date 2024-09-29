@@ -184,12 +184,12 @@ static int exynos_reboot_probe(struct platform_device *pdev)
 		arm_pm_restart = exynos_reboot.variant->reboot;
 		dev_info(&pdev->dev, "Success to register arm_pm_restart\n");
 	}
-#if !defined(CONFIG_SEC_REBOOT)
+
 	if (exynos_reboot.variant->power_off) {
 		pm_power_off = exynos_reboot.variant->power_off;
 		dev_info(&pdev->dev, "Success to register pm_power_off\n");
 	}
-#endif
+
 	if (sysfs_create_groups(&pdev->dev.kobj, exynos_reboot_groups)) {
 		dev_err(&pdev->dev, "failed create sysfs\n");
 		return -ENOMEM;

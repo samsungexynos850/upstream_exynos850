@@ -386,7 +386,7 @@ static ssize_t store_ufc_table_change(struct kobject *kobj, const char *buf,
 
 	struct ufc_table_info *table_info = to_ufc_table_info(kobj);
 
-	ret= sscanf(buf, "%u %u %u\n",
+	ret= sscanf(buf, "%d %d %d\n",
 			&edit_row, &edit_col, &edit_freq);
 
 	if (ret != 3) {

@@ -616,8 +616,10 @@ static int s3c2410wdt_keepalive(struct watchdog_device *wdd)
 	if (!(in_panic || in_interrupt() || wdt->in_suspend))
 		s3c2410wdt_gettime(wdt->cluster);
 
+#ifdef CONFIG_SEC_DEBUG_WATCHDOGD_FOOTPRINT
 	if (wdt->cluster == LITTLE_CLUSTER)
 		secdbg_wdd_set_keepalive();
+#endif
 
 	return 0;
 }
@@ -700,7 +702,9 @@ static int s3c2410wdt_start(struct watchdog_device *wdd)
 	wtcon = readl(wdt->reg_base + S3C2410_WTCON);
 	dev_info(wdt->dev, "Watchdog cluster %u start, WTCON = %lx\n", wdt->cluster, wtcon);
 
+#ifdef CONFIG_SEC_DEBUG_WATCHDOGD_FOOTPRINT
 	secdbg_wdd_set_start();
+#endif
 
 	return 0;
 }

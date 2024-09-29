@@ -35,7 +35,9 @@
 #include "debug-snapshot-local.h"
 #include <linux/debug-snapshot-helper.h>
 
+#if defined(CONFIG_SEC_DEBUG)
 #include <linux/sec_debug.h>
+#endif
 
 static void dbg_snapshot_soc_dummy_func(void *dummy) {return;}
 static int dbg_snapshot_soc_dummy_func_int(unsigned int dummy) {return 0;}
@@ -552,10 +554,10 @@ int dbg_snapshot_post_panic(void)
 			dbg_snapshot_spin_func();
 		}
 	}
+
 #if defined(CONFIG_SEC_DEBUG)
 	secdbg_base_post_panic_handler();
 #endif
-
 	dss_soc_ops->soc_post_panic_exit(NULL);
 
 	/* for stall cpu when not enabling panic reboot */

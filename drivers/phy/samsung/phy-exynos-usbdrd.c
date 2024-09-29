@@ -167,7 +167,7 @@ exynos_usbdrd_hs_phy_tune_store(struct device *dev,
 	if (!tune_name)
 		return -ENOMEM;
 
-	if (sscanf(buf, "%s %x", tune_name, &tune_val) != 2)
+	if (sscanf(buf, "%29s %x", tune_name, &tune_val) != 2)
 		goto exit;
 
 	tune_node = of_parse_phandle(dev->of_node, "hs_tune_param", 0);
@@ -245,7 +245,7 @@ exynos_usbdrd_phy_tune_store(struct device *dev,
 	if (!tune_name)
 		return -ENOMEM;
 
-	if (sscanf(buf, "%s %x", tune_name, &tune_val) != 2)
+	if (sscanf(buf, "%29s %x", tune_name, &tune_val) != 2)
 		goto exit;
 
 	tune_node = of_parse_phandle(dev->of_node, "ss_tune_param", 0);
@@ -1646,11 +1646,7 @@ static void exynos_usbdrd_utmi_tune(struct exynos_usbdrd_phy *phy_drd,
 	struct exynos_usb_tune_param *hs_tune_param = phy_drd->usbphy_info.tune_param;
 	int i;
 
-	if(!hs_tune_param){
-		dev_info(phy_drd->dev, "%s - hs_tune_param is NULL\n", __func__);
-		return;
-	} else
-		dev_info(phy_drd->dev, "%s\n", __func__);
+	dev_info(phy_drd->dev, "%s\n", __func__);
 
 	if (phy_state >= OTG_STATE_A_IDLE) {
 		/* for host mode */

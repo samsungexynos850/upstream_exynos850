@@ -16,7 +16,6 @@
 #include <linux/syscalls.h>
 #include <linux/syscore_ops.h>
 #include <linux/uaccess.h>
-#include <linux/sec_debug.h>
 
 /*
  * this indicates whether you can reboot with ctrl-alt-del: the default is yes
@@ -44,6 +43,7 @@ int reboot_default = 1;
 int reboot_cpu;
 enum reboot_type reboot_type = BOOT_ACPI;
 int reboot_force;
+/* @fs.sec -- d1fbf05204832e38d0dd3c9d4c98160a -- */
 // To prevent kernel panic by EIO during shutdown
 int ignore_fs_panic;
 
@@ -244,7 +244,6 @@ void migrate_to_reboot_cpu(void)
  */
 void kernel_restart(char *cmd)
 {
-	secdbg_base_set_task_in_sys_reboot((uint64_t)current);
 	kernel_restart_prepare(cmd);
 	migrate_to_reboot_cpu();
 	syscore_shutdown();
@@ -289,7 +288,6 @@ EXPORT_SYMBOL_GPL(kernel_halt);
  */
 void kernel_power_off(void)
 {
-	secdbg_base_set_task_in_sys_shutdown((uint64_t)current);
 	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
 	if (pm_power_off_prepare)
 		pm_power_off_prepare();

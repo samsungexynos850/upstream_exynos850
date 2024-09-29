@@ -135,6 +135,7 @@ struct exynos_panel_info {
 	unsigned int esc_clk;
 
 	unsigned int fps;
+	unsigned int active_fps;
 
 	struct exynos_dsc dsc;
 

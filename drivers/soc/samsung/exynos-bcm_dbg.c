@@ -38,7 +38,15 @@
 #include <soc/samsung/exynos-itmon.h>
 #endif
 
+#ifdef CONFIG_RKP
+#include <linux/rkp.h>
+
+struct exynos_bcm_dbg_data *bcm_dbg_data;
+EXPORT_SYMBOL(bcm_dbg_data);
+#else
 static struct exynos_bcm_dbg_data *bcm_dbg_data = NULL;
+#endif
+
 static bool pd_sync_init = false;
 #ifdef CONFIG_EXYNOS_BCM_DBG_GNR
 static void *bcm_addr;
@@ -3552,6 +3560,7 @@ static void __iomem *bcm_ioremap(phys_addr_t phys_addr, size_t size)
 	return ret;
 }
 
+#ifndef CONFIG_RKP
 struct page_change_data {
 	pgprot_t set_mask;
 	pgprot_t clear_mask;
@@ -3597,6 +3606,7 @@ static int bcm_change_memory_common(unsigned long addr, int numpages,
 	flush_tlb_kernel_range(start, end);
 	return ret;
 }
+#endif
 
 int __nocfi exynos_bcm_dbg_load_bin(void)
 {
@@ -3606,16 +3616,21 @@ int __nocfi exynos_bcm_dbg_load_bin(void)
 	u8 *buf = NULL;
 	char *lib_bcm = NULL;
 	mm_segment_t old_fs;
+#ifdef CONFIG_RKP
+	rkp_dynamic_load_t rkp_dyn;
+#endif
 
 	if (bcm_dbg_data->bcm_load_bin)
 		return 0;
 
+#ifndef CONFIG_RKP
 	ret = bcm_change_memory_common((unsigned long)bcm_addr,
 				BCM_BIN_SIZE, __pgprot(0), __pgprot(PTE_PXN));
 	if (ret) {
 		BCM_ERR("%s: failed to change memory common\n", __func__);
 		goto err_out;
 	}
+#endif
 
 	os_func.print = printk;
 	os_func.snprint = snprintf;
@@ -3657,6 +3672,20 @@ int __nocfi exynos_bcm_dbg_load_bin(void)
 			   (unsigned long)lib_bcm + BCM_BIN_SIZE);
 	memcpy((void *)lib_bcm, (void *)buf, fsize);
 	flush_cache_all();
+
+#ifdef CONFIG_RKP
+	memset(&rkp_dyn, 0, sizeof(rkp_dyn));
+	rkp_dyn.binary_base = (unsigned long)bcm_addr;
+	rkp_dyn.binary_size = fsize;
+	rkp_dyn.code_base1 = (unsigned long)bcm_addr;
+	rkp_dyn.code_size1 = BCM_CODE_SIZE;
+	rkp_dyn.type = RKP_DYN_FIMC;
+	ret = uh_call(UH_APP_RKP, RKP_DYNAMIC_LOAD, RKP_DYN_COMMAND_INS, (u64)&rkp_dyn, 0, 0);
+	if (ret) {
+		BCM_ERR("fail to load verify FIMC in EL2");
+		goto err_out;
+	}
+#endif
 
 	bin_func = ((start_up_func_t)lib_bcm)((void **)&os_func);
 

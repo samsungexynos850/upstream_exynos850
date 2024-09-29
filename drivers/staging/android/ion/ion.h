@@ -328,6 +328,12 @@ void ion_page_pool_destroy(struct ion_page_pool *pool);
 struct page *ion_page_pool_alloc(struct ion_page_pool *pool, bool nozero);
 void ion_page_pool_free(struct ion_page_pool *pool, struct page *page);
 
+#ifdef CONFIG_ION_SYSTEM_HEAP
+long ion_page_pool_nr_pages(void);
+#else
+static inline long ion_page_pool_nr_pages(void) { return 0; }
+#endif
+
 /** ion_page_pool_shrink - shrinks the size of the memory cached in the pool
  * @pool:		the pool
  * @gfp_mask:		the memory type to reclaim
@@ -360,4 +366,9 @@ void ion_buffer_kmap_put(struct ion_buffer *buffer);
 #define perrfndev(dev, format, arg...) \
 	dev_err(dev, IONPREFIX "%s: " format "\n", __func__, ##arg)
 
+#ifdef CONFIG_ION_MODULE
+int ion_add_cma_heaps(void);
+int ion_system_heap_create(void);
+int ion_system_contig_heap_create(void);
+#endif
 #endif /* _ION_H */

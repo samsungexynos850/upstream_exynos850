@@ -3,7 +3,7 @@
  *
  * exynos5 is vender functions
  *
- * Copyright (c) 2015 Samsung Electronics Co., Ltd
+ * Copyright (c) 2020 Samsung Electronics Co., Ltd
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -21,8 +21,14 @@
 
 #if defined(CONFIG_CAMERA_AAS_V21S)
 #include "is-vendor-config_aas_v21s.h"
+#elif defined(CONFIG_CAMERA_XXT_V5)
+#include "is-vendor-config_xxt_v5.h"
+#elif defined(CONFIG_CAMERA_MMT_V12)
+#include "is-vendor-config_mmt_v12.h"
+#elif defined(CONFIG_CAMERA_AAU_V12S)
+#include "is-vendor-config_aau_v12s.h"
 #else
-#include "is-vendor-config_aas_v21s.h"
+#include "is-vendor-config_xxt_v5.h"
 #endif
 
 #endif

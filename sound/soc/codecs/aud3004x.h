@@ -1649,6 +1649,9 @@ int aud3004x_jack_remove(struct snd_soc_component *codec);
 #define AP_JACK_OUT_SHIFT			4
 #define AP_JACK_OUT_MASK			BIT(AP_JACK_OUT_SHIFT)
 
+#define SEL_ANT_RJDET_SHIFT			1
+#define SEL_ANT_RJDET_MASK			BIT(SEL_ANT_RJDET_SHIFT)
+
 /* AUD3004X_E5_DCTR_FSM4 */
 #define RST_POLE_SHIFT				3
 #define RST_POLE_MASK				BIT(RST_POLE_SHIFT)

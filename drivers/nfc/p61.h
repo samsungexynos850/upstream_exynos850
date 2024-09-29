@@ -1,20 +1,29 @@
 /*
- * Copyright (C) 2012-2014 NXP Semiconductors
+ *  Copyright (C) 2012-2020 NXP Semiconductors
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
  */
+#ifndef _P61_H_
+#define _P61_H_
 
+#ifdef CONFIG_NFC_FEATURE_SN100U
+#define DEFAULT_BUFFER_SIZE 780
+#else
 #define DEFAULT_BUFFER_SIZE 258
+#endif
 
 #define P61_MAGIC 0xEB
 
@@ -70,11 +79,39 @@
 #define P61_SET_POWER_SCHEME	_IOW(P61_MAGIC, 0x08, long)
 #define P61_SET_DWNLD_STATUS	_IOW(P61_MAGIC, 0x09, long)
 #define P61_INHIBIT_PWR_CNTRL	_IOW(P61_MAGIC, 0x0A, long)
+#ifdef CONFIG_NFC_FEATURE_SN100U
+/*
+ * SPI can call this IOCTL to perform the eSE COLD_RESET
+ * via NFC driver.
+ */
+#define ESE_PERFORM_COLD_RESET  _IOW(P61_MAGIC, 0x0C, long)
+
+#define PERFORM_RESET_PROTECTION  _IOW(P61_MAGIC, 0x0D, long)
+#endif
 
 /* only nonTZ +++++*/
 /* Transmit data to the device and retrieve data from it simultaneously.*/
 #define P61_RW_SPI_DATA			_IOWR(P61_MAGIC, 0x0F, unsigned long)
 /* only nonTZ -----*/
+#endif
+
+#ifdef CONFIG_COMPAT
+#define P61_SET_PWR_COMPAT				_IOW(P61_MAGIC, 0x01, unsigned int)
+#define P61_SET_DBG_COMPAT				_IOW(P61_MAGIC, 0x02, unsigned int)
+#define P61_SET_POLL_COMPAT				_IOW(P61_MAGIC, 0x03, unsigned int)
+#define P61_SET_SPM_PWR_COMPAT			_IOW(P61_MAGIC, 0x04, unsigned int)
+#define P61_GET_SPM_STATUS_COMPAT		_IOR(P61_MAGIC, 0x05, unsigned int)
+#define P61_SET_THROUGHPUT_COMPAT		_IOW(P61_MAGIC, 0x06, unsigned int)
+#define P61_GET_ESE_ACCESS_COMPAT		_IOW(P61_MAGIC, 0x07, unsigned int)
+#define P61_SET_POWER_SCHEME_COMPAT		_IOW(P61_MAGIC, 0x08, unsigned int)
+#define P61_SET_DWNLD_STATUS_COMPAT		_IOW(P61_MAGIC, 0x09, unsigned int)
+#define P61_INHIBIT_PWR_CNTRL_COMPAT	_IOW(P61_MAGIC, 0x0A, unsigned int)
+#define P61_RW_SPI_DATA_COMPAT			_IOWR(P61_MAGIC, 0x0F, unsigned int)
+
+#ifdef CONFIG_NFC_FEATURE_SN100U
+#define ESE_PERFORM_COLD_RESET_COMPAT	_IOW(P61_MAGIC, 0x0C, unsigned int)
+#define PERFORM_RESET_PROTECTION_COMPAT	_IOW(P61_MAGIC, 0x0D, unsigned int)
+#endif
 #endif
 
 struct p61_ioctl_transfer {
@@ -83,7 +120,22 @@ struct p61_ioctl_transfer {
 	unsigned int len;
 };
 
+#ifdef CONFIG_COMPAT
+struct p61_ioctl_transfer32 {
+	u32 rx_buffer;
+	u32 tx_buffer;
+	u32 len;
+};
+#endif
 struct p61_spi_platform_data {
 	unsigned int irq_gpio;
 	unsigned int rst_gpio;
 };
+
+enum {
+	SPI_CLK, /* gate_spi_clk */
+	SPI_SRC_CLK, /* ipclk_spi */
+	MAX_SPI_CLK_CNT,
+};
+
+#endif

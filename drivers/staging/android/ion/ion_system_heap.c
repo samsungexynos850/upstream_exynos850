@@ -116,12 +116,6 @@ static int ion_system_heap_allocate(struct ion_heap *heap,
 		return -ENOMEM;
 	}
 
-	if (!!(flags & ION_FLAG_PROTECTED)) {
-		perrfn("ION_FLAG_PROTECTED is set to non-secure heap %s",
-		       heap->name);
-		return -EINVAL;
-	}
-
 	INIT_LIST_HEAD(&pages);
 	while (size_remaining > 0) {
 		page = alloc_largest_available(sys_heap, buffer, size_remaining,
@@ -379,8 +373,7 @@ static struct ion_heap *__ion_system_heap_create(void)
 		system_heap = heap;
 		show_mem_extra_notifier_register(&ion_system_heap_nb);
 		show_mem_extra_notifier_register(&ion_system_heap_pool_nb);
-	}
-	else
+	} else
 		pr_err("system_heap had been already created\n");
 
 	return &heap->heap;
@@ -390,7 +383,7 @@ free_heap:
 	return ERR_PTR(-ENOMEM);
 }
 
-static int ion_system_heap_create(void)
+int ion_system_heap_create(void)
 {
 	struct ion_heap *heap;
 
@@ -402,7 +395,6 @@ static int ion_system_heap_create(void)
 	ion_device_add_heap(heap);
 	return 0;
 }
-subsys_initcall(ion_system_heap_create);
 
 static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 					   struct ion_buffer *buffer,
@@ -414,12 +406,6 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 	struct sg_table *table;
 	unsigned long i;
 	int ret;
-
-	if (!!(flags & ION_FLAG_PROTECTED)) {
-		perrfn("ION_FLAG_PROTECTED is set to non-secure heap %s",
-		       heap->name);
-		return -EINVAL;
-	}
 
 	page = alloc_pages(low_order_gfp_flags | __GFP_NOWARN, order);
 	if (!page)
@@ -490,7 +476,7 @@ static struct ion_heap *__ion_system_contig_heap_create(void)
 	return heap;
 }
 
-static int __maybe_unused ion_system_contig_heap_create(void)
+int ion_system_contig_heap_create(void)
 {
 	struct ion_heap *heap;
 
@@ -502,3 +488,6 @@ static int __maybe_unused ion_system_contig_heap_create(void)
 	return 0;
 }
 
+#ifndef CONFIG_ION_MODULE
+subsys_initcall(ion_system_heap_create);
+#endif

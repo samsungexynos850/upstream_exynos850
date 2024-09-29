@@ -283,7 +283,7 @@ static void dbg_snapshot_dump_one_task_info(struct task_struct *tsk, bool is_mai
 	touch_softlockup_watchdog();
 	dss_soc_ops->soc_kick_watchdog(NULL);
 
-	dev_info(dss_desc.dev, "%8d %8llu %8llu %16llu %c(%d) %3d  %16zx %16zx  %16zx %c %16s [%s]\n",
+	dev_info(dss_desc.dev, "%8d %8llu %8llu %16llu %3c(%.3x) %4d  %16zx %16zx  %16zx %c %16s [%s]\n",
 			tsk->pid, tsk->utime / NSEC_PER_MSEC, tsk->stime / NSEC_PER_MSEC,
 			tsk->se.exec_start, state_array[idx], (int)(tsk->state),
 			task_cpu(tsk), wchan, pc, (unsigned long)tsk,
@@ -323,7 +323,7 @@ void dbg_snapshot_dump_task_info(void)
 	dev_info(dss_desc.dev, "\n");
 	dev_info(dss_desc.dev, " current proc : %d %s\n", current->pid, current->comm);
 	dev_info(dss_desc.dev, " ----------------------------------------------------------------------------------------------------------------------------\n");
-	dev_info(dss_desc.dev, "     pid  uTime(ms)  sTime(ms)    exec(ns)  stat  cpu       wchan           user_pc        task_struct       comm   sym_wchan\n");
+	dev_info(dss_desc.dev, "     pid  uTime(ms)  sTime(ms)    exec(ns)     stat    cpu       wchan           user_pc        task_struct       comm   sym_wchan\n");
 	dev_info(dss_desc.dev, " ----------------------------------------------------------------------------------------------------------------------------\n");
 
 	/* processes */

@@ -19,12 +19,27 @@
 #define TOUCH_PRINT_INFO_DWORK_TIME 30000 /* 30 secs */
 
 #ifdef HX_SMART_WAKEUP
-#define GEST_SUP_NUM 1
-/* Setting cust key define (DF = double finger) */
-uint8_t gest_event[GEST_SUP_NUM] = {0x80};
-/*gest_event mapping to gest_key_def*/
-uint16_t gest_key_def[GEST_SUP_NUM] = {KEY_WAKEUP};
+#define GEST_SUP_NUM 26
+/*Setting cust key define (DF = double finger)*/
+/*{Double Tap, Up, Down, Left, Rright, C, Z, M,
+	O, S, V, W, e, m, @, (reserve),
+	Finger gesture, ^, >, <, f(R), f(L), Up(DF), Down(DF),
+	Left(DF), Right(DF)}*/
 
+uint8_t gest_event[GEST_SUP_NUM] = {
+	0x80, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+	0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+	0x81, 0x1D, 0x2D, 0x3D, 0x1F, 0x2F, 0x51, 0x52,
+	0x53, 0x54
+};
+
+/*gest_event mapping to gest_key_def*/
+uint16_t gest_key_def[GEST_SUP_NUM] = {
+	KEY_POWER, 251, 252, 253, 254, 255, 256, 257,
+	258, 259, 260, 261, 262, 263, 264, 265,
+	266, 267, 268, 269, 270, 271, 272, 273,
+	274, 275
+};
 #endif
 
 #define SUPPORT_FINGER_DATA_CHECKSUM 0x0F
@@ -657,7 +672,6 @@ int himax_input_register(struct himax_ts_data *ts)
 	set_bit(EV_SYN, ts->input_dev->evbit);
 	set_bit(EV_ABS, ts->input_dev->evbit);
 	set_bit(EV_KEY, ts->input_dev->evbit);
-	set_bit(KEY_INT_CANCEL, ts->input_dev->keybit);
 #if defined(HX_PLATFOME_DEFINE_KEY)
 	himax_platform_key();
 #endif
@@ -665,7 +679,7 @@ int himax_input_register(struct himax_ts_data *ts)
 	set_bit(KEY_POWER, ts->input_dev->keybit);
 #endif
 #if defined(HX_SMART_WAKEUP)
-	for (i = 0; i < GEST_SUP_NUM; i++) {
+	for (i = 1; i < GEST_SUP_NUM; i++) {
 		set_bit(gest_key_def[i], ts->input_dev->keybit);
 	}
 #endif
@@ -936,9 +950,6 @@ static void himax_esd_hw_reset(void)
 	}
 	g_core_fp.fp_reload_disable(0);
 	g_core_fp.fp_sense_on(0x00);
-#if defined(CONFIG_SEC_FACTORY)
-	g_core_fp.set_bending_algo_for_factory(FW_SET_FACTORY_ON);
-#endif
 	himax_report_all_leave_event(g_ts);
 	himax_int_enable(1);
 ESCAPE_0F_UPDATE:
@@ -1001,8 +1012,8 @@ static int himax_wake_event_parse(struct himax_ts_data *ts, int ts_status)
 	}
 
 	input_info(true, ts->dev,
-			"%s %s: Himax gesture_flag(0X%X) check_FC(%d) gesture_pos(%d)\n",
-			HIMAX_LOG_TAG, __func__, gesture_flag, check_FC, gesture_pos);
+			"%s %s: Himax gesture_flag= %x check_FC is %d\n",
+			HIMAX_LOG_TAG, __func__, gesture_flag, check_FC);
 
 	if (check_FC != GEST_PTLG_ID_LEN) {
 		kfree(buf);
@@ -1106,18 +1117,15 @@ static void himax_wake_event_report(void)
 	if (KEY_EVENT) {
 		input_report_key(g_ts->input_dev, KEY_EVENT, 1);
 		input_sync(g_ts->input_dev);
+		input_info(true, g_ts->dev,
+				"%s %s SMART WAKEUP KEY event %d press\n",
+				HIMAX_LOG_TAG, __func__, KEY_EVENT);
 
 		input_report_key(g_ts->input_dev, KEY_EVENT, 0);
 		input_sync(g_ts->input_dev);
-
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-		input_info(true, g_ts->dev, "%s : SMART WAKEUP KEY event %d : press & release\n",
-						__func__, KEY_EVENT);
-#else
-		input_info(true, g_ts->dev, "%s : SMART WAKEUP KEY press & release\n",
-						__func__);
-#endif
-
+		input_info(true, g_ts->dev,
+				"%s %s SMART WAKEUP KEY event %d release\n",
+				HIMAX_LOG_TAG, __func__, KEY_EVENT);
 		FAKE_POWER_KEY_SEND = true;
 #ifdef HX_GESTURE_TRACK
 		input_info(true, g_ts->dev,
@@ -1611,9 +1619,6 @@ void hx_update_dirly_0f(void)
 	input_info(true, g_ts->dev,
 			"HXTP:It will update fw after esd event in zero flash mode!\n");
 	g_core_fp.fp_0f_operation_dirly();
-#if defined(CONFIG_SEC_FACTORY)
-	g_core_fp.set_bending_algo_for_factory(FW_SET_FACTORY_ON);
-#endif
 
 }
 #endif
@@ -2605,31 +2610,6 @@ void himax_ts_work(struct himax_ts_data *ts)
 
 	int ts_status = HX_TS_NORMAL_END;
 	int ts_path = 0;
-	int ret = 0;
-
-	if (atomic_read(&ts->suspend_mode) == HIMAX_STATE_POWER_OFF) {
-		input_err(true, ts->dev, "%s: POWER_OFF & not handled\n", __func__);
-		return;
-	}
-
-	if (atomic_read(&ts->suspend_mode) == HIMAX_STATE_LPM) {
-		wake_lock_timeout(&ts->wakelock, msecs_to_jiffies(500));
-
-		/* waiting for blsp block resuming, if not occurs spi error */
-		ret = wait_for_completion_interruptible_timeout(&ts->resume_done, msecs_to_jiffies(500));
-		if (ret == 0) {
-			input_err(true, ts->dev, "%s: LPM: pm resume is not handled\n", __func__);
-			return;
-		}
-
-		if (ret < 0) {
-			input_err(true, ts->dev, "%s: LPM: -ERESTARTSYS if interrupted, %d\n", __func__, ret);
-			return;
-		}
-
-		input_info(true, ts->dev, "%s: run LPM interrupt handler, %d\n", __func__, ret);
-		/* run lpm interrupt handler */
-	}
 
 	if (debug_data != NULL)
 		debug_data->fp_ts_dbg_func(ts, HX_FINGER_ON);
@@ -2873,10 +2853,6 @@ int himax_chip_common_init(void)
 	}
 #endif
 
-	wake_lock_init(&ts->wakelock, WAKE_LOCK_SUSPEND, "tsp_wakelock");
-	init_completion(&ts->resume_done);
-	complete_all(&ts->resume_done);
-
 	for (i = 0; i < g_hx_ic_dt_num; i++) {
 		if (g_core_chip_dt[i].fp_chip_detect != NULL) {
 			if (g_core_chip_dt[i].fp_chip_detect() == true) {
@@ -3099,7 +3075,6 @@ err_detect_failed:
 err_update_wq_failed:
 #endif
 error_ic_detect_failed:
-	wake_lock_destroy(&ts->wakelock);
 	if (gpio_is_valid(pdata->gpio_irq)) {
 		gpio_free(pdata->gpio_irq);
 	}
@@ -3179,97 +3154,22 @@ void himax_chip_common_deinit(void)
 	return;
 }
 
-int himax_ctrl_lcd_regulators(struct himax_ts_data *ts, bool on)
-{
-	struct regulator *regulator_lcd_pwr1 = NULL;
-	struct regulator *regulator_lcd_pwr2 = NULL;
-	struct regulator *regulator_lcd_reset = NULL;
-
-	static bool enabled;
-	int ret = 0;
-
-	input_info(true, ts->dev, "%s: called! on(%d) enabled(%d)\n",
-					__func__, on, enabled);
-
-	if (enabled == on)
-		return ret;
-
-	regulator_lcd_pwr1 = regulator_get(NULL, ts->pdata->regulator_lcd_pwr1);
-	if (IS_ERR_OR_NULL(regulator_lcd_pwr1)) {
-		input_err(true, ts->dev, "%s: Failed to get %s regulator.\n",
-				__func__, ts->pdata->regulator_lcd_pwr1);
-		ret = PTR_ERR(regulator_lcd_pwr1);
-		goto error;
-	}
-
-	regulator_lcd_pwr2 = regulator_get(NULL, ts->pdata->regulator_lcd_pwr2);
-	if (IS_ERR_OR_NULL(regulator_lcd_pwr1)) {
-		input_err(true, ts->dev, "%s: Failed to get %s regulator.\n",
-				__func__, ts->pdata->regulator_lcd_pwr2);
-		ret = PTR_ERR(regulator_lcd_pwr2);
-		goto error;
-	}
-	regulator_lcd_reset = regulator_get(NULL, ts->pdata->regulator_lcd_reset);
-	if (IS_ERR_OR_NULL(regulator_lcd_reset)) {
-		input_err(true, ts->dev, "%s: Failed to get %s regulator.\n",
-				__func__, ts->pdata->regulator_lcd_reset);
-		ret = PTR_ERR(regulator_lcd_reset);
-		goto error;
-	}
-
-	if (on) {
-		ret = regulator_enable(regulator_lcd_pwr1);
-		if (ret) {
-			input_err(true, ts->dev, "%s: Failed to enable regulator_lcd_pwr1: %d\n", __func__, ret);
-			goto out;
-		}
-		ret = regulator_enable(regulator_lcd_pwr2);
-		if (ret) {
-			input_err(true, ts->dev, "%s: Failed to enable regulator_lcd_pwr2: %d\n", __func__, ret);
-			goto out;
-		}
-		ret = regulator_enable(regulator_lcd_reset);
-		if (ret) {
-			input_err(true, ts->dev, "%s: Failed to enable regulator_lcd_reset: %d\n", __func__, ret);
-			goto out;
-		}
-	} else {
-		regulator_disable(regulator_lcd_pwr1);
-		regulator_disable(regulator_lcd_pwr2);
-		regulator_disable(regulator_lcd_reset);
-	}
-
-	enabled = on;
-
-out:
-	input_info(true, ts->dev, "%s: %s: lcd_pwr1:(%d),lcd_pwr2:(%d),lcd_reset:(%d)\n",
-			__func__, on ? "on" : "off",
-			regulator_is_enabled(regulator_lcd_pwr1),
-			regulator_is_enabled(regulator_lcd_pwr2),
-			regulator_is_enabled(regulator_lcd_reset));
-
-error:
-	regulator_put(regulator_lcd_pwr1);
-	regulator_put(regulator_lcd_pwr2);
-	regulator_put(regulator_lcd_reset);
-
-	return ret;
-}
-
-
 int himax_chip_common_suspend(struct himax_ts_data *ts)
 {
 	int ret;
 
-	input_info(true, ts->dev, "%s %s: START(%d)\n", HIMAX_LOG_TAG, __func__, ts->SMWP_enable);
+	input_info(true, ts->dev, "%s %s: START\n", HIMAX_LOG_TAG, __func__);
 
 	if (ts->suspended) {
 		input_info(true, ts->dev, "%s %s: Already suspended. Skipped. \n", HIMAX_LOG_TAG, __func__);
 		return 0;
 	} else {
+		himax_int_enable(0);
 		ts->suspended = true;
 		input_info(true, ts->dev, "%s %s: enter \n", HIMAX_LOG_TAG, __func__);
 	}
+
+	himax_pinctrl_configure(ts, false);
 
 	if (debug_data != NULL && debug_data->flash_dump_going == true) {
 		input_info(true, ts->dev,
@@ -3278,77 +3178,59 @@ int himax_chip_common_suspend(struct himax_ts_data *ts)
 		return 0;
 	}
 
-	if (ts->prox_power_off == 1 && ts->aot_enabled) {
-		ts->SMWP_enable = 0;
-		input_info(true, ts->dev, "%s: prox_power_off & disable aot\n", __func__);
-	}
-
 #if defined(HX_SMART_WAKEUP) || defined(HX_HIGH_SENSE) || defined(HX_USB_DETECT_GLOBAL)
 #ifndef HX_RESUME_SEND_CMD
 	g_core_fp.fp_resend_cmd_func(ts->suspended);
 #endif
 #endif
+#ifdef HX_SMART_WAKEUP
+
+	if (ts->SMWP_enable) {
+		atomic_set(&ts->suspend_mode, 1);
+		ts->pre_finger_mask = 0;
+		FAKE_POWER_KEY_SEND = false;
+		input_info(true, ts->dev,
+				"[himax] %s: SMART_WAKEUP enable, reject suspend\n",
+				__func__);
+		return 0;
+	}
+#endif
+
+	g_core_fp.fp_suspend_ic_action();
+
+	if (!ts->use_irq) {
+		ret = cancel_work_sync(&ts->work);
+
+		if (ret) {
+			himax_int_enable(1);
+		}
+	}
+
+	usleep_range(10 * 1000, 10 * 1000);
+	himax_report_all_leave_event(ts);
+
+/*ts->first_pressed = 0;*/
+	atomic_set(&ts->suspend_mode, 1);
+	ts->pre_finger_mask = 0;
+
+	if (ts->pdata->powerOff3V3 && ts->pdata->power) {
+		ts->pdata->power(0);
+	}
 
 	cancel_delayed_work(&ts->work_print_info);
 	himax_print_info(ts);
 
-#ifdef HX_SMART_WAKEUP
-	if (ts->SMWP_enable) {
-		atomic_set(&ts->suspend_mode, HIMAX_STATE_LPM);
-
-		himax_ctrl_lcd_regulators(ts, true);
-
-		ts->pre_finger_mask = 0;
-		FAKE_POWER_KEY_SEND = false;
-
-		input_info(true, ts->dev, "%s: SMART_WAKEUP enable\n", __func__);
-	} else
-#endif
-	{
-		himax_int_enable(0);
-
-		/*ts->first_pressed = 0;*/
-		atomic_set(&ts->suspend_mode, HIMAX_STATE_POWER_OFF);
-		ts->pre_finger_mask = 0;
-
-		g_core_fp.fp_suspend_ic_action();
-
-		if (!ts->use_irq) {
-			ret = cancel_work_sync(&ts->work);
-
-			if (ret) {
-				himax_int_enable(1);
-			}
-		}
-
-		if (ts->pdata->powerOff3V3 && ts->pdata->power) {
-			ts->pdata->power(0);
-		}
-		usleep_range(10 * 1000, 10 * 1000);
-
-		himax_pinctrl_configure(ts, false);
-	}
-
-	if (ts->prox_power_off == 1) {
-		input_report_key(ts->input_dev, KEY_INT_CANCEL, 1);
-		input_sync(ts->input_dev);
-		input_report_key(ts->input_dev, KEY_INT_CANCEL, 0);
-		input_sync(ts->input_dev);
-	}
-
-	himax_report_all_leave_event(ts);
-	input_info(true, ts->dev, "%s: END\n", __func__);
-
+	input_info(true, ts->dev, "%s %s: END \n", HIMAX_LOG_TAG,
+			__func__);
 	return 0;
 }
 
 int himax_chip_common_resume(struct himax_ts_data *ts)
 {
-//#if defined(HX_RST_PIN_FUNC) && defined(HX_RESUME_HW_RESET) || defined(HX_ZERO_FLASH)
-#if defined(HX_RESUME_SET_FW)
+#if defined(HX_RST_PIN_FUNC) && defined(HX_RESUME_HW_RESET) || defined(HX_ZERO_FLASH)
 	int result = 0;
 #endif
-	input_info(true, ts->dev, "%s %s: START(%d)\n", HIMAX_LOG_TAG, __func__, ts->SMWP_enable);
+	input_info(true, ts->dev, "%s %s: START\n", HIMAX_LOG_TAG, __func__);
 
 	if (ts->suspended == false) {
 		input_info(true, ts->dev,
@@ -3359,53 +3241,16 @@ int himax_chip_common_resume(struct himax_ts_data *ts)
 		ts->suspended = false;
 	}
 
-	if (ts->SMWP_enable) {
-		himax_ctrl_lcd_regulators(ts, false);
-	} else {
-		himax_pinctrl_configure(ts, true);
-	}
+	himax_pinctrl_configure(ts, true);
 
 #ifdef HX_ESD_RECOVERY
 	g_zero_event_count = 0;
 #endif
-	atomic_set(&ts->suspend_mode, HIMAX_STATE_POWER_ON);
+	atomic_set(&ts->suspend_mode, 0);
 
 	if (ts->pdata->powerOff3V3 && ts->pdata->power) {
 		ts->pdata->power(1);
 	}
-
-#if defined(HX_RST_PIN_FUNC) && defined(HX_RESUME_HW_RESET)
-	input_info(true, ts->dev, "%s %s: START g_core_fp.fp_ic_reset\n", HIMAX_LOG_TAG, __func__);
-	g_core_fp.fp_ic_reset(false, false);
-#endif
-
-#if defined(HX_RESUME_SET_FW)
-	input_info(true, ts->dev, "%s %s: It will update fw after esd event in zero flash mode!\n", HIMAX_LOG_TAG, __func__);
-	result = g_core_fp.fp_0f_operation_dirly();
-	if (result) {
-		input_err(true, ts->dev, "%s %s: Something is wrong! Skip Update with zero flash!\n", HIMAX_LOG_TAG, __func__);
-		goto ESCAPE_0F_UPDATE;
-	}
-	g_core_fp.fp_reload_disable(0);
-	g_core_fp.fp_sense_on(0x00);
-
-#if defined(CONFIG_SEC_FACTORY)
-	g_core_fp.set_bending_algo_for_factory(FW_SET_FACTORY_ON);
-#endif
-
-#endif
-
-	if (ts->prox_power_off && ts->aot_enabled) {
-		input_info(true, ts->dev, "%s: clear prox_power_off & enable aot\n", __func__);
-		ts->SMWP_enable = 1;
-	}
-	ts->prox_power_off = 0;
-
-#if defined(HX_SMART_WAKEUP) || defined(HX_HIGH_SENSE) || defined(HX_USB_DETECT_GLOBAL)
-	g_core_fp.fp_resend_cmd_func(ts->suspended);
-#endif
-
-#if 0
 #if defined(HX_SMART_WAKEUP) || defined(HX_HIGH_SENSE) || defined(HX_USB_DETECT_GLOBAL)
 	g_core_fp.fp_resend_cmd_func(ts->suspended);
 
@@ -3421,9 +3266,6 @@ int himax_chip_common_resume(struct himax_ts_data *ts)
 	}
 	g_core_fp.fp_reload_disable(0);
 	g_core_fp.fp_sense_on(0x00);
-#if defined(CONFIG_SEC_FACTORY)
-	g_core_fp.set_bending_algo_for_factory(FW_SET_FACTORY_ON);
-#endif
 
 #endif
 #else
@@ -3436,20 +3278,12 @@ int himax_chip_common_resume(struct himax_ts_data *ts)
 	}
 	g_core_fp.fp_reload_disable(0);
 	g_core_fp.fp_sense_on(0x00);
-#if defined(CONFIG_SEC_FACTORY)
-	g_core_fp.set_bending_algo_for_factory(FW_SET_FACTORY_ON);
-#endif
-#endif
 #endif
 #endif
 
 	g_core_fp.fp_resume_ic_action();
-
-//	if (!ts->aot_enabled)
-		himax_int_enable(1);
-
-//#if defined(HX_RST_PIN_FUNC) && defined(HX_RESUME_HW_RESET) || defined(HX_ZERO_FLASH)
-#if defined(HX_RESUME_HW_RESET)
+	himax_int_enable(1);
+#if defined(HX_RST_PIN_FUNC) && defined(HX_RESUME_HW_RESET) || defined(HX_ZERO_FLASH)
 ESCAPE_0F_UPDATE:
 #endif
 

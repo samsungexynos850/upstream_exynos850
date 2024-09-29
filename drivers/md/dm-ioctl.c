@@ -20,12 +20,6 @@
 
 #include <linux/uaccess.h>
 
-#ifdef CONFIG_PROC_FSLOG
-#include <linux/fslog.h>
-#else
-#define ST_LOG(fmt, ...)
-#endif
-
 #define DM_MSG_PREFIX "ioctl"
 #define DM_DRIVER_EMAIL "dm-devel@redhat.com"
 
@@ -885,13 +879,8 @@ static int dev_remove(struct file *filp, struct dm_ioctl *param, size_t param_si
 
 	param->flags &= ~DM_DEFERRED_REMOVE;
 
-	// P201006-04824
-	r = dm_kobject_uevent(md, KOBJ_REMOVE, param->event_nr);
-	if (r) {
-		DMWARN("dm_kobject_uevent(%s) return error: %d", md->name, r);
-		ST_LOG("dm_kobject_uevent(%s) return error: %d", md->name, r);
-	}
-	param->flags |= DM_UEVENT_GENERATED_FLAG;
+	if (!dm_kobject_uevent(md, KOBJ_REMOVE, param->event_nr))
+		param->flags |= DM_UEVENT_GENERATED_FLAG;
 
 	dm_put(md);
 	dm_destroy(md);

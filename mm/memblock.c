@@ -255,7 +255,8 @@ phys_addr_t __init_memblock memblock_find_in_range_node(phys_addr_t size,
 	phys_addr_t kernel_end, ret;
 
 	/* pump up @end */
-	if (end == MEMBLOCK_ALLOC_ACCESSIBLE)
+	if (end == MEMBLOCK_ALLOC_ACCESSIBLE ||
+	    end == MEMBLOCK_ALLOC_KASAN)
 		end = memblock.current_limit;
 
 	/* avoid allocating the first page */
@@ -599,8 +600,7 @@ void free_memsize_reserved(phys_addr_t free_base, phys_addr_t free_size)
 	struct reserved_mem_reg *rmem_reg;
 	phys_addr_t free_end, end;
 
-	for (i = 0 ; i < reserved_mem_reg_count; i++)
-	{
+	for (i = 0 ; i < reserved_mem_reg_count; i++) {
 		rmem_reg = &reserved_mem_reg[i];
 
 		end = rmem_reg->base + rmem_reg->size;
@@ -679,8 +679,7 @@ static bool memsize_update_nomap_region(const char *name, phys_addr_t base,
 	if (!name || nomap)
 		return false;
 
-	for (i = 0; i < reserved_mem_reg_count; i++)
-	{
+	for (i = 0; i < reserved_mem_reg_count; i++) {
 		rmem_reg = &reserved_mem_reg[i];
 
 		if (!rmem_reg->nomap)
@@ -1676,13 +1675,15 @@ again:
 done:
 	ptr = phys_to_virt(alloc);
 
-	/*
-	 * The min_count is set to 0 so that bootmem allocated blocks
-	 * are never reported as leaks. This is because many of these blocks
-	 * are only referred via the physical address which is not
-	 * looked up by kmemleak.
-	 */
-	kmemleak_alloc(ptr, size, 0, 0);
+	/* Skip kmemleak for kasan_init() due to high volume. */
+	if (max_addr != MEMBLOCK_ALLOC_KASAN)
+		/*
+		 * The min_count is set to 0 so that bootmem allocated
+		 * blocks are never reported as leaks. This is because many
+		 * of these blocks are only referred via the physical
+		 * address which is not looked up by kmemleak.
+		 */
+		kmemleak_alloc(ptr, size, 0, 0);
 
 	return ptr;
 }
@@ -2151,8 +2152,6 @@ static int __init early_memblock(char *p)
 }
 early_param("memblock", early_memblock);
 
-#if defined(CONFIG_DEBUG_FS) && !defined(CONFIG_ARCH_DISCARD_MEMBLOCK)
-
 static int memblock_debug_show(struct seq_file *m, void *private)
 {
 	struct memblock_type *type = m->private;
@@ -2268,8 +2267,7 @@ static int memsize_reserved_show(struct seq_file *m, void *private)
 	sort(reserved_mem_reg, reserved_mem_reg_count,
 	     sizeof(reserved_mem_reg[0]), __rmem_reg_cmp, NULL);
 	seq_printf(m, "v1\n");
-	for (i = 0 ; i < reserved_mem_reg_count; i++)
-	{
+	for (i = 0 ; i < reserved_mem_reg_count; i++) {
 		rmem_reg = &reserved_mem_reg[i];
 		seq_printf(m, "0x%09lx-0x%09lx 0x%08lx ( %7lu KB ) %s %s %s\n",
 #if defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
@@ -2352,5 +2350,3 @@ static int __init memblock_init_debugfs(void)
 	return 0;
 }
 __initcall(memblock_init_debugfs);
-
-#endif /* CONFIG_DEBUG_FS */

@@ -29,6 +29,9 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/netdevice.h>
+#if defined(CONFIG_SOC_EXYNOS3830)
+#include <linux/pm_qos.h>
+#endif
 #include <linux/pm_runtime.h>
 #include <linux/version.h>
 #include <soc/samsung/exynos-itmon.h>
@@ -144,8 +147,7 @@ enum crash_type {
 	CRASH_REASON_MIF_RSV_MAX = 12,
 	CRASH_REASON_CP_SRST,
 	CRASH_REASON_CP_RSV_0,
-	CRASH_REASON_CP_RSV_MAX,
-	CRASH_REASON_CLD = 16,
+	CRASH_REASON_CP_RSV_MAX = 15,
 	CRASH_REASON_NONE = 0xFFFF,
 };
 
@@ -398,11 +400,6 @@ struct io_device {
 	int (*recv_net_skb)(struct io_device *iod, struct link_device *ld,
 			    struct sk_buff *skb);
 
-	/* inform the IO device that the modem is now online or offline or
-	 * crashing or whatever...
-	 */
-	void (*modem_state_changed)(struct io_device *iod, enum modem_state);
-
 	/* inform the IO device that the SIM is not inserting or removing */
 	void (*sim_state_changed)(struct io_device *iod, bool sim_online);
 
@@ -514,6 +511,10 @@ struct link_device {
 
 	/* Save Source IP addresses for each PDN setup request */
 	struct pdn_table pdn_table;
+
+#if defined(CONFIG_SOC_EXYNOS3830)
+	struct pm_qos_request pm_qos_mif;
+#endif
 
 	int (*init_comm)(struct link_device *ld, struct io_device *iod);
 	void (*terminate_comm)(struct link_device *ld, struct io_device *iod);

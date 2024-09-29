@@ -138,11 +138,6 @@ struct himax_i2c_platform_data {
 	const char *i_CTPM_firmware_name;
 	int hx_config_size;
 
-	bool enable_settings_aot;
-	const char *regulator_lcd_pwr1;
-	const char *regulator_lcd_pwr2;
-	const char *regulator_lcd_reset;
-
 #if defined(CONFIG_HMX_DB)
 	bool	i2c_pull_up;
 	bool	digital_pwr_regulator;

@@ -1045,8 +1045,8 @@ static bool jbd2_write_access_granted(handle_t *handle, struct buffer_head *bh,
 	/* For undo access buffer must have data copied */
 	if (undo && !jh->b_committed_data)
 		goto out;
-	if (READ_ONCE(jh->b_transaction) != handle->h_transaction &&
-	    READ_ONCE(jh->b_next_transaction) != handle->h_transaction)
+	if (jh->b_transaction != handle->h_transaction &&
+	    jh->b_next_transaction != handle->h_transaction)
 		goto out;
 	/*
 	 * There are two reasons for the barrier here:
@@ -1903,7 +1903,7 @@ static void __jbd2_journal_temp_unlink_buffer(struct journal_head *jh)
 	if (transaction && is_journal_aborted(transaction->t_journal))
 		clear_buffer_jbddirty(bh);
 	else if (test_clear_buffer_jbddirty(bh))
-		mark_buffer_dirty_sync(bh);	/* Expose it to the VM */
+		mark_buffer_dirty(bh);	/* Expose it to the VM */
 }
 
 /*
@@ -2467,8 +2467,8 @@ void __jbd2_journal_refile_buffer(struct journal_head *jh)
 	 * our jh reference and thus __jbd2_journal_file_buffer() must not
 	 * take a new one.
 	 */
-	WRITE_ONCE(jh->b_transaction, jh->b_next_transaction);
-	WRITE_ONCE(jh->b_next_transaction, NULL);
+	jh->b_transaction = jh->b_next_transaction;
+	jh->b_next_transaction = NULL;
 	if (buffer_freed(bh))
 		jlist = BJ_Forget;
 	else if (jh->b_modified)

@@ -26,10 +26,7 @@
  */
 #define EXYNOS_PMU_INFORM2 0x0808
 #define EXYNOS_PMU_INFORM3 0x080C
-#define EXYNOS_PMU_PS_HOLD_CONTROL 0x030C
-
-#define SEC_DEBUG_MAGIC_INFORM          (EXYNOS_PMU_INFORM2)
-#define SEC_DEBUG_PANIC_INFORM          (EXYNOS_PMU_INFORM3)
+#define EXYNOS_PMU_PS_HOLD_CONTROL 0x330C
 
 /*
  * Bootstat @ /proc/boot_stat
@@ -60,11 +57,22 @@ struct device_init_time_entry {
 #endif /* CONFIG_SEC_BOOT_STAT */
 
 /*
+ * Initcall log @ /proc/initcall_debug
+ * show a sorted execution time list of initcalls.
+ */
+#ifdef CONFIG_SEC_INITCALL_DEBUG
+#define SEC_INITCALL_DEBUG_MIN_TIME		10000
+extern void sec_initcall_debug_add(initcall_t fn, unsigned long long t);
+#else
+#define sec_initcall_debug_add(a, b)		do { } while (0)
+#endif /* CONFIG_SEC_INITCALL_DEBUG */
+
+/*
  * Param op.
  */
 #ifdef CONFIG_SEC_PARAM
 #define CM_OFFSET			CONFIG_CM_OFFSET
-#define CM_OFFSET_LIMIT			CM_OFFSET + 3
+#define CM_OFFSET_LIMIT			(CM_OFFSET + 3)
 #define WC_OFFSET			CONFIG_WC_OFFSET
 #define WC_OFFSET_LIMIT			WC_OFFSET
 #define FMM_LOCK_OFFSET			CONFIG_FMM_LOCK_OFFSET

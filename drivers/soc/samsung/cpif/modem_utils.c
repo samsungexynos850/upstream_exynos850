@@ -1685,12 +1685,10 @@ void mif_queue_skb(struct sk_buff *skb, int dir)
 
 	list_for_each_entry_rcu(ptype, ptype_list, list) {
 		if (pt_prev) {
-			local_bh_disable();
 			skb_orphan_frags_rx(skb2, GFP_ATOMIC);
 			refcount_inc(&skb2->users);
 			pt_prev->func(skb2, skb2->dev, pt_prev, skb->dev);
 			pt_prev = ptype;
-			local_bh_enable();
 			continue;
 		}
 
@@ -1724,11 +1722,9 @@ void mif_queue_skb(struct sk_buff *skb, int dir)
 
 out_unlock:
 	if (pt_prev) {
-		if (!skb_orphan_frags_rx(skb2, GFP_ATOMIC)) {
-			local_bh_disable();
+		if (!skb_orphan_frags_rx(skb2, GFP_ATOMIC))
 			pt_prev->func(skb2, skb->dev, pt_prev, skb->dev);
-			local_bh_enable();
-		} else
+		else
 			kfree_skb(skb2);
 	}
 	rcu_read_unlock_bh();

@@ -32,6 +32,7 @@
 #include <linux/usb/gadget.h>
 #include <linux/usb/of.h>
 #include <linux/usb/otg.h>
+#include <linux/usb_notify.h>
 
 #include "core.h"
 #include "otg.h"
@@ -42,12 +43,14 @@
 
 #define DWC3_DEFAULT_AUTOSUSPEND_DELAY	5000 /* ms */
 
+#if IS_ENABLED(CONFIG_BATTERY_SAMSUNG)
 /* for BC1.2 spec */
 int dwc3_set_vbus_current(int state)
 {
 	struct power_supply *psy;
 	union power_supply_propval pval = {0};
 
+	pr_info("usb: %s : %dmA\n", __func__, state);
 	psy = power_supply_get_by_name("battery");
 	if (!psy) {
 		pr_err("%s: fail to get battery power_supply\n", __func__);
@@ -63,10 +66,29 @@ int dwc3_set_vbus_current(int state)
 static void dwc3_exynos_set_vbus_current_work(struct work_struct *w)
 {
 	struct dwc3 *dwc = container_of(w, struct dwc3, set_vbus_current_work);
+	struct otg_notify *o_notify = get_otg_notify();
 
+	switch (dwc->vbus_current) {
+	case USB_CURRENT_SUSPENDED:
+	/* set vbus current for suspend state is called in usb_notify. */
+		send_otg_notify(o_notify, NOTIFY_EVENT_USBD_SUSPENDED, 1);
+		goto skip;
+	case USB_CURRENT_UNCONFIGURED:
+		send_otg_notify(o_notify, NOTIFY_EVENT_USBD_UNCONFIGURED, 1);
+		break;
+	case USB_CURRENT_HIGH_SPEED:
+	case USB_CURRENT_SUPER_SPEED:
+		send_otg_notify(o_notify, NOTIFY_EVENT_USBD_CONFIGURED, 1);
+		break;
+	default:
+		break;
+	}
 	dwc3_set_vbus_current(dwc->vbus_current);
+skip:
+	return;
 }
 /* -------------------------------------------------------------------------- */
+#endif
 
 /**
  * dwc3_get_dr_mode - Validates and sets dr_mode
@@ -477,10 +499,6 @@ static int dwc3_core_soft_reset(struct dwc3 *dwc)
 
 	usb_phy_init(dwc->usb2_phy);
 	usb_phy_init(dwc->usb3_phy);
-
-	dev_info(dwc->dev, "%s: init_count:%d, power_count:%d\n", __func__,
-			dwc->usb2_generic_phy->init_count, dwc->usb2_generic_phy->power_count);
-
 	ret = phy_init(dwc->usb2_generic_phy);
 	if (ret < 0)
 		goto err_usb2phy_power;
@@ -1326,9 +1344,6 @@ int dwc3_core_init(struct dwc3 *dwc)
 		if (dwc->dis_tx_ipgap_linecheck_quirk)
 			reg |= DWC3_GUCTL1_TX_IPGAP_LINECHECK_DIS;
 
-		if (dwc->parkmode_disable_ss_quirk)
-			reg |= DWC3_GUCTL1_PARKMODE_DISABLE_SS;
-
 		dwc3_writel(dwc->regs, DWC3_GUCTL1, reg);
 	}
 
@@ -1727,8 +1742,6 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 				"snps,dis-del-phy-power-chg-quirk");
 	dwc->dis_tx_ipgap_linecheck_quirk = device_property_read_bool(dev,
 				"snps,dis-tx-ipgap-linecheck-quirk");
-	dwc->parkmode_disable_ss_quirk = device_property_read_bool(dev,
-				"snps,parkmode-disable-ss-quirk");
 
 	dwc->tx_de_emphasis_quirk = device_property_read_bool(dev,
 				"snps,tx_de_emphasis_quirk");
@@ -1758,7 +1771,6 @@ static void dwc3_get_properties(struct dwc3 *dwc)
 	dwc->tx_max_burst_prd = tx_max_burst_prd;
 
 	dwc->imod_interval = 0;
-	dwc->max_cnt_link_info = 0;
 }
 
 /* check whether the core supports IMOD */
@@ -1925,7 +1937,9 @@ static int dwc3_probe(struct platform_device *pdev)
 	dwc3_debugfs_init(dwc);
 	pm_runtime_put(dev);
 
+#if IS_ENABLED(CONFIG_BATTERY_SAMSUNG)
 	INIT_WORK(&dwc->set_vbus_current_work, dwc3_exynos_set_vbus_current_work);
+#endif
 
 	/* Disable LDO */
 	phy_conn(dwc->usb2_generic_phy, 0);

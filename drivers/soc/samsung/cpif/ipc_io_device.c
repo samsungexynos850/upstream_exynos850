@@ -123,7 +123,6 @@ static unsigned int ipc_poll(struct file *filp, struct poll_table_struct *wait)
 		if (iod->format == IPC_FMT) {
 			return POLLHUP;
 		}
-
 		/* give delay to prevent infinite sys_poll call from
 		 * select() in APP layer without 'sleep' user call takes
 		 * almost 100% cpu usage when it is looked up by 'top'
@@ -133,7 +132,9 @@ static unsigned int ipc_poll(struct file *filp, struct poll_table_struct *wait)
 		break;
 
 	case STATE_OFFLINE:
-		/* fall through */
+		if ((iod->ch == EXYNOS_CH_ID_CPLOG && ld->protocol == PROTOCOL_SIT)
+			|| iod->ch == SIPC_CH_ID_CASS)
+			return POLLHUP;
 	default:
 		break;
 	}
@@ -331,6 +332,7 @@ static ssize_t ipc_write(struct file *filp, const char __user *data,
 		msleep(INIT_END_WAIT_MS);
 		if (curr_init_end_cnt >= 0)
 			mld->last_init_end_cnt = curr_init_end_cnt;
+
 		atomic_dec(&mld->init_end_busy);
 	}
 

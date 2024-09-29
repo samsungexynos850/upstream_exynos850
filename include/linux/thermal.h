@@ -32,6 +32,9 @@
 /* Default weight of a bound cooling device */
 #define THERMAL_WEIGHT_DEFAULT 0
 
+/* Max sensors that can be used for a single virtual thermalzone */
+#define THERMAL_MAX_VIRT_SENSORS 10
+
 /* use value, which < 0K, to indicate an invalid/uninitialized temperature */
 #define THERMAL_TEMP_INVALID	-274000
 
@@ -145,6 +148,8 @@ struct thermal_cooling_device {
 	struct mutex lock; /* protect thermal_instances list */
 	struct list_head thermal_instances;
 	struct list_head node;
+	unsigned long sysfs_cur_state_req;
+	unsigned long sysfs_min_state_req;
 };
 
 struct thermal_attr {
@@ -337,6 +342,12 @@ struct thermal_zone_params {
 	 * 		Used by thermal zone drivers (default 0).
 	 */
 	int offset;
+
+	/*
+	 * @tracks_low:	Indicates that the thermal zone params are for
+	 *		temperatures falling below the thresholds.
+	 */
+	bool tracks_low;
 };
 
 struct thermal_genl_event {
@@ -426,6 +437,8 @@ struct __thermal_zone {
 	int polling_delay;
 	int slope;
 	int offset;
+	struct thermal_zone_device *tzd;
+	bool default_disable;
 
 	/* trip data */
 	int ntrips;
@@ -435,9 +448,44 @@ struct __thermal_zone {
 	int num_tbps;
 	struct __thermal_bind_params *tbps;
 
-	/* sensor interface */
-	void *sensor_data;
 	const struct thermal_zone_of_device_ops *ops;
+	struct list_head list;
+	/* sensor interface */
+	struct __sensor_param *senps;
+};
+
+/* Different aggregation logic supported for virtual sensors */
+enum aggregation_logic {
+	VIRT_WEIGHTED_AVG,
+	VIRT_MAXIMUM,
+	VIRT_MINIMUM,
+	VIRT_COUNT_THRESHOLD,
+	VIRT_AGGREGATION_NR,
+};
+
+/*
+ * struct virtual_sensor_data - Data structure used to provide
+ *			      information about the virtual zone.
+ * @virt_zone_name - Virtual thermal zone name
+ * @num_sensors - Number of sensors this virtual zone uses to compute
+ *		  temperature
+ * @sensor_names - Array of sensor names
+ * @logic - Temperature aggregation logic to be used
+ * @coefficients - Coefficients to be used for weighted average logic
+ * @coefficient_ct - number of coefficients provided as input
+ * @avg_offset - offset value to be used for the weighted aggregation logic
+ * @avg_denominator - denominator value to be used for the weighted aggregation
+ *			logic
+ */
+struct virtual_sensor_data {
+	int                    num_sensors;
+	char                   virt_zone_name[THERMAL_NAME_LENGTH];
+	char                   *sensor_names[THERMAL_MAX_VIRT_SENSORS];
+	enum aggregation_logic logic;
+	int                    coefficients[THERMAL_MAX_VIRT_SENSORS];
+	int                    coefficient_ct;
+	int                    avg_offset;
+	int                    avg_denominator;
 };
 
 /* Function declarations */
@@ -452,6 +500,9 @@ struct thermal_zone_device *devm_thermal_zone_of_sensor_register(
 		const struct thermal_zone_of_device_ops *ops);
 void devm_thermal_zone_of_sensor_unregister(struct device *dev,
 					    struct thermal_zone_device *tz);
+struct thermal_zone_device *devm_thermal_of_virtual_sensor_register(
+		struct device *dev,
+		const struct virtual_sensor_data *sensor_data);
 #else
 static inline struct thermal_zone_device *
 thermal_zone_of_sensor_register(struct device *dev, int id, void *data,
@@ -477,6 +528,14 @@ static inline
 void devm_thermal_zone_of_sensor_unregister(struct device *dev,
 					    struct thermal_zone_device *tz)
 {
+}
+
+static inline
+struct thermal_zone_device *devm_thermal_of_virtual_sensor_register(
+		struct device *dev,
+		const struct virtual_sensor_data *sensor_data)
+{
+	return ERR_PTR(-ENODEV);
 }
 
 #endif

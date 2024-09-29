@@ -46,12 +46,6 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 	bool protected = cma_heap->secure && (flags & ION_FLAG_PROTECTED);
 	int ret = -ENOMEM;
 
-	if (!cma_heap->secure && (flags & ION_FLAG_PROTECTED)) {
-		perrfn("ION_FLAG_PROTECTED is set to non-secure heap %s",
-		       heap->name);
-		return -EINVAL;
-	}
-
 	pages = cma_alloc(cma_heap->cma, nr_pages, align, false);
 	if (!pages) {
 		perrfn("failed to allocate from %s(id %d), size %lu",
@@ -233,10 +227,13 @@ static int __ion_add_cma_heaps(struct cma *cma, void *data)
 	return 0;
 }
 
-static int ion_add_cma_heaps(void)
+int ion_add_cma_heaps(void)
 {
 	cma_for_each_area(__ion_add_cma_heaps, NULL);
 	return 0;
 }
+
+#ifndef CONFIG_ION_MODULE
 device_initcall(ion_add_cma_heaps);
 #endif /* CONFIG_ION_EXYNOS */
+#endif

@@ -976,9 +976,9 @@ static struct usb_device *usbdev_lookup_by_devt(dev_t devt)
 	return to_usb_device(dev);
 }
 
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
-static unsigned int prev_cmd = 0;
-static int prev_ret = 0;
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
+static unsigned int prev_cmd;
+static int prev_ret;
 #endif
 /*
  * file operations
@@ -1033,10 +1033,6 @@ static int usbdev_open(struct inode *inode, struct file *file)
 	usb_unlock_device(dev);
 	snoop(&dev->dev, "opened by process %d: %s\n", task_pid_nr(current),
 			current->comm);
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
-	prev_cmd = 0;
-	prev_ret = 0;
-#endif
 	return ret;
 
  out_unlock_device:
@@ -2580,7 +2576,7 @@ static long usbdev_do_ioctl(struct file *file, unsigned int cmd,
 	return ret;
 }
 
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 static int usbdev_log(unsigned int cmd, int ret)
 {
 	char *cmd_string;
@@ -2654,7 +2650,7 @@ static int usbdev_log(unsigned int cmd, int ret)
 		break;
 	}
 	if ((prev_cmd != cmd) || (prev_ret != ret)) {
-		printk(KERN_ERR "%s: %s error ret=%d\n", __func__, cmd_string, ret);
+		pr_err("%s: %s error ret=%d\n", __func__, cmd_string, ret);
 		prev_cmd = cmd;
 		prev_ret = ret;
 	}
@@ -2668,7 +2664,7 @@ static long usbdev_ioctl(struct file *file, unsigned int cmd,
 	int ret;
 
 	ret = usbdev_do_ioctl(file, cmd, (void __user *)arg);
-#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+#if IS_ENABLED(CONFIG_USB_DEBUG_DETAILED_LOG)
 	if (ret < 0)
 		usbdev_log(cmd, ret);
 	else {

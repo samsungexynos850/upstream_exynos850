@@ -650,7 +650,7 @@ static int xhci_plat_remove(struct platform_device *dev)
 	usb3_portsc = NULL;
 	pp_set_delayed = 0;
 
-#if defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
+#if IS_ENABLED(CONFIG_USB_HOST_SAMSUNG_FEATURE)
 	pr_info("%s\n", __func__);
 	/* In order to prevent kernel panic */
 	if (!pm_runtime_suspended(&xhci->shared_hcd->self.root_hub->dev)) {
@@ -678,7 +678,6 @@ static int xhci_plat_remove(struct platform_device *dev)
 	xhci_dbg(xhci, "%s: waited %dmsec", __func__, timeout);
 #endif
 
-	pm_runtime_get_sync(&dev->dev);
 	xhci->xhc_state |= XHCI_STATE_REMOVING;
 	xhci->xhci_alloc->offset = 0;
 
@@ -686,7 +685,7 @@ static int xhci_plat_remove(struct platform_device *dev)
 	wake_unlock(xhci->wakelock);
 	wake_lock_destroy(xhci->wakelock);
 
-#if defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
+#if IS_ENABLED(CONFIG_USB_HOST_SAMSUNG_FEATURE)
 	usb_remove_hcd(xhci->shared_hcd);
 #else
 	usb_remove_hcd(shared_hcd);
@@ -704,7 +703,7 @@ static int xhci_plat_remove(struct platform_device *dev)
 		hcd->phy = NULL;
 
 	usb_remove_hcd(hcd);
-#if defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
+#if IS_ENABLED(CONFIG_USB_HOST_SAMSUNG_FEATURE)
 	usb_put_hcd(xhci->shared_hcd);
 #else
 	usb_put_hcd(shared_hcd);
@@ -713,9 +712,8 @@ static int xhci_plat_remove(struct platform_device *dev)
 	clk_disable_unprepare(reg_clk);
 	usb_put_hcd(hcd);
 
-	pm_runtime_disable(&dev->dev);
-	pm_runtime_put_noidle(&dev->dev);
 	pm_runtime_set_suspended(&dev->dev);
+	pm_runtime_disable(&dev->dev);
 
 	return 0;
 }
@@ -751,15 +749,7 @@ static int __maybe_unused xhci_plat_resume(struct device *dev)
 	if (ret)
 		return ret;
 
-	ret = xhci_resume(xhci, 0);
-	if (ret)
-		return ret;
-
-	pm_runtime_disable(dev);
-	pm_runtime_set_active(dev);
-	pm_runtime_enable(dev);
-
-	return 0;
+	return xhci_resume(xhci, 0);
 }
 
 static int __maybe_unused xhci_plat_runtime_suspend(struct device *dev)
@@ -806,7 +796,6 @@ MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
 static struct platform_driver usb_xhci_driver = {
 	.probe	= xhci_plat_probe,
 	.remove	= xhci_plat_remove,
-	.shutdown = usb_hcd_platform_shutdown,
 	.driver	= {
 		.name = "xhci-hcd",
 		.pm = &xhci_plat_pm_ops,

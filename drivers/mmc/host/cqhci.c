@@ -13,6 +13,7 @@
 #include <linux/delay.h>
 #include <linux/highmem.h>
 #include <linux/io.h>
+#include <linux/iopoll.h>
 #include <linux/module.h>
 #include <linux/dma-mapping.h>
 #include <linux/slab.h>
@@ -112,6 +113,7 @@ static void cqhci_interrupt_mask_set(struct cqhci_host *cq_host, bool enable)
 		cmd_mask |= (RESP_ERR | CMD_DONE | RESP_CRC_ERR |
 			RESP_TIMEOUT | HW_LOCK_ERR);
 		err_mask = RESP_DEVICE_STATE;
+
 		/* disable write protection violation indication */
 		err_mask &= ~(WP_VIOLATION | WP_ERASE_SKIP);
 	} else {
@@ -196,7 +198,6 @@ static void cqhci_dumpregs(struct cqhci_host *cq_host)
 		/* do not recover system if test mode is enabled */
 		BUG();
 #endif
-
 }
 
 /**
@@ -426,38 +427,38 @@ static int cqhci_enable(struct mmc_host *mmc, struct mmc_card *card)
 }
 
 /* CQHCI is idle and should halt immediately, so set a small timeout */
-#define CQHCI_OFF_TIMEOUT 100
+#define CQHCI_OFF_TIMEOUT 100000
+
+static u32 cqhci_read_ctl(struct cqhci_host *cq_host)
+{
+	return cqhci_readl(cq_host, CQHCI_CTL);
+}
 
 static void cqhci_off(struct mmc_host *mmc, bool add_disabled)
 {
 	struct cqhci_host *cq_host = mmc->cqe_private;
-	ktime_t timeout;
 	u32 reg;
 	int retries = 3;
+	int err;
 
 	if (!cq_host->enabled || !mmc->cqe_on || cq_host->recovery_halt)
 		return;
 
-	do {
+	while (retries--) {
 		cqhci_writel(cq_host, CQHCI_HALT, CQHCI_CTL);
+		err = readx_poll_timeout(cqhci_read_ctl, cq_host, reg,
+					 reg & CQHCI_HALT, 0, CQHCI_OFF_TIMEOUT);
+		if (reg & CQHCI_HALT)
+			break;
+	}
 
-		timeout = ktime_add_ms(ktime_get(), CQHCI_OFF_TIMEOUT);
-		do {
-			reg = cqhci_readl(cq_host, CQHCI_CTL);
-			if (reg & CQHCI_HALT) {
-				pr_debug("%s: cqhci: CQE off\n", mmc_hostname(mmc));
-				goto done;
-			}
-		} while (ktime_before(ktime_get(), timeout));
-
-	} while (--retries);
-
-	if (retries <= 0) {
+	if (err < 0) {
 		mmc_card_error_logging(mmc->card, NULL, HALT_UNHALT_ERR);
 		pr_err("%s: cqhci: CQE stuck on\n", mmc_hostname(mmc));
 	}
+	else
+		pr_debug("%s: cqhci: CQE off\n", mmc_hostname(mmc));
 
-done:
 	cqhci_interrupt_mask_set(cq_host, false);
 	cqhci_set_irqs(cq_host, 0);
 
@@ -1225,7 +1226,6 @@ static void cqhci_recovery_finish(struct mmc_host *mmc)
 
 	__cqhci_enable(cq_host);
 	ok = cqhci_halt(mmc, CQHCI_FINISH_HALT_TIMEOUT);
-
 	if (cq_host->ops->reset) {
 		ret = cq_host->ops->reset(mmc, false);
 		if (ret) {
@@ -1267,6 +1267,7 @@ static void cqhci_recovery_finish(struct mmc_host *mmc)
 	cqhci_recover_mrqs(cq_host);
 
 	WARN_ON(cq_host->qcnt);
+
 
 	spin_lock_irqsave(&cq_host->lock, flags);
 	cq_host->qcnt = 0;

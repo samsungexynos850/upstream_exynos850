@@ -254,8 +254,7 @@ static void tcp_ecn_accept_cwr(struct sock *sk, const struct sk_buff *skb)
 		 * cwnd may be very low (even just 1 packet), so we should ACK
 		 * immediately.
 		 */
-		if (TCP_SKB_CB(skb)->seq != TCP_SKB_CB(skb)->end_seq)
-			inet_csk(sk)->icsk_ack.pending |= ICSK_ACK_NOW;
+		inet_csk(sk)->icsk_ack.pending |= ICSK_ACK_NOW;
 	}
 }
 
@@ -3666,15 +3665,6 @@ static int tcp_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 		tcp_in_ack_event(sk, ack_ev_flags);
 	}
 
-	/* This is a deviation from RFC3168 since it states that:
-	 * "When the TCP data sender is ready to set the CWR bit after reducing
-	 * the congestion window, it SHOULD set the CWR bit only on the first
-	 * new data packet that it transmits."
-	 * We accept CWR on pure ACKs to be more robust
-	 * with widely-deployed TCP implementations that do this.
-	 */
-	tcp_ecn_accept_cwr(sk, skb);
-
 	/* We passed data and got it acked, remove any soft error
 	 * log. Something worked...
 	 */
@@ -4382,7 +4372,6 @@ static bool tcp_try_coalesce(struct sock *sk,
 		skb_hwtstamps(to)->hwtstamp = skb_hwtstamps(from)->hwtstamp;
 	}
 
-	DROPDUMP_CLEAR_SKB(from);
 	return true;
 }
 
@@ -4405,9 +4394,6 @@ static bool tcp_ooo_try_coalesce(struct sock *sk,
 
 static void tcp_drop(struct sock *sk, struct sk_buff *skb)
 {
-#ifdef CONFIG_NET_SUPPORT_DROPDUMP
-	dropdump_queue(skb);
-#endif
 	sk_drops_add(sk, skb);
 	__kfree_skb(skb);
 }
@@ -4532,11 +4518,7 @@ static void tcp_data_queue_ofo(struct sock *sk, struct sk_buff *skb)
 	if (tcp_ooo_try_coalesce(sk, tp->ooo_last_skb,
 				 skb, &fragstolen)) {
 coalesce_done:
-		/* For non sack flows, do not grow window to force DUPACK
-		 * and trigger fast retransmit.
-		 */
-		if (tcp_is_sack(tp))
-			tcp_grow_window(sk, skb);
+		tcp_grow_window(sk, skb);
 		kfree_skb_partial(skb, fragstolen);
 		skb = NULL;
 		goto add_sack;
@@ -4620,11 +4602,7 @@ add_sack:
 		tcp_sack_new_ofo_skb(sk, seq, end_seq);
 end:
 	if (skb) {
-		/* For non sack flows, do not grow window to force DUPACK
-		 * and trigger fast retransmit.
-		 */
-		if (tcp_is_sack(tp))
-			tcp_grow_window(sk, skb);
+		tcp_grow_window(sk, skb);
 		skb_condense(skb);
 		skb_set_owner_r(skb, sk);
 	}
@@ -4705,8 +4683,7 @@ void tcp_data_ready(struct sock *sk)
 	const struct tcp_sock *tp = tcp_sk(sk);
 	int avail = tp->rcv_nxt - tp->copied_seq;
 
-	if (avail < sk->sk_rcvlowat && !tcp_rmem_pressure(sk) &&
-	    !sock_flag(sk, SOCK_DONE))
+	if (avail < sk->sk_rcvlowat && !sock_flag(sk, SOCK_DONE))
 		return;
 
 	sk->sk_data_ready(sk);
@@ -4724,6 +4701,8 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 	}
 	skb_dst_drop(skb);
 	__skb_pull(skb, tcp_hdr(skb)->doff * 4);
+
+	tcp_ecn_accept_cwr(sk, skb);
 
 	tp->rx_opt.dsack = 0;
 
@@ -4743,7 +4722,6 @@ queue_and_out:
 			sk_forced_mem_schedule(sk, skb->truesize);
 		else if (tcp_try_rmem_schedule(sk, skb, skb->truesize)) {
 			NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRCVQDROP);
-			DROPDUMP_QUEUE_SKB(skb, NET_DROPDUMP_OPT_TCP_RMEMSCHEDULEFAIL);
 			goto drop;
 		}
 
@@ -4781,7 +4759,6 @@ queue_and_out:
 		tcp_dsack_set(sk, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq);
 
 out_of_window:
-		DROPDUMP_QPCAP_SKB(skb, NET_DROPDUMP_OPT_TCP_OUTOFWINDOW);
 		tcp_enter_quickack_mode(sk, TCP_MAX_QUICKACKS);
 		inet_csk_schedule_ack(sk);
 drop:
@@ -5391,7 +5368,6 @@ static bool tcp_validate_incoming(struct sock *sk, struct sk_buff *skb,
 						  LINUX_MIB_TCPACKSKIPPEDPAWS,
 						  &tp->last_oow_ack_time))
 				tcp_send_dupack(sk, skb);
-			DROPDUMP_QUEUE_SKB(skb, NET_DROPDUMP_OPT_TCP_PAWSREJECTED);
 			goto discard;
 		}
 		/* Reset is accepted even if it did not pass PAWS. */
@@ -5412,7 +5388,6 @@ static bool tcp_validate_incoming(struct sock *sk, struct sk_buff *skb,
 						  LINUX_MIB_TCPACKSKIPPEDSEQ,
 						  &tp->last_oow_ack_time))
 				tcp_send_dupack(sk, skb);
-			DROPDUMP_QPCAP_SKB(skb, NET_DROPDUMP_OPT_TCP_INVALIDSEQ);
 		} else if (tcp_reset_check(sk, skb)) {
 			tcp_reset(sk);
 		}
@@ -5471,10 +5446,8 @@ static bool tcp_validate_incoming(struct sock *sk, struct sk_buff *skb,
 	 */
 	if (th->syn) {
 syn_challenge:
-		if (syn_inerr) {
+		if (syn_inerr)
 			TCP_INC_STATS(sock_net(sk), TCP_MIB_INERRS);
-			DROPDUMP_QUEUE_SKB(skb, NET_DROPDUMP_TCP_MIB_INERRS);
-		}
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPSYNCHALLENGE);
 		tcp_send_challenge_ack(sk, skb);
 		goto discard;
@@ -5483,7 +5456,6 @@ syn_challenge:
 	return true;
 
 discard:
-	DROPDUMP_CHECK_SKB(skb);
 	tcp_drop(sk, skb);
 	return false;
 }
@@ -5592,7 +5564,6 @@ void tcp_rcv_established(struct sock *sk, struct sk_buff *skb)
 				 * on entry.
 				 */
 				tcp_ack(sk, skb, 0);
-				DROPDUMP_CLEAR_SKB(skb);
 				__kfree_skb(skb);
 				tcp_data_snd_check(sk);
 				/* When receiving pure ack in fast path, update
@@ -5603,7 +5574,6 @@ void tcp_rcv_established(struct sock *sk, struct sk_buff *skb)
 				return;
 			} else { /* Header too small */
 				TCP_INC_STATS(sock_net(sk), TCP_MIB_INERRS);
-				DROPDUMP_QUEUE_SKB(skb, NET_DROPDUMP_TCP_MIB_INERRS1);
 				goto discard;
 			}
 		} else {
@@ -5656,10 +5626,8 @@ slow_path:
 	if (len < (th->doff << 2) || tcp_checksum_complete(skb))
 		goto csum_error;
 
-	if (!th->ack && !th->rst && !th->syn) {
-		DROPDUMP_QUEUE_SKB(skb, NET_DROPDUMP_TCP_MIB_INERRS7);
+	if (!th->ack && !th->rst && !th->syn)
 		goto discard;
-	}
 
 	/*
 	 *	Standard slow path.
@@ -5687,9 +5655,8 @@ step5:
 csum_error:
 	TCP_INC_STATS(sock_net(sk), TCP_MIB_CSUMERRORS);
 	TCP_INC_STATS(sock_net(sk), TCP_MIB_INERRS);
-	DROPDUMP_QUEUE_SKB(skb, NET_DROPDUMP_TCP_MIB_INERRS2);
+
 discard:
-	DROPDUMP_CHECK_SKB(skb);
 	tcp_drop(sk, skb);
 }
 EXPORT_SYMBOL(tcp_rcv_established);
@@ -6064,7 +6031,6 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			consume_skb(skb);
 			return 0;
 		}
-		DROPDUMP_QUEUE_SKB(skb, NET_DROPDUMP_OPT_TCP_NOTCONNECTED);
 		goto discard;
 
 	case TCP_SYN_SENT:
@@ -6109,7 +6075,6 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		if (sk->sk_state == TCP_SYN_RECV)
 			return 1;	/* send one RST */
 		tcp_send_challenge_ack(sk, skb);
-		DROPDUMP_QUEUE_SKB(skb, NET_DROPDUMP_OPT_TCP_INVALIDACK);
 		goto discard;
 	}
 	switch (sk->sk_state) {
@@ -6281,7 +6246,6 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 
 	if (!queued) {
 discard:
-		DROPDUMP_CHECK_SKB(skb);
 		tcp_drop(sk, skb);
 	}
 	return 0;

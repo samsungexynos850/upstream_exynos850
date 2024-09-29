@@ -2266,6 +2266,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 	spin_lock(&sk->sk_receive_queue.lock);
 	h.raw = packet_current_rx_frame(po, skb,
 					TP_STATUS_KERNEL, (macoff+snaplen));
+
 	if (!h.raw)
 		goto drop_n_account;
 

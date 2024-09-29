@@ -268,6 +268,9 @@ static void exynos_panel_get_display_modes(struct exynos_panel_info *info,
 
 	DPU_INFO_PANEL("%s +\n", __func__);
 
+	of_property_read_u32(np, "active_fps", &info->active_fps);
+	DPU_INFO_PANEL("active_fps(%d)\n", info->active_fps);
+
 	of_property_read_u32(np, "default_mode", &info->cur_mode_idx);
 	DPU_INFO_PANEL("default display mode index(%d)\n", info->cur_mode_idx);
 

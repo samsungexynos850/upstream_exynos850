@@ -54,7 +54,7 @@ config SEC_DEBUG_LAST_KMSG
 config SEC_DEBUG_FIRST2M_LOG
 	bool "support storing of initial 2M kernel log"
 	depends on SEC_DEBUG
-	default n
+	default y
 	help
 	  This option enables hooking of initial 2M kernel log.
  	  It can be used for debugging purpose in case of booting failure or something else.
@@ -62,7 +62,7 @@ config SEC_DEBUG_FIRST2M_LOG
 config SEC_DEBUG_INIT_LOG
 	bool "support hooking of init task log"
 	depends on SEC_DEBUG
-	default n
+	default y
 	help
 	  This option enables hooking of init task log.
 	  It can be used for debugging purpose in case of booting failure or something else.
@@ -139,7 +139,6 @@ config SEC_DEBUG_EXCEPTION_STACK
 
 config SEC_DEBUG_ATOMIC_SLEEP_PANIC
 	bool "Panic (Reboot) On Atomic Sleep"
-	depends on DEBUG_ATOMIC_SLEEP
 	depends on SEC_DEBUG && !SAMSUNG_PRODUCT_SHIP
 	default y
 	help
@@ -194,7 +193,7 @@ config SEC_DEBUG_LOCKUP_INFO
 config SEC_DEBUG_COMPLETE_HINT
 	bool "Provide complete hint"
 	depends on SEC_DEBUG
-	default y
+	default n
 	help
 	  This option enables the kernel to provide complete hint.
 	  If some tasks wait wait_for_completion, provide complete hint.
@@ -321,3 +320,16 @@ config SEC_DEBUG_QSPIN_OWNER
 	  This option enables spinlock owner information.
 	  The CPU number of owner is written into lock value.
 
+config SEC_DUMP_SINK
+	tristate "Enable to dump_sink"
+	depends on SEC_DEBUG
+	default n
+	help
+	  This option enables dump sink.
+
+config SEC_DEBUG_DUMP_SUMMARY
+	bool "Enable dump summary in rmem"
+	depends on SEC_DEBUG
+	default y
+	help
+	  This option enables dump summary in rmem.

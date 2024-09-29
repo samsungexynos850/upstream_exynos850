@@ -1,18 +1,36 @@
+/*
+ * drivers/media/radio/s610/fm_rds.h
+ *
+ * FM Radio RDS driver header for SAMSUNG S610 chip
+ *
+ * Copyright (c) 2017 Samsung Electronics Co., Ltd.
+ *		http://www.samsung.com
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ */
 #ifndef FM_RDS_H
 #define FM_RDS_H
 
 void fm_rds_write_data(struct s610_radio *radio, u16 rds_data,
-	fm_rds_block_type_enum blk_type, fm_host_rds_errors_enum errors);
+	enum fm_rds_block_type_enum blk_type, enum fm_host_rds_errors_enum errors);
 void fm_rds_write_data_remove(struct s610_radio *radio,
-	fm_rds_rm_align_enum removeblock);
+	enum fm_rds_rm_align_enum removeblock);
 u16 fm_rds_get_avail_bytes(struct s610_radio *radio);
 int fm_read_rds_data(struct s610_radio *radio, u8 *buffer, int size,
 		u16 *blocks);
 void fm_rds_change_state(struct s610_radio *radio,
-		fm_rds_state_enum new_state);
+		enum fm_rds_state_enum new_state);
 void fm_rds_update_error_status(struct s610_radio *radio, u16 errors);
-static fm_host_rds_errors_enum fm_rds_process_block(struct s610_radio *radio,
-		u16 data, fm_rds_block_type_enum block_type, u16 err_count);
+static enum fm_host_rds_errors_enum fm_rds_process_block(struct s610_radio *radio,
+		u16 data, enum fm_rds_block_type_enum block_type, u16 err_count);
 void fm_process_rds_data(struct s610_radio *radio);
 int ringbuf_bytes_used(const struct ringbuf_t *rb);
 void fm_rds_parser(struct fm_rds_parser_info *pi, u16 info, u8 blk_type, u8 err_cnt);
@@ -26,11 +44,10 @@ extern bool fm_get_rds_sync_status(struct s610_radio *radio);
 #endif	/*USE_RDS_HW_DECODER*/
 
 extern int fm_set_flags(struct s610_radio *radio, u16 flags);
-extern void fm_timer_reset(fm_timer_t *timer, int usec, fm_callback_t *func,
-		void *arg);
 extern u32 fmspeedy_get_reg(u32 addr);
 extern u32 fmspeedy_get_reg_work(u32 addr);
 extern void fm_update_rssi_work(struct s610_radio *radio);
+extern struct s610_radio *gradio;
 
 #define RDS_BLK_TYPE_MASK	0xE0
 #define RDS_BLK_TYPE_SHIFT	5
@@ -52,10 +69,9 @@ extern void fm_update_rssi_work(struct s610_radio *radio);
 #define RDS_EVENT_RTP_MASK   0x20
 #define RDS_EVENT_PTY_MASK   0x40
 
-
 #define RDS_RTP_AID	0x4BD7
 
-typedef enum {
+enum fm_rds_event_type_enum {
 	RDS_EVENT_NONE = 0,
 	RDS_EVENT_PI,
 	RDS_EVENT_PS,
@@ -64,7 +80,7 @@ typedef enum {
 	RDS_EVENT_ECC,
 	RDS_EVENT_RTP,
 	RDS_EVENT_PTY,
-} fm_rds_event_type_enum;
+};
 
 enum {
 	RDS_GRPTYPE_0A = 0x0,
@@ -88,7 +104,7 @@ u16 OFFSET_WORD[] = {
 		0xFC,
 		0x198,
 		0x168,
-		//0x350, /* Need to override C with C' if current version is B */
+		/*0x350, *//* Need to override C with C' if current version is B */
 		0x1B4,
 };
 

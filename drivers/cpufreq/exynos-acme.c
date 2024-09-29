@@ -28,7 +28,6 @@
 
 #include <soc/samsung/cal-if.h>
 #include <soc/samsung/ect_parser.h>
-#include <soc/samsung/exynos-dm.h>
 #include <soc/samsung/exynos-cpuhp.h>
 #include <soc/samsung/exynos-cpupm.h>
 #include <soc/samsung/exynos-alt.h>
@@ -1054,10 +1053,8 @@ void sec_bootstat_get_cpuinfo(int *freq, int *online)
 		domain = find_domain(cpu);
 		if (!domain)
 			continue;
-		pr_err("%s, dm type = %d\n", __func__, domain->dm_type);
-		cluster = 0;
-		if (domain->dm_type == DM_CPU_CL1)
-			cluster = 1;
+		pr_info("%s, dm type = %d\n", __func__, domain->dm_type);
+		cluster = domain->dm_type;
 
 		freq[cluster] = get_freq(domain);
 	}

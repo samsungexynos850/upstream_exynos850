@@ -50,6 +50,7 @@
 #include "dw_mmc-exynos.h"
 #include "../core/queue.h"
 #include "cqhci.h"
+#include "dw_mmc-exynos-fmp.h"
 
 /* Common flag combinations */
 #define DW_MCI_DATA_ERROR_FLAGS	(SDMMC_INT_DRTO | SDMMC_INT_DCRC | \
@@ -3729,14 +3730,14 @@ static irqreturn_t dw_mci_detect_interrupt(int irq, void *dev_id)
 	struct dw_mci *host = dev_id;
 	struct mmc_host *mmc = host->slot->mmc;
 
-	/* sdcard power off */
-	if (host->quirks & DW_MCI_QUIRK_CD_PWR_OFF)
-		queue_work(host->sd_card_det_workqueue, &host->card_det_work);
-
 	if (host->card_detect_cnt < 0x7FFFFFF0)
 		host->card_detect_cnt++;
 
 	mmc->trigger_card_event = true;
+	/* sdcard power off */
+	if (host->quirks & DW_MCI_QUIRK_CD_PWR_OFF)
+		queue_work(host->sd_card_det_workqueue, &host->card_det_work);
+
 	queue_work(host->card_workqueue, &host->card_work);
 
 	return IRQ_HANDLED;
@@ -4033,12 +4034,12 @@ static void dw_mci_cmdq_cmd_log(struct mmc_host *mmc, bool new_cmd,
 {
 
 }
+#endif
 
 static int dw_mci_cmdq_core_reset(struct mmc_host *mmc)
 {
 	return 0;
 }
-#endif
 
 #endif
 
@@ -4144,6 +4145,11 @@ static int dw_mci_init_slot(struct dw_mci *host, struct platform_device *pdev)
 		else
 			dev_info(host->dev, "CMDQ host enabled!!!\n");
 	}
+#endif
+
+#ifdef CONFIG_MMC_DW_EXYNOS_FMP
+	if (mmc->caps2 & MMC_CAP2_CRYPTO)
+		fmp_mmc_init_crypt(mmc);
 #endif
 
 #if defined(CONFIG_DEBUG_FS)
@@ -4618,7 +4624,6 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
 	if (of_find_property(np, "card-detect-gpio", NULL)) {
 		pdata->cd_type = DW_MCI_CD_GPIO;
 		pdata->caps2 |= MMC_CAP2_NO_PRESCAN_POWERUP;
-		pdata->caps2 |= MMC_CAP2_DETECT_ON_ERR;
 	}
 	if (of_find_property(np, "broken-drto", NULL))
 		pdata->sw_drto = true;
@@ -4960,12 +4965,12 @@ int dw_mci_probe(struct dw_mci *host, struct platform_device *pdev)
 #ifdef CONFIG_CPU_IDLE
 	dw_mci_sicd_control(host, true);
 #endif
+	host->card_detect_cnt = 0;
+
 	/* Now that slots are all setup, we can enable card detect */
 	dw_mci_enable_cd(host);
 	if (drv_data && drv_data->runtime_pm_control)
 		drv_data->runtime_pm_control(host,0);
-
-	host->card_detect_cnt = 0;
 
 	return 0;
 

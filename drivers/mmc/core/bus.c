@@ -140,13 +140,8 @@ static void mmc_bus_shutdown(struct device *dev)
 	struct mmc_host *host = card->host;
 	int ret;
 
-	if (!drv) {
-		pr_debug("%s: %s: drv is NULL\n", dev_name(dev), __func__);
-		return;
-	}
-
-	if (!card) {
-		pr_debug("%s: %s: card is NULL\n", dev_name(dev), __func__);
+	if (!drv || !card) {
+		pr_debug("%s: %s: drv or card is NULL. SDcard/tray was removed\n", dev_name(dev), __func__);
 		return;
 	}
 
@@ -372,12 +367,13 @@ int mmc_add_card(struct mmc_card *card)
 			mmc_card_hs400es(card) ? "Enhanced strobe " : "",
 			mmc_card_ddr52(card) ? "DDR " : "",
 			uhs_bus_speed_mode, type, card->rca);
-		ST_LOG("%s: new %s%s%s%s%s card at address %04x\n",
+		ST_LOG("%s: new %s%s%s%s%s%s card at address %04x\n",
 			mmc_hostname(card->host),
 			mmc_card_uhs(card) ? "ultra high speed " :
 			(mmc_card_hs(card) ? "high speed " : ""),
 			mmc_card_hs400(card) ? "HS400 " :
 			(mmc_card_hs200(card) ? "HS200 " : ""),
+			mmc_card_hs400es(card) ? "Enhanced strobe " : "",
 			mmc_card_ddr52(card) ? "DDR " : "",
 			uhs_bus_speed_mode, type, card->rca);
 	}

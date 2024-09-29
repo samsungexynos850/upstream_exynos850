@@ -1,3 +1,24 @@
+/*
+ * drivers/media/radio/s610/fm_ctrl.h
+ *
+ * Speedy driver header for SAMSUNG S610 chip
+ *
+ * Copyright (c) 2017 Samsung Electronics Co., Ltd.
+ *		http://www.samsung.com
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ */
+#ifndef FM_CTRL_H
+#define FM_CTRL_H
+
 void fm_pwron(void);
 void fm_pwroff(void);
 void fmspeedy_wakeup(void);
@@ -17,4 +38,5 @@ int fmspeedy_set_reg_field_work(u32 addr, u32 shift, u32 mask, u32 data);
 void fm_audio_check(void);
 void fm_audio_control(struct s610_radio *radio, bool audio_out, bool lr_switch,
 		u32 req_time, u32 audio_addr);
-
+extern struct s610_radio *gradio;
+#endif	/* FM_CTRL_H */

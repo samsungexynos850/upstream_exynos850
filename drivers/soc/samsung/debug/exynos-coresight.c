@@ -295,16 +295,16 @@ unsigned long exynos_cs_read_pc(int cpu)
 	raw_spin_lock_irqsave(&state->lock, flags);
 	if (cpu_is_offline(cpu) || !exynos_cpu.power_state(cpu) ||
 					state->is_hp_out || state->is_c2) {
-		dev_dbg(dbg.dev, "%s: cpu%d is turned off : "
+		dev_emerg(dbg.dev, "%s: cpu%d is turned off : "
 			"c2:[%x], hot-plug out:[%x], power:[%x] ,offline:[%ld]\n",
 			__func__, cpu, state->is_c2, state->is_hp_out,
 			exynos_cpu.power_state(cpu), cpu_is_offline(cpu));
 		target_cpu_pc = 0;
 	} else {
-		dev_dbg(dbg.dev, "%s: cpu%d is power on\n", __func__, cpu);
+		dev_emerg(dbg.dev, "%s: cpu%d is power on\n", __func__, cpu);
 		exynos_cs_get_pc(cpu, 1);
 		target_cpu_pc = exynos_cs_pc[cpu][1].pc;
-		dev_dbg(dbg.dev, "%s: cpu%d PC = [0x%lx]\n", __func__, cpu, target_cpu_pc);
+		dev_emerg(dbg.dev, "%s: cpu%d PC = [0x%lx]\n", __func__, cpu, target_cpu_pc);
 	}
 	raw_spin_unlock_irqrestore(&state->lock, flags);
 

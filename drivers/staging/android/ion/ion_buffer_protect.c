@@ -37,8 +37,7 @@ static DEFINE_SPINLOCK(siova_pool_lock);
 static unsigned long find_first_fit_with_align(unsigned long *map,
 					       unsigned long size,
 					       unsigned long start,
-					       unsigned int nr,
-					       void *data,
+					       unsigned int nr, void *data,
 					       struct gen_pool *pool,
 					       unsigned long start_addr)
 {
@@ -63,7 +62,7 @@ static int ion_secure_iova_alloc(unsigned long *addr, unsigned long size,
 	spin_lock(&siova_pool_lock);
 	if (align > PAGE_SIZE) {
 		gen_pool_set_algo(secure_iova_pool,
-				 (genpool_algo_t)find_first_fit_with_align, &align);
+				  (genpool_algo_t)find_first_fit_with_align, &align);
 		out_addr = gen_pool_alloc(secure_iova_pool, size);
 		gen_pool_set_algo(secure_iova_pool, NULL, NULL);
 	} else {

@@ -1,3 +1,21 @@
+/*
+ * drivers/media/radio/s610/fm_low_ref.h
+ *
+ * FM Radio Rx Low level driver header for SAMSUNG S610 chip
+ *
+ * Copyright (c) 2017 Samsung Electronics Co., Ltd.
+ *		http://www.samsung.com
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ */
 #ifndef FM_LOW_REF_H
 #define FM_LOW_REF_H
 
@@ -40,7 +58,7 @@ void fm_set_flags(struct s610_radio *radio, u16 flags);
 void fm_set_handler_if_count(void (*fn)(struct s610_radio *radio));
 void fm_set_handler_audio_pause(void (*fn)(struct s610_radio *radio));
 void fm_update_if_count(struct s610_radio *radio);
-void fm_update_if_count_int(struct s610_radio *radio);
+void fm_update_if_count_work(struct s610_radio *radio);
 void fm_update_rssi(struct s610_radio *radio);
 void fm_update_rssi_work(struct s610_radio *radio);
 void fm_update_snr(struct s610_radio *radio);
@@ -73,7 +91,7 @@ void fm_rx_init(void);
 
 void fm_lo_off(void);
 void fm_lo_prepare_setup(struct s610_radio *radio);
-void fm_lo_set(const struct_fm_lo_setup lo_set);
+void fm_lo_set(const struct fm_lo_setup lo_set);
 void fm_lo_initialize(struct s610_radio *radio);
 void fm_sx_reset(void);
 void fm_sx_start(void);
@@ -88,7 +106,7 @@ static bool fm_tuner_push_freq(struct s610_radio *radio,
 static void fm_tuner_enable_rds(struct s610_radio *radio,
 	bool enable);
 void fm_set_rssi_thresh(struct s610_radio *radio,
-	fm_tuner_state state);
+	enum fm_tuner_state_low state);
 static void fm_tuner_control_mute(struct s610_radio *radio);
 void fm_tuner_set_force_mute(struct s610_radio *radio, bool mute);
 void fm_tuner_set_mute_audio(struct s610_radio *radio, bool mute);
@@ -96,8 +114,6 @@ void fm_tuner_set_mute_audio(struct s610_radio *radio, bool mute);
 void fm_check_interferer(struct s610_radio *radio);
 void fm_reset_force_mono_interf(struct s610_radio *radio);
 #endif
-void fm_timer_reset(fm_timer_t *timer, int usec,
-		fm_callback_t *func, void *arg);
 void fm_start_if_counter(void);
 static void fm_preset_tuned(struct s610_radio *radio);
 static void fm_search_done(struct s610_radio *radio, u16 flags);
@@ -105,9 +121,9 @@ static void fm_search_check_signal2(unsigned long data);
 static void fm_search_check_signal1(struct s610_radio *radio, bool rssi_oor);
 static void fm_search_tuned(unsigned long data);
 static void fm_start_tune(struct s610_radio *radio,
-		fm_tuner_state new_state);
+		enum fm_tuner_state_low new_state);
 static void fm_tuner_change_state(struct s610_radio *radio,
-		fm_tuner_state new_state);
+		enum fm_tuner_state_low new_state);
 void cancel_tuner_timer(struct s610_radio *radio);
 static void fm_tuner_exit_state(struct s610_radio *radio);
 void fm_set_tuner_mode(struct s610_radio *radio);
@@ -160,4 +176,11 @@ extern void fm_audio_control(struct s610_radio *radio,
 extern int fm_read_rds_data(struct s610_radio *radio, u8 *buffer, int size,
 		u16 *blocks);
 extern void fm_process_rds_data(struct s610_radio *radio);
+extern struct s610_radio *gradio;
+extern u32 *vol_level_init;
+extern u32 *fm_spur_trf_init;
+extern u32 *fm_dual_clk_init;
+#ifdef USE_SPUR_CANCEL
+extern u32 *fm_spur_init;
+#endif
 #endif	/*FM_LOW_REF_H*/

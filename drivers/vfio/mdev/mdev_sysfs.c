@@ -113,7 +113,7 @@ struct mdev_type *add_mdev_supported_type(struct mdev_parent *parent,
 				   "%s-%s", dev_driver_string(parent->dev),
 				   group->name);
 	if (ret) {
-		kobject_put(&type->kobj);
+		kfree(type);
 		return ERR_PTR(ret);
 	}
 

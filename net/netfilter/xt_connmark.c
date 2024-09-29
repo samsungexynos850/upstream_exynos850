@@ -77,12 +77,12 @@ static unsigned int knoxvpn_uidpid(struct sk_buff *skb, u_int32_t newmark)
 		return -1;
 	}
 
-	if( skb->sk == NULL) {
+	if (skb->sk == NULL) {
 		pr_err("KNOX: skb->sk value is null");
 		return -1;
 	}
 
-	if( knox_shinfo == NULL) {
+	if (knox_shinfo == NULL) {
 		pr_err("KNOX: knox_shinfo is null");
 		return -1;
 	}

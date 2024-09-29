@@ -204,8 +204,8 @@ struct dw_mci {
 	struct tasklet_struct	tasklet;
 	u32 tasklet_state;
 	struct work_struct card_work;
+	u32 card_detect_cnt;
 	struct work_struct card_det_work;
-	u32			card_detect_cnt;
 	unsigned long		pending_events;
 	unsigned long		completed_events;
 	enum dw_mci_state	state;

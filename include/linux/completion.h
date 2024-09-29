@@ -91,7 +91,7 @@ static inline void __init_completion(struct completion *x)
 	x->done = 0;
 #ifdef CONFIG_SEC_DEBUG_COMPLETE_HINT
 	secdbg_hint_init(&x->hint);
-#endif	
+#endif
 	init_waitqueue_head(&x->wait);
 }
 

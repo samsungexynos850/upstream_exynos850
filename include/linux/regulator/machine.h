@@ -251,6 +251,7 @@ void regulator_has_full_constraints(void);
 int regulator_show_enabled(void);
 #endif /* CONFIG_SEC_PM_DEBUG */
 #else
+
 static inline void regulator_has_full_constraints(void)
 {
 }

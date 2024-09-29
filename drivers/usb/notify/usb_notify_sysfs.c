@@ -2,12 +2,12 @@
 /*
  *  drivers/usb/notify/usb_notify_sysfs.c
  *
- * Copyright (C) 2015-2017 Samsung, Inc.
+ * Copyright (C) 2015-2020 Samsung, Inc.
  * Author: Dongrak Shin <dongrak.shin@samsung.com>
  *
  */
 
- /* usb notify layer v3.4 */
+ /* usb notify layer v3.5 */
 
 #define pr_fmt(fmt) "usb_notify: " fmt
 
@@ -396,42 +396,45 @@ static ssize_t usb_hw_param_show(struct device *dev,
 	int index, ret = 0;
 	unsigned long long *p_param = NULL;
 
-	p_param = get_hw_param(n, USB_CCIC_WATER_INT_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+	if (udev->fp_hw_param_manager) {
+		p_param = get_hw_param(n, USB_CCIC_WATER_INT_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_INT_COUNT);
-	p_param = get_hw_param(n, USB_CCIC_DRY_INT_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CCIC_DRY_INT_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_DRY_INT_COUNT);
-	p_param = get_hw_param(n, USB_CLIENT_SUPER_SPEED_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CLIENT_SUPER_SPEED_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CLIENT_SUPER_SPEED_COUNT);
-	p_param = get_hw_param(n, USB_CLIENT_HIGH_SPEED_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CLIENT_HIGH_SPEED_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CLIENT_HIGH_SPEED_COUNT);
-	p_param = get_hw_param(n, USB_CCIC_WATER_TIME_DURATION);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CCIC_WATER_TIME_DURATION);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_TIME_DURATION);
-	p_param = get_hw_param(n, USB_CCIC_WATER_VBUS_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CCIC_WATER_VBUS_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_VBUS_COUNT);
-	p_param = get_hw_param(n, USB_CCIC_WATER_LPM_VBUS_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CCIC_WATER_LPM_VBUS_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_LPM_VBUS_COUNT);
-	p_param = get_hw_param(n, USB_CCIC_WATER_VBUS_TIME_DURATION);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CCIC_WATER_VBUS_TIME_DURATION);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_VBUS_TIME_DURATION);
-	p_param = get_hw_param(n, USB_CCIC_WATER_LPM_VBUS_TIME_DURATION);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n,
+				USB_CCIC_WATER_LPM_VBUS_TIME_DURATION);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_LPM_VBUS_TIME_DURATION);
+	}
 	p_param = get_hw_param(n, USB_CCIC_VERSION);
 	if (p_param)
 		*p_param = show_ccic_version();
@@ -514,42 +517,45 @@ static ssize_t hw_param_show(struct device *dev,
 	int index = 0, ret = 0;
 	unsigned long long *p_param = NULL;
 
-	p_param = get_hw_param(n, USB_CCIC_WATER_INT_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+	if (udev->fp_hw_param_manager) {
+		p_param = get_hw_param(n, USB_CCIC_WATER_INT_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_INT_COUNT);
-	p_param = get_hw_param(n, USB_CCIC_DRY_INT_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CCIC_DRY_INT_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_DRY_INT_COUNT);
-	p_param = get_hw_param(n, USB_CLIENT_SUPER_SPEED_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CLIENT_SUPER_SPEED_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CLIENT_SUPER_SPEED_COUNT);
-	p_param = get_hw_param(n, USB_CLIENT_HIGH_SPEED_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CLIENT_HIGH_SPEED_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CLIENT_HIGH_SPEED_COUNT);
-	p_param = get_hw_param(n, USB_CCIC_WATER_TIME_DURATION);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CCIC_WATER_TIME_DURATION);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_TIME_DURATION);
-	p_param = get_hw_param(n, USB_CCIC_WATER_VBUS_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CCIC_WATER_VBUS_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_VBUS_COUNT);
-	p_param = get_hw_param(n, USB_CCIC_WATER_LPM_VBUS_COUNT);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CCIC_WATER_LPM_VBUS_COUNT);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_LPM_VBUS_COUNT);
-	p_param = get_hw_param(n, USB_CCIC_WATER_VBUS_TIME_DURATION);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n, USB_CCIC_WATER_VBUS_TIME_DURATION);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_VBUS_TIME_DURATION);
-	p_param = get_hw_param(n, USB_CCIC_WATER_LPM_VBUS_TIME_DURATION);
-	if (p_param && udev->fp_hw_param_manager)
-		*p_param += udev->fp_hw_param_manager
+		p_param = get_hw_param(n,
+				USB_CCIC_WATER_LPM_VBUS_TIME_DURATION);
+		if (p_param)
+			*p_param += udev->fp_hw_param_manager
 					(USB_CCIC_WATER_LPM_VBUS_TIME_DURATION);
+	}
 	if (!is_skip_list(n, USB_CCIC_VERSION)) {
 		p_param = get_hw_param(n, USB_CCIC_VERSION);
 		if (p_param)
@@ -663,6 +669,8 @@ int set_usb_whitelist_array(const char *buf, int *whitelist_array)
 
 	source = (char *)buf;
 	while ((ptr = strsep(&source, ":")) != NULL) {
+		if (strlen(ptr) < 3)
+			continue;
 		pr_info("%s token = %c%c%c!\n", __func__,
 			ptr[0], ptr[1], ptr[2]);
 		for (i = U_CLASS_PER_INTERFACE; i <= U_CLASS_VENDOR_SPEC; i++) {

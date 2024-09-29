@@ -21,7 +21,7 @@
 #define HALT_UNHALT_ERR		0x00000001
 #define CQ_EN_DIS_ERR		0x00000002
 #define RPMB_SWITCH_ERR		0x00000004
-#define HW_RST		0x00000008
+#define HW_RST			0x00000008
 #define STATUS_ERR_MASK		(HALT_UNHALT_ERR | CQ_EN_DIS_ERR | RPMB_SWITCH_ERR | HW_RST)
 
 struct mmc_blk_request;
@@ -252,21 +252,21 @@ struct mmc_part {
 };
 
 struct mmc_card_error_log {
-	char	type[5];	// sbc, cmd, data, stop, busy
+	char	type[5];        // sbc, cmd, data, stop, busy
 	int	err_type;
 	u32	status;
 	u64	first_issue_time;
 	u64	last_issue_time;
 	u32	count;
-	u32	ge_cnt;		// status[19] : general error or unknown error
-	u32	cc_cnt;		// status[20] : internal card controller error
-	u32	ecc_cnt;	// status[21] : ecc error
-	u32	wp_cnt;		// status[26] : write protection error
-	u32	oor_cnt;	// status[31] : out of range error
-	u32     halt_cnt;       // cq halt / unhalt fail
-	u32     cq_cnt;         // cq enable / disable fail
-	u32     rpmb_cnt;       // RPMB switch fail
-	u32	noti_cnt;	// uevent notification count
+	u32	ge_cnt;			// status[19] : general error or unknown error_count
+	u32	cc_cnt;			// status[20] : internal card controller error_count
+	u32	ecc_cnt;		// status[21] : ecc error_count
+	u32	wp_cnt;			// status[26] : write protection error_count
+	u32	oor_cnt;		// status[31] : out of range error
+	u32	noti_cnt;		// uevent notification count
+	u32	halt_cnt;	// cq halt / unhalt fail
+	u32	cq_cnt;		// cq enable / disable fail
+	u32	rpmb_cnt;	// RPMB switch fail
 	u32	hw_rst_cnt;	// reset count
 };
 
@@ -341,7 +341,6 @@ struct mmc_card {
 
 	unsigned int		bouncesz;	/* Bounce buffer size */
 	struct workqueue_struct *complete_wq;	/* Private workqueue */
-
 	struct device_attribute error_count;
 	struct mmc_card_error_log err_log[10];
 };

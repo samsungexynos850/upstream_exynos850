@@ -71,12 +71,6 @@ static int ion_carveout_heap_allocate(struct ion_heap *heap,
 		return -EACCES;
 	}
 
-	if (!carveout_heap->secure && (flags & ION_FLAG_PROTECTED)) {
-		perrfn("ION_FLAG_PROTECTED is set to non-secure heap %s",
-		       heap->name);
-		return -EINVAL;
-	}
-
 	table = kmalloc(sizeof(*table), GFP_KERNEL);
 	if (!table)
 		return -ENOMEM;

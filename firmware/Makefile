@@ -10,14 +10,35 @@ CONFIG_EXTRA_FIRMWARE_DIR="firmware"
 fwdir := $(subst $(quote),,$(CONFIG_EXTRA_FIRMWARE_DIR))
 fwabs := $(addprefix $(srctree)/,$(filter-out /%,$(fwdir)))$(filter /%,$(fwdir))
 
-fw-external-$(CONFIG_SENSORS_SSP) += sensorhub/shub_nacho_bl.bin
-fw-external-$(CONFIG_SENSORS_SSP_A21S) += sensorhub/shub_nacho_a21s.bin 
-fw-external-$(CONFIG_SENSORS_SSP_A21S) += sensorhub/a21s_bring_up.bin
+fw-shipped-$(CONFIG_TOUCHSCREEN_SEC_TS_A552) += tsp_sec/hero2la.bin
+fw-shipped-$(CONFIG_TOUCHSCREEN_SEC_TS) += tsp_sec/y761_dream1.fw
 
-fw-external-$(CONFIG_TOUCHSCREEN_SYNAPTICS_TCM) += tsp_synaptics/td4150_a21s.bin
-
+fw-external-$(CONFIG_TOUCHSCREEN_SYNAPTICS_TCM) += tsp_synaptics/td4150_a21s.bin tsp_synaptics/td4150_a12s_boe.bin \
+														tsp_synaptics/td4375_a12s_boe.bin tsp_synaptics/td4160_a12s_boe.bin
 fw-external-$(CONFIG_TOUCHSCREEN_HIMAX_CHIPSET) += tsp_himax/hx83112a_a21s.bin
-fw-external-$(CONFIG_TOUCHSCREEN_NT36xxx_HOSTDL_SPI) += tsp_novatek/nt36675_a21s_csot.bin tsp_novatek/nt36675_a21s_mp_csot.bin
+
+fw-external-$(CONFIG_TOUCHSCREEN_ILITEK_ILI9881X) += tsp_ilitek/ili9881x_m12s.hex tsp_ilitek/ili7806s_m12s.hex \
+														tsp_ilitek/ili9882_a12s.hex tsp_ilitek/ili7807s_a12s.hex
+fw-external-$(CONFIG_TOUCHSCREEN_NT36xxx_HOSTDL_SPI) += tsp_novatek/nt36525_m12s_csot.bin tsp_novatek/nt36525_m12s_mp_csot.bin \
+														tsp_novatek/nt36525_m12s_dtc.bin tsp_novatek/nt36525_m12s_mp_dtc.bin \
+														tsp_novatek/nt36675_m12s_ltps.bin tsp_novatek/nt36675_m12s_mp_ltps.bin \
+														tsp_novatek/nt36525_xcover5.bin tsp_novatek/nt36525_xcover5_mp.bin \
+														tsp_novatek/nt36525_a12s_csot.bin tsp_novatek/nt36525_a12s_mp_csot.bin \
+														tsp_novatek/nt36525_a12s_dtc.bin tsp_novatek/nt36525_a12s_mp_dtc.bin \
+														tsp_novatek/nt36525_a12s_sharp.bin tsp_novatek/nt36525_a12s_mp_sharp.bin
+
+
+fw-external-$(CONFIG_KEYBOARD_STM_FSR) += key_stm/sidekey.fw.20190725
+fw-shipped-$(CONFIG_FIVE_TEE_DRIVER) += five/ffffffff000000000000000000000072.tlbin
+
+fw-external-$(CONFIG_SENSORS_SSP) += sensorhub/shub_nacho_bl.bin
+fw-external-$(CONFIG_SENSORS_SSP_M12) += sensorhub/shub_nacho_m12.bin
+fw-external-$(CONFIG_SENSORS_SSP_XCOVER5) += sensorhub/shub_nacho_xcover5.bin
+fw-external-$(CONFIG_SHUB) += sensorhub/shub_nacho_bl.bin sensorhub/shub_nacho_a12s.bin sensorhub/shub_nacho_m12.bin sensorhub/shub_nacho_xcover5.bin
+
+fw-external-$(CONFIG_SENSORS_A96T3X6) += abov/a96t356_a12_main.bin abov/a96t356_a12_sub.bin
+fw-external-$(CONFIG_SENSORS_A96T3X6_M12_ALL) += abov/a96t356_m12s.bin abov/a96t356_m12s_sub.bin
+fw-external-$(CONFIG_SENSORS_A96T3X6_M12_KOR) += abov/a96t356_m12s_kor.bin abov/a96t356_m12s_kor_sub.bin
 
 quiet_cmd_fwbin = MK_FW   $@
       cmd_fwbin = FWNAME="$(patsubst firmware/%.gen.S,%,$@)";		     \

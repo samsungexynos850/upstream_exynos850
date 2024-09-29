@@ -260,6 +260,7 @@ struct dsim_device {
 
 	int continuous_underrun_max;
 	int continuous_underrun_cnt;
+	bool hold_rpm_on_boot;
 };
 
 int dsim_call_panel_ops(struct dsim_device *dsim, u32 cmd, void *arg);

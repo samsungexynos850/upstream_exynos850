@@ -41,8 +41,6 @@
 #include <kutf/kutf_utils.h>
 #include <kutf/kutf_helpers.h>
 
-#if defined(CONFIG_DEBUG_FS)
-
 /**
  * struct kutf_application - Structure which represents kutf application
  * @name:	The name of this test application.
@@ -1138,6 +1136,8 @@ void kutf_test_abort(struct kutf_context *context)
 	kutf_test_log_result(context, "", KUTF_RESULT_ABORT);
 }
 EXPORT_SYMBOL(kutf_test_abort);
+
+#if defined(CONFIG_DEBUG_FS)
 
 /**
  * init_kutf_core() - Module entry point.

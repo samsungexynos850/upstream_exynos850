@@ -3822,7 +3822,7 @@ static void cfq_init_cfqq(struct cfq_data *cfqd, struct cfq_queue *cfqq,
 
 	if (is_sync) {
 		if (!cfq_class_idle(cfqq) &&
-		(!cfqd->cfq_rt_idle_only || cfq_class_rt(cfqq)))
+		    (!cfqd->cfq_rt_idle_only || cfq_class_rt(cfqq)))
 			cfq_mark_cfqq_idle_window(cfqq);
 		cfq_mark_cfqq_sync(cfqq);
 	}

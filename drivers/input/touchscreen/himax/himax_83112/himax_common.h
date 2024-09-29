@@ -35,10 +35,8 @@
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
 #include <linux/pm_wakeup.h>
-#include <linux/wakelock.h>
 #include <linux/seq_file.h>
 #include <linux/proc_fs.h>
-#include <linux/regulator/consumer.h>
 #include "himax_platform.h"
 
 #if defined(CONFIG_FB)
@@ -66,7 +64,7 @@
 #define HX_ESD_RECOVERY
 #define HX_TP_PROC_GUEST_INFO
 /*#define HX_AUTO_UPDATE_FW*/
-#define HX_SMART_WAKEUP		// for MR
+/*#define HX_SMART_WAKEUP*/
 /*#define HX_GESTURE_TRACK*/
 /*#define HX_HIGH_SENSE*/
 /*#define HX_PALM_REPORT*/
@@ -240,7 +238,6 @@ enum fix_touch_info {
 #ifdef HX_ZERO_FLASH
 #define HX_SPI_OPERATION
 #define HX_0F_DEBUG
-#define HX_RESUME_SET_FW
 #endif
 struct himax_ic_data {
 	int vendor_fw_ver;
@@ -378,7 +375,6 @@ struct himax_ts_data {
 	int p_y[10];
 
 	uint8_t glove_enabled;
-	long prox_power_off;
 
 	struct device *dev;
 	struct workqueue_struct *himax_wq;
@@ -389,9 +385,6 @@ struct himax_ts_data {
 	struct himax_i2c_platform_data *pdata;
 	struct himax_virtual_key *button;
 	struct mutex rw_lock;
-
-	struct completion resume_done;
-	struct wake_lock wakelock;
 
 	struct delayed_work work_print_info;
 	u32 print_info_cnt_open;
@@ -460,8 +453,6 @@ struct himax_ts_data {
 #ifdef SEC_FACTORY_MODE
 	struct sec_cmd_data sec;
 #endif
-	bool aot_enabled;
-
 };
 
 struct himax_debug {
@@ -475,12 +466,6 @@ enum input_protocol_type {
 	PROTOCOL_TYPE_A = 0x00,
 	PROTOCOL_TYPE_B = 0x01,
 };
-
-typedef enum {
-	HIMAX_STATE_POWER_ON = 0,
-	HIMAX_STATE_POWER_OFF,
-	HIMAX_STATE_LPM,
-} TOUCH_POWER_MODE;
 
 #ifdef HX_HIGH_SENSE
 void himax_set_HSEN_func(uint8_t HSEN_enable);

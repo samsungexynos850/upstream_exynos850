@@ -20,6 +20,9 @@
 #include <linux/slab.h>
 #include <linux/psci.h>
 #include <linux/debugfs.h>
+#if defined(CONFIG_SEC_FACTORY)
+#include <linux/sec_class.h>
+#endif
 #include <asm/cpuidle.h>
 #include <asm/smp_plat.h>
 
@@ -472,27 +475,6 @@ static void __init exynos_pm_debugfs_init(void)
 }
 #endif
 
-#if defined(CONFIG_SEC_FACTORY)
-static ssize_t show_asv_info(struct device *dev,
-		struct device_attribute *attr,
-		char *buf)
-{
-	int count = 0;
-
-	/* Set asv group info to buf */
-	count += sprintf(&buf[count], "%d ", asv_ids_information(tg));
-	count += sprintf(&buf[count], "%03x ", asv_ids_information(bg));
-	count += sprintf(&buf[count], "%03x ", asv_ids_information(g3dg));
-	count += sprintf(&buf[count], "%u ", asv_ids_information(bids));
-	count += sprintf(&buf[count], "%u ", asv_ids_information(gids));
-	count += sprintf(&buf[count], "\n");
-
-	return count;
-}
-
-static DEVICE_ATTR(asv_info, 0664, show_asv_info, NULL);
-#endif /* CONFIG_SEC_FACTORY */
-
 static void parse_dt_wakeup_stat_names(struct device_node *np)
 {
 	struct device_node *root, *child;
@@ -589,9 +571,33 @@ free_name:
 	return;
 }
 
+#if defined(CONFIG_SEC_FACTORY)
+static ssize_t asv_info_show(struct device *dev,
+		struct device_attribute *attr,
+		char *buf)
+{
+	int count = 0;
+
+	/* Set asv group info to buf */
+	count += sprintf(&buf[count], "%d ", asv_ids_information(tg));
+	count += sprintf(&buf[count], "%03x ", asv_ids_information(bg));
+	count += sprintf(&buf[count], "%03x ", asv_ids_information(g3dg));
+	count += sprintf(&buf[count], "%u ", asv_ids_information(bids));
+	count += sprintf(&buf[count], "%u ", asv_ids_information(gids));
+	count += sprintf(&buf[count], "\n");
+
+	return count;
+}
+
+static DEVICE_ATTR_RO(asv_info);
+#endif /* CONFIG_SEC_FACTORY */
+
 static __init int exynos_pm_drvinit(void)
 {
 	int ret;
+#if defined(CONFIG_SEC_FACTORY)
+	struct device *dev;
+#endif
 
 	pm_info = kzalloc(sizeof(struct exynos_pm_info), GFP_KERNEL);
 	if (pm_info == NULL) {
@@ -718,10 +724,15 @@ static __init int exynos_pm_drvinit(void)
 #endif
 
 #if defined(CONFIG_SEC_FACTORY)
-	/* create sysfs group */
-	ret = sysfs_create_file(power_kobj, &dev_attr_asv_info.attr);
-	if (ret)
-		pr_err("%s: failed to create exynos9630 asv attribute file\n", __func__);
+	dev = sec_device_create(NULL, "asv");
+	BUG_ON(!dev);
+	if (IS_ERR(dev))
+		pr_err("%s %s: failed to create sec device\n",
+				EXYNOS_PM_PREFIX, __func__);
+
+	if (device_create_file(dev, &dev_attr_asv_info) < 0)
+		pr_err("%s %s: failed to create sysfs file\n",
+				EXYNOS_PM_PREFIX, __func__);
 #endif
 
 	return 0;

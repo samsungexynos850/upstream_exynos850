@@ -25,11 +25,6 @@ config MMC_TEST_MODE
 	This selects support for test mode for debugging.
 	Select this option if this feature is needed on working.
 
-config MMC_BLOCK_DEFERRED_RESUME
-	bool "Enable Deferred Resume"
-	depends on MMC != n
-	default n
-
 if MMC
 
 source "drivers/mmc/core/Kconfig"

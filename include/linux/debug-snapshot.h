@@ -152,7 +152,7 @@ extern struct task_struct *get_the_busiest_task(void);
 #define secdbg_show_sched_info(a, b)	do { } while (0)
 static inline int secdbg_show_busy_task(unsigned int cpu, unsigned long long duration, int count)
 {
-        return -1;
+	return -1;
 }
 
 static struct task_struct *get_the_busiest_task(void)

@@ -1125,8 +1125,8 @@ __init_dom_list(struct device_node *dom_list_dn,
 			kfree(dom);
 			return -EINVAL;
 		}
-
-		cpulist_parse(buf, &dom->cpus);
+		else
+			cpulist_parse(buf, &dom->cpus);
 
 		if (of_property_read_u32(dom_dn, "upper-boundary",
 					(u32 *)&dom->upper_boundary))
@@ -2104,8 +2104,8 @@ static int __init init_ecs_mode_list(struct device_node *dn, struct list_head *m
 			kfree(mode);
 			return -EINVAL;
 		}
-
-		cpulist_parse(buf, &mode->cpus);
+		else
+			cpulist_parse(buf, &mode->cpus);
 
 		if (of_property_read_u32(mode_dn, "enabled", &mode->enabled)) {
 			kfree(mode);
@@ -2143,8 +2143,8 @@ static int __init init_ecs_domain_list(struct device_node *dn, struct list_head 
 			kfree(domain);
 			return -EINVAL;
 		}
-
-		cpulist_parse(buf, &domain->cpus);
+		else
+			cpulist_parse(buf, &domain->cpus);
 
 		if (of_property_read_u32(domain_dn, "role", &domain->role)) {
 			kfree(domain);

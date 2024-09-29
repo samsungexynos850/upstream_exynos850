@@ -537,11 +537,11 @@ static void tasklet_action_common(struct softirq_action *a,
 				dbg_snapshot_irq(DSS_FLAG_SOFTIRQ_TASKLET,
 						t->func, NULL, 0, DSS_FLAG_IN);
 #ifdef CONFIG_SEC_DEBUG_LOCKUP_INFO
-				if(softirq_nr == TASKLET_SOFTIRQ) {
+				if (softirq_nr == TASKLET_SOFTIRQ) {
 					sl_softirq_entry(softirq_to_name[TASKLET_SOFTIRQ], t->func);
 					t->func(t->data);
 					sl_softirq_exit();
-				} else{
+				} else {
 					sl_softirq_entry(softirq_to_name[HI_SOFTIRQ], t->func);
 					t->func(t->data);
 					sl_softirq_exit();

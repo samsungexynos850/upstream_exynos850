@@ -74,12 +74,6 @@ static int ion_hpa_allocate(struct ion_heap *heap,
 		return -ENOMEM;
 	}
 
-	if (!hpa_heap->secure && (flags & ION_FLAG_PROTECTED)) {
-		perrfn("ION_FLAG_PROTECTED is set to non-secure heap %s",
-		       heap->name);
-		return -EINVAL;
-	}
-
 	pages = kmalloc(desc_size, GFP_KERNEL);
 	if (!pages)
 		return -ENOMEM;

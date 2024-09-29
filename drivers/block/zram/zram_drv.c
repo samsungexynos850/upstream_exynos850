@@ -47,9 +47,6 @@
 #include "zram_drv.h"
 #include "../loop.h"
 
-/* Total bytes used by the compressed storage */
-static u64 zram_pool_total_size;
-
 static DEFINE_IDR(zram_index_idr);
 /* idr index must be protected */
 static DEFINE_MUTEX(zram_index_mutex);
@@ -409,7 +406,6 @@ static int init_lru_writeback(struct zram *zram)
 		ret = -ENOMEM;
 		return ret;
 	}
-
 	/* bitmap for 2MB block */
 	bitmap_sz = (BITS_TO_LONGS(zram->nr_pages) * sizeof(long)) / NR_FALLOC_PAGES;
 	zram->blk_bitmap = kvzalloc(bitmap_sz, GFP_KERNEL);
@@ -1007,7 +1003,7 @@ static int zram_try_mark_page(struct zram *zram, u32 index)
 			zram_test_flag(zram, index, ZRAM_UNDER_PPR)) {
 		zram_slot_unlock(zram, index);
 		return ABORT;
-	}else if (zram_test_flag(zram, index, ZRAM_UNDER_WB)) {
+	} else if (zram_test_flag(zram, index, ZRAM_UNDER_WB)) {
 		zram_slot_unlock(zram, index);
 		return SKIP;
 	}
@@ -1138,7 +1134,7 @@ static void mark_end_of_page(struct zwbs *zwbs)
 {
 	struct zram_wb_header *zhdr;
 	struct page *page = zwbs->page;
-	int offset = zwbs->off;	
+	int offset = zwbs->off;
 	void *mem;
 
 	if (offset + sizeof(struct zram_wb_header) < PAGE_SIZE) {
@@ -1253,7 +1249,7 @@ static void zram_reset_stats(struct zram *zram)
 }
 
 static void zram_writeback_done(struct zram *zram,
-			struct zwbs *zwbs, unsigned long blk_idx, bool ppr)
+		struct zwbs *zwbs, unsigned long blk_idx, bool ppr)
 {
 	unsigned long index;
 	unsigned int offset;
@@ -2708,7 +2704,6 @@ compress_again:
 	}
 
 	alloced_pages = zs_get_total_pages(zram->mem_pool);
-	zram_pool_total_size = alloced_pages << PAGE_SHIFT;
 	update_used_max(zram, alloced_pages);
 
 	if (zram->limit_pages && alloced_pages > zram->limit_pages) {
@@ -3127,6 +3122,7 @@ static ssize_t reset_store(struct device *dev,
 	/* From now on, anyone can't open /dev/zram[0-9] */
 	zram->claim = true;
 	mutex_unlock(&bdev->bd_mutex);
+
 #ifdef CONFIG_ZRAM_LRU_WRITEBACK
 	stop_lru_writeback(zram);
 #endif
@@ -3442,25 +3438,6 @@ static void destroy_devices(void)
 	cpuhp_remove_multi_state(CPUHP_ZCOMP_PREPARE);
 }
 
-static int zram_size_notifier(struct notifier_block *nb,
-			       unsigned long action, void *data)
-{
-	struct seq_file *s;
-
-	s = (struct seq_file *)data;
-	if (s)
-		seq_printf(s, "ZramDevice:     %8lu kB\n",
-			(unsigned long)zram_pool_total_size >> 10);
-	else
-		pr_cont("ZramDevice:%lukB ",
-			(unsigned long)zram_pool_total_size >> 10);
-	return 0;
-}
-
-static struct notifier_block zram_size_nb = {
-	.notifier_call = zram_size_notifier,
-};
-
 static int __init zram_init(void)
 {
 	int ret;
@@ -3498,7 +3475,6 @@ static int __init zram_init(void)
 #ifdef CONFIG_ZRAM_LRU_WRITEBACK
 	am_app_launch_notifier_register(&zram_app_launch_nb);
 #endif
-	show_mem_extra_notifier_register(&zram_size_nb);
 	return 0;
 
 out_error:

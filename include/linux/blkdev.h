@@ -46,6 +46,7 @@ struct pr_ops;
 struct rq_qos;
 struct blk_queue_stats;
 struct blk_stat_callback;
+struct keyslot_manager;
 
 #define BLKDEV_MIN_RQ	4
 #ifdef CONFIG_LARGE_DIRTY_BUFFER
@@ -168,9 +169,6 @@ struct request {
 	unsigned int __data_len;	/* total data len */
 	int tag;
 	sector_t __sector;		/* sector cursor */
-#ifdef CONFIG_CRYPTO_DISKCIPHER
-	u64 __dun;                      /* dun for UFS */
-#endif
 	struct bio *bio;
 	struct bio *biotail;
 
@@ -585,6 +583,10 @@ struct request_queue {
 	 * queue_lock internally, e.g. scsi_request_fn().
 	 */
 	unsigned int		request_fn_active;
+#ifdef CONFIG_BLK_INLINE_ENCRYPTION
+	/* Inline crypto capabilities */
+	struct keyslot_manager *ksm;
+#endif
 
 	unsigned int		rq_timeout;
 	int			poll_nsec;
@@ -635,7 +637,7 @@ struct request_queue {
 	unsigned int		sg_reserved_size;
 	int			node;
 #ifdef CONFIG_BLK_DEV_IO_TRACE
-	struct blk_trace __rcu	*blk_trace;
+	struct blk_trace	*blk_trace;
 	struct mutex		blk_trace_mutex;
 #endif
 	/*
@@ -1058,13 +1060,6 @@ static inline sector_t blk_rq_pos(const struct request *rq)
 {
 	return rq->__sector;
 }
-
-#ifdef CONFIG_CRYPTO_DISKCIPHER
-static inline sector_t blk_rq_dun(const struct request *rq)
-{
-	return rq->__dun;
-}
-#endif
 
 static inline unsigned int blk_rq_bytes(const struct request *rq)
 {
@@ -2123,14 +2118,5 @@ static inline int blkdev_issue_flush(struct block_device *bdev, gfp_t gfp_mask,
 }
 
 #endif /* CONFIG_BLOCK */
-
-#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-#define SIO_PATCH_VERSION(name, major, minor, description)	\
-	static const char *sio_##name##_##major##_##minor __attribute__ \
-		((used, section("sio_patches"))) = \
-			(#name " " #major "." #minor " " description)
-#else
-#define SIO_PATCH_VERSION(name, major, minor, description)
-#endif
 
 #endif

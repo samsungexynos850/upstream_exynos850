@@ -360,8 +360,6 @@ int alloc_pages_highorder_except(int order, struct page **pages, int nents,
 	int picked = 0;
 	int i;
 
-	base_pfn = ALIGN(base_pfn, pageblock_nr_pages);
-
 	while (true) {
 		struct zone *zone;
 

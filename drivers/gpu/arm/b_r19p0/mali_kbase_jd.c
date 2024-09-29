@@ -183,6 +183,7 @@ static void kbase_jd_post_external_resources(struct kbase_jd_atom *katom)
 		}
 		kfree(katom->extres);
 		katom->extres = NULL;
+		katom->is_freed = true;
 	}
 	kbase_gpu_vm_unlock(katom->kctx);
 }
@@ -371,6 +372,7 @@ failed_dma_fence_setup:
  early_err_out:
 	kfree(katom->extres);
 	katom->extres = NULL;
+	katom->is_freed = true;
 #ifdef CONFIG_MALI_DMA_FENCE
 	if (implicit_sync) {
 		kfree(info.resv_objs);
@@ -738,6 +740,7 @@ bool jd_submit_atom(struct kbase_context *kctx, const struct base_jd_atom_v2 *us
 	katom->kctx = kctx;
 	katom->nr_extres = user_atom->nr_extres;
 	katom->extres = NULL;
+	katom->is_freed = false;
 	katom->device_nr = user_atom->device_nr;
 	katom->jc = user_atom->jc;
 	katom->core_req = user_atom->core_req;

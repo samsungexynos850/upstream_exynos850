@@ -768,43 +768,6 @@ static int mmc_compare_ext_csds(struct mmc_card *card, unsigned bus_width)
 	return err;
 }
 
-static ssize_t mmc_gen_unique_number_show(struct device *dev,
-			      struct device_attribute *attr,
-			      char *buf)
-{
-	struct mmc_card *card = mmc_dev_to_card(dev);
-	char gen_pnm[3];
-	int i;
-
-	switch (card->cid.manfid) {
-		case 0x02:	/* Sandisk	-> [3][4] */
-		case 0x45:
-			sprintf(gen_pnm, "%.*s", 2, card->cid.prod_name + 3);
-			break;
-		case 0x11:	/* Toshiba	-> [1][2] */
-		case 0x90:	/* Hynix */
-			sprintf(gen_pnm, "%.*s", 2, card->cid.prod_name + 1);
-			break;
-		case 0x13:
-		case 0xFE:	/* Micron 	-> [4][5] */
-			sprintf(gen_pnm, "%.*s", 2, card->cid.prod_name + 4);
-			break;
-		case 0x15:	/* Samsung 	-> [0][1] */
-		default:
-			sprintf(gen_pnm, "%.*s", 2, card->cid.prod_name + 0);
-			break;
-	}
-	/* Convert to Captal */
-	for (i = 0 ; i < 2 ; i++)
-	{
-		if (gen_pnm[i] >= 'a' && gen_pnm[i] <= 'z')
-			gen_pnm[i] -= ('a' - 'A');
-	}
-	return sprintf(buf, "C%s%02X%08X%02X\n",
-			gen_pnm, card->cid.prv, card->cid.serial, UNSTUFF_BITS(card->raw_cid, 8, 8));
-}
-
-
 MMC_DEV_ATTR(cid, "%08x%08x%08x%08x\n", card->raw_cid[0], card->raw_cid[1],
 	card->raw_cid[2], card->raw_cid[3]);
 MMC_DEV_ATTR(csd, "%08x%08x%08x%08x\n", card->raw_csd[0], card->raw_csd[1],
@@ -832,8 +795,6 @@ MMC_DEV_ATTR(rel_sectors, "%#x\n", card->ext_csd.rel_sectors);
 MMC_DEV_ATTR(ocr, "0x%08x\n", card->ocr);
 MMC_DEV_ATTR(rca, "0x%04x\n", card->rca);
 MMC_DEV_ATTR(cmdq_en, "%d\n", card->ext_csd.cmdq_en);
-MMC_DEV_ATTR(caps, "0x%08x\n", card->host->caps);
-MMC_DEV_ATTR(caps2, "0x%08x\n", card->host->caps2);
 
 static ssize_t mmc_fwrev_show(struct device *dev,
 			      struct device_attribute *attr,
@@ -850,7 +811,6 @@ static ssize_t mmc_fwrev_show(struct device *dev,
 }
 
 static DEVICE_ATTR(fwrev, S_IRUGO, mmc_fwrev_show, NULL);
-static DEVICE_ATTR(unique_number, (S_IRUSR|S_IRGRP), mmc_gen_unique_number_show, NULL);
 
 static ssize_t mmc_dsr_show(struct device *dev,
 			    struct device_attribute *attr,
@@ -893,9 +853,6 @@ static struct attribute *mmc_std_attrs[] = {
 	&dev_attr_rca.attr,
 	&dev_attr_dsr.attr,
 	&dev_attr_cmdq_en.attr,
-	&dev_attr_unique_number.attr,
-	&dev_attr_caps.attr,
-	&dev_attr_caps2.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(mmc_std);
@@ -1948,12 +1905,9 @@ static int mmc_sleep(struct mmc_host *host)
 	 * If the max_busy_timeout of the host is specified, validate it against
 	 * the sleep cmd timeout. A failure means we need to prevent the host
 	 * from doing hw busy detection, which is done by converting to a R1
-	 * response instead of a R1B. Note, some hosts requires R1B, which also
-	 * means they are on their own when it comes to deal with the busy
-	 * timeout.
+	 * response instead of a R1B.
 	 */
-	if (!(host->caps & MMC_CAP_NEED_RSP_BUSY) && host->max_busy_timeout &&
-	    (timeout_ms > host->max_busy_timeout)) {
+	if (host->max_busy_timeout && (timeout_ms > host->max_busy_timeout)) {
 		cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
 	} else {
 		cmd.flags = MMC_RSP_R1B | MMC_CMD_AC;

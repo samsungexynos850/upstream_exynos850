@@ -337,6 +337,8 @@
 
 #define KEY_MICMUTE		248	/* Mute / unmute the microphone */
 
+#define KEY_HOT			252	/* Intelligence Key */
+
 #define KEY_RECENT		254
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
@@ -655,7 +657,7 @@
 #define KEY_ONSCREEN_KEYBOARD		0x278
 
 #define KEY_DEX_ON			0x2bd
-#define KEY_INT_CANCEL			0x2be	/* for touch event skip */
+#define KEY_INT_CANCEL		0x2be	/* for touch event skip */
 #define KEY_WINK			0x2bf    /* Intelligence Key */
 
 #define BTN_TRIGGER_HAPPY		0x2c0

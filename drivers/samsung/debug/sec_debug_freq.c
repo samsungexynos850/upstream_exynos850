@@ -101,6 +101,7 @@ static void secdbg_freq_ac_print(int type, unsigned long index,
 			unsigned int main_val, unsigned int sub_val,
 			unsigned int table_sub, struct secdbg_skew_domain *skew_domain)
 {
+#ifdef SEC_DEBUG_AUTO_COMMENT
 	const char *freq_type = get_lower_name(type);
 	const char *main_type = get_lower_name(skew_domain->master_dss_id);
 	const char *sub_type = get_lower_name(skew_domain->slave_dss_id);
@@ -111,6 +112,7 @@ static void secdbg_freq_ac_print(int type, unsigned long index,
 			sub_type, sub_val/1000, table_sub,
 			get_freq_name(skew_domain->master_dss_id),
 			get_freq_name(skew_domain->slave_dss_id));
+#endif
 
 	if (IS_ENABLED(CONFIG_SEC_DEBUG_FREQ_SKEW_PANIC))
 		BUG();
@@ -541,7 +543,7 @@ static void __init secdbg_freq_ect_data_init(void)
 	}
 }
 
-static void __init secdbg_freq_init(void)
+static int __init secdbg_freq_init(void)
 {
 	secdbg_freq_dt_init();
 
@@ -554,5 +556,7 @@ static void __init secdbg_freq_init(void)
 	secdbg_print_all_skew_domain_info();
 
 	pr_info("%s: initialized\n", __func__);
+
+	return 0;
 }
 subsys_initcall(secdbg_freq_init);

@@ -208,7 +208,7 @@ static ssize_t camera_ssrm_camera_info_store(struct device *dev,
 	ret_count = sscanf(buf, "%d%d%d%d%d%d%d", &temp.operation, &temp.cameraID, &temp.previewMinFPS,
 		&temp.previewMaxFPS, &temp.previewSizeWidth,  &temp.previewSizeHeight, &temp.sensorOn);
 
-	if (ret_count > sizeof(SsrmCameraInfo)/sizeof(int))
+	if (ret_count > sizeof(SsrmCameraInfo[0])/sizeof(int))
 		return -EINVAL;
 
 	switch (temp.operation) {
@@ -345,7 +345,7 @@ static ssize_t camera_tilt_show(char *buf, int position)
 			avg_err = (s32 *)&cal_buf[dual_tilt_avg_err];
 			dll_version = (s32 *)&cal_buf[dual_tilt_dll_version];
 			model_id = (char *)&cal_buf[dual_tilt_dll_model_id];
-			
+
 			strncpy(temp_buffer, model_id, dual_tilt_dll_model_id_length);
 			temp_buffer[dual_tilt_dll_model_id_length] = '\0';
 
@@ -501,7 +501,7 @@ static ssize_t camera_rear_camfw_show(struct device *dev,
 			if (!crc32_check_list[CAMERA_REAR2][CRC32_CHECK_FACTORY])
 				strcat(command_ack, "CD4");
 #endif
-			if (finfo[position]->header_ver[3] != 'L')
+			if (finfo[position]->header_ver[3] != 'L' && finfo[position]->header_ver[3] != 'E')
 				strcat(command_ack, "_Q");
 
 			return sprintf(buf, "%s %s\n", finfo[position]->header_ver, command_ack);
@@ -584,7 +584,7 @@ static ssize_t camera_rear_camfw_full_show(struct device *dev,
 			if (!crc32_check_list[CAMERA_REAR2][CRC32_CHECK_FACTORY])
 				strcat(command_ack, "CD4");
 #endif
-			if (finfo[position]->header_ver[3] != 'L')
+			if (finfo[position]->header_ver[3] != 'L' && finfo[position]->header_ver[3] != 'E')
 				strcat(command_ack, "_Q");
 
 			return sprintf(buf, "%s %s %s\n", finfo[position]->header_ver, pinfo->header_ver, command_ack);
@@ -1159,7 +1159,8 @@ static ssize_t camera_front_camfw_show(struct device *dev,
 
 			if (!crc32_check_list[SENSOR_POSITION_FRONT][CRC32_CHECK_FACTORY])
 				strcat(command_ack, "CD3");
-			if (finfo[SENSOR_POSITION_FRONT]->header_ver[3] != 'L')
+			if (finfo[SENSOR_POSITION_FRONT]->header_ver[3] != 'L'
+				&& finfo[SENSOR_POSITION_FRONT]->header_ver[3] != 'E')
 				strcat(command_ack, "_Q");
 
 			return sprintf(buf, "%s %s\n", finfo[SENSOR_POSITION_FRONT]->header_ver, command_ack);
@@ -1544,7 +1545,7 @@ static ssize_t camera_rear2_camfw_show(struct device *dev,
 			strcpy(command_ack, "NG_");
 			if (!crc32_check_list[position][CRC32_CHECK_FACTORY])
 				strcat(command_ack, "CD4");
-			if (finfo[position]->header_ver[3] != 'L')
+			if (finfo[position]->header_ver[3] != 'L' && finfo[position]->header_ver[3] != 'E')
 				strcat(command_ack, "_Q");
 
 			return sprintf(buf, "%s %s\n", finfo[position]->header_ver, command_ack);
@@ -1935,7 +1936,7 @@ static ssize_t camera_front2_camfw_show(struct device *dev,
 			strcpy(command_ack, "NG_");
 			if (!crc32_check_list[position][CRC32_CHECK_FACTORY])
 				strcat(command_ack, "CD5");
-			if (finfo[position]->header_ver[3] != 'L')
+			if (finfo[position]->header_ver[3] != 'L' && finfo[position]->header_ver[3] != 'E')
 				strcat(command_ack, "_Q");
 
 			return sprintf(buf, "%s %s\n", finfo[position]->header_ver, command_ack);
@@ -2443,7 +2444,7 @@ static ssize_t camera_rear3_camfw_show(struct device *dev,
 			strcpy(command_ack, "NG_");
 			if (!crc32_check_list[position][CRC32_CHECK_FACTORY])
 				strcat(command_ack, "CD6");
-			if (finfo[position]->header_ver[3] != 'L')
+			if (finfo[position]->header_ver[3] != 'L' && finfo[position]->header_ver[3] != 'E')
 				strcat(command_ack, "_Q");
 
 			return sprintf(buf, "%s %s\n", finfo[position]->header_ver, command_ack);
@@ -2889,7 +2890,7 @@ static ssize_t camera_rear4_camfw_show(struct device *dev,
 			strcpy(command_ack, "NG_");
 			if (!crc32_check_list[position][CRC32_CHECK_FACTORY])
 				strcat(command_ack, "CD6");
-			if (finfo[position]->header_ver[3] != 'L')
+			if (finfo[position]->header_ver[3] != 'L' && finfo[position]->header_ver[3] != 'E')
 				strcat(command_ack, "_Q");
 
 			return sprintf(buf, "%s %s\n", finfo[position]->header_ver, command_ack);

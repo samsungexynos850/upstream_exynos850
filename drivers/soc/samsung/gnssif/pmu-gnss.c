@@ -241,12 +241,6 @@ static void gnss_request_gnss2ap_baaw(void)
 	gnss_cmgp_write(0x18, 0x00010E00);
 	gnss_cmgp_write(0x1C, 0x80000003);
 
-	gif_info("RFIC RST\n");
-	gnss_cmgp_write(0x20, 0x000B1C30);
-	gnss_cmgp_write(0x24, 0x000B1C40);
-	gnss_cmgp_write(0x28, 0x00011C30);
-	gnss_cmgp_write(0x2C, 0x80000003);
-
 #elif defined(CONFIG_SOC_EXYNOS9630)
 	gif_info("MAILBOX CP APM AP CHUB WLBT\n");
 	gnss_cmgp_write(0x00, 0x000B0F60);	/* GNSS Start address >> 12bit */

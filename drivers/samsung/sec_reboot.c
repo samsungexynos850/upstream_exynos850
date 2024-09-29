@@ -17,8 +17,10 @@
 #include <linux/input.h>
 #endif
 
-#include <linux/sec_ext.h>
+#include "./debug/sec_debug_internal.h"
+#ifdef CONFIG_BATTERY_SAMSUNG
 #include "../battery/common/sec_battery.h"
+#endif
 #include <linux/sec_batt.h>
 
 #include <asm/cacheflush.h>
@@ -38,6 +40,9 @@ EXPORT_SYMBOL_GPL(pmic_key_get_pwrkey);
 #include <linux/debug-snapshot.h>
 #include <linux/sec_debug.h>
 #include <linux/string.h>
+#include <linux/power_supply.h>
+
+#define EXYNOS_PMU_PS_HOLD_CONTROL 0x030C
 
 #undef MODULE_PARAM_PREFIX
 #define MODULE_PARAM_PREFIX "sec_debug."
@@ -264,13 +269,14 @@ static void sec_power_off(void)
 	local_irq_disable();
 
 	sec_set_reboot_magic(SEC_REBOOT_LPM, SEC_REBOOT_END_OFFSET, 0xFF);
+#ifdef CONFIG_BATTERY_SAMSUNG
 	psy_do_property("ac", get, POWER_SUPPLY_PROP_ONLINE, ac_val);
 	psy_do_property("ac", get, POWER_SUPPLY_EXT_PROP_WATER_DETECT, water_val);
 	psy_do_property("usb", get, POWER_SUPPLY_PROP_ONLINE, usb_val);
 	psy_do_property("wireless", get, POWER_SUPPLY_PROP_ONLINE, wpc_val);
 	pr_info("[%s] AC[%d], USB[%d], WPC[%d], WATER[%d]\n",
 			__func__, ac_val.intval, usb_val.intval, wpc_val.intval, water_val.intval);
-
+#endif
 	secdbg_base_clear_magic_rambase();
 
 	flush_cache_all();
@@ -278,11 +284,7 @@ static void sec_power_off(void)
 
 	while (1) {
 		/* Check reboot charging */
-#ifdef CONFIG_SAMSUNG_BATTERY
-		if ((ac_val.intval || water_val.intval || usb_val.intval || wpc_val.intval || (poweroff_try >= 5)) && !lpcharge) {
-#else
 		if ((ac_val.intval || water_val.intval || usb_val.intval || wpc_val.intval || (poweroff_try >= 5))) {
-#endif
 			exynos_pmu_write(SEC_DEBUG_PANIC_INFORM, SEC_RESET_REASON_UNKNOWN);
 			pr_emerg("%s: charger connected or power off failed(%d), reboot!\n", __func__, poweroff_try);
 			/* To enter LP charging */

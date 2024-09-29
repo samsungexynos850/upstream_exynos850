@@ -59,9 +59,4 @@ config EXYNOS_HALT
 	bool "Exynos support HALT"
 	default n
 	depends on ARCH_EXYNOS && EXYNOS_DEBUG
-
-config EXYNOS_SSLD
-        tristate "Exynos support S2R Scenario Lockup Detector"
-        depends on EXYNOS_DEBUG
-        default n
 endif

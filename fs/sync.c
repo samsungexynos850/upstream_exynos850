@@ -23,6 +23,17 @@
 			SYNC_FILE_RANGE_WAIT_AFTER)
 
 /* Interruptible sync for Samsung Mobile Device */
+/* @fs.sec -- 30cbf83784121f91517b701d9706bccd -- */
+
+static inline int sec_sys_sync() {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+	ksys_sync();
+	return 0;
+#else
+	return sys_sync();
+#endif
+}
+
 #ifdef CONFIG_INTERRUPTIBLE_SYNC
 
 #include <linux/workqueue.h>
@@ -71,15 +82,6 @@ static DEFINE_MUTEX(intr_sync_wq_lock);
 static inline struct interruptible_sync_work *INTR_SYNC_WORK(struct work_struct *work)
 {
 	return container_of(work, struct interruptible_sync_work, work);
-}
-
-static inline int sec_sys_sync() {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
-	ksys_sync();
-	return 0;
-#else
-	return sys_sync();
-#endif
 }
 
 static void do_intr_sync(struct work_struct *work)

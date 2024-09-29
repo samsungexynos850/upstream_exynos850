@@ -83,12 +83,16 @@ static uint type = MT_CACHE;
 static uint start_size = 64;
 static uint end_size = SZ_4M;
 static uint core = 4;
+#ifdef CONFIG_DEBUG_FS
 static uint run = 0;
+#endif
 static uint func = 1;
 static int val = 0;
 static uint align = 0;
 static uint flush = 0;
+#ifdef CONFIG_DEBUG_FS
 static uint dump = 0;
+#endif
 static uint pmu = 0;
 static uint chk = 0;
 static uint src_mset = 0;
@@ -599,6 +603,7 @@ void func_perf(void *src, void *dst, struct file *file)
 }
 */
 
+#ifdef CONFIG_DEBUG_FS
 static int perf_main(void)
 {
 	struct device *dev = memcpy_dev;
@@ -997,6 +1002,7 @@ static const struct file_operations info_debugfs_fops = {
 		.release	= single_release,
 };
 
+#endif
 // end of sysfs nodes
 /*------------------------------------------------------------------*/
 
@@ -1035,13 +1041,16 @@ static struct platform_driver memcpy_driver = {
 static int __init perf_init(void)
 {
 	struct device_node *dn = NULL;
+#ifdef CONFIG_DEBUG_FS
 	struct dentry *root, *d;
+#endif
 	int ret;
 
 	dn = of_find_node_by_name(dn, "exynos_perf_ncmemcpy");
 	of_property_read_u32(dn, "cal-id-mif", &cal_id_mif);
 	of_property_read_u32(dn, "devfreq-mif", &devfreq_mif);
 
+#ifdef CONFIG_DEBUG_FS
 	root = debugfs_create_dir("exynos_perf_ncmemcpy", NULL);
 	if (!root) {
 		pr_err("%s: create debugfs\n", __FILE__);
@@ -1133,6 +1142,7 @@ static int __init perf_init(void)
 	if (!d)
 		return -ENOMEM;
 
+#endif
 	ret = platform_driver_register(&memcpy_driver);
 	if (!ret)
 		pr_info("%s: init\n", memcpy_driver.driver.name);

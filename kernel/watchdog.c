@@ -708,14 +708,18 @@ void check_softlockup_type(void)
 		sl_info->softirq_info.last_arrival != 0 && sl_info->softirq_info.fn != NULL) {
 		sl_info->delay_time = local_clock() - sl_info->softirq_info.last_arrival;
 		sl_info->sl_type = SL_SOFTIRQ_STUCK;
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 		pr_auto(ASL9, "Softlockup state: %s, Latency: %lluns, Softirq type: %s, Func: %pf, preempt_count : %x\n",
 			sl_to_name[sl_info->sl_type], sl_info->delay_time, sl_info->softirq_info.softirq_type, sl_info->softirq_info.fn, sl_info->preempt_count);
+#endif
 	} else {
 		secdbg_softlockup_get_info(cpu, sl_info);
 		if (!(preempt_count() & PREEMPT_MASK) || softirq_count())
 			sl_info->sl_type = SL_UNKNOWN_STUCK;
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 		pr_auto(ASL9, "Softlockup state: %s, Latency: %lluns, Task: %s, preempt_count: %x\n",
 			sl_to_name[sl_info->sl_type], sl_info->delay_time, sl_info->task_info.task_comm, sl_info->preempt_count);
+#endif
 	}
 }
 
@@ -725,6 +729,7 @@ unsigned long long get_dss_softlockup_thresh(void)
 }
 EXPORT_SYMBOL(get_dss_softlockup_thresh);
 #endif
+
 #else /* CONFIG_SOFTLOCKUP_DETECTOR */
 static void lockup_detector_reconfigure(void)
 {
@@ -1050,6 +1055,7 @@ static void check_hardlockup_type(unsigned int cpu)
 
 	secdbg_hardlockup_get_info(cpu, hl_info);
 
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 	if (hl_info->hl_type == HL_TASK_STUCK) {
 		pr_auto(ASL9, "Hardlockup state: %s, Latency: %lluns, TASK: %s\n",
 			hl_to_name[hl_info->hl_type], hl_info->delay_time, hl_info->task_info.task_comm);
@@ -1069,6 +1075,7 @@ static void check_hardlockup_type(unsigned int cpu)
 		pr_auto(ASL9, "Hardlockup state: %s, Latency: %lluns, TASK: %s\n",
 			hl_to_name[hl_info->hl_type], hl_info->delay_time, hl_info->task_info.task_comm);
 	}
+#endif
 }
 
 void update_hardlockup_type(unsigned int cpu)
@@ -1077,7 +1084,9 @@ void update_hardlockup_type(unsigned int cpu)
 
 	if (hl_info->hl_type == HL_TASK_STUCK && !irqs_disabled()) {
 		hl_info->hl_type = HL_UNKNOWN_STUCK;
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 		pr_auto(ASL9, "Unknown stuck because IRQ was enabled but IRQ was not generated\n");
+#endif
 	}
 }
 EXPORT_SYMBOL(update_hardlockup_type);

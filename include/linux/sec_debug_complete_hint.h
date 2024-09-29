@@ -37,6 +37,7 @@ struct secdbg_hint {
 
 static inline void secdbg_hint_init(struct secdbg_hint *hint);
 
+#ifdef CONFIG_SEC_DEBUG_COMPLETE_HINT
 #include <linux/completion.h>
 
 static inline void secdbg_hint_add_completion_to_task(struct completion *x)
@@ -48,6 +49,7 @@ static inline void secdbg_hint_del_completion_to_task(struct completion *x)
 {
 	current->x = 0;
 }
+#endif
 
 static inline void secdbg_hint_init(struct secdbg_hint *hint)
 {

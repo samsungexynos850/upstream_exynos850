@@ -627,6 +627,7 @@ struct kbase_jd_atom {
 
 	u16 nr_extres;
 	struct kbase_ext_res *extres;
+	bool is_freed;
 
 	u32 device_nr;
 	u64 jc;

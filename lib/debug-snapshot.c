@@ -35,17 +35,12 @@
 
 /* To Support Samsung SoC */
 #include <soc/samsung/cal-if.h>
-
-/* 1. last kmsg hooking */
-#include <linux/sec_debug.h>
-
 #ifdef CONFIG_SEC_PM_DEBUG
 #include <linux/uaccess.h>
 #include <linux/proc_fs.h>
 
 static bool sec_log_full;
 #endif
-
 /* 1. last kmsg hooking */
 #include <linux/sec_debug.h>
 
@@ -872,7 +867,6 @@ static void __init dbg_snapshot_fixmap(void)
 
 	/* output the information of debug-snapshot */
 	dbg_snapshot_output();
-
 #ifdef CONFIG_SEC_DEBUG_LAST_KMSG
 	secdbg_lkmg_store(dss_items[DSS_ITEM_KERNEL_ID].head_ptr,
 			dss_items[DSS_ITEM_KERNEL_ID].curr_ptr,
