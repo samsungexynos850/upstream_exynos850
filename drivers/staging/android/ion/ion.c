@@ -32,6 +32,8 @@
 
 #include <trace/systrace_mark.h>
 
+#define CREATE_TRACE_POINTS
+#include "ion_trace.h"
 #include "ion.h"
 #include "ion_exynos.h"
 #include "ion_debug.h"
@@ -69,6 +71,20 @@ static void ion_buffer_add(struct ion_device *dev,
 	get_task_comm(buffer->thread_comm, current);
 	buffer->pid = current->group_leader->pid;
 	buffer->tid = current->pid;
+}
+
+static void track_buffer_created(struct ion_buffer *buffer)
+{
+	long total = atomic_long_add_return(buffer->size, &total_heap_bytes);
+
+	trace_ion_stat(buffer->sg_table, buffer->size, total);
+}
+
+static void track_buffer_destroyed(struct ion_buffer *buffer)
+{
+	long total = atomic_long_sub_return(buffer->size, &total_heap_bytes);
+
+	trace_ion_stat(buffer->sg_table, -buffer->size, total);
 }
 
 /* this function should only be called while dev->lock is held */
@@ -123,8 +139,7 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 	nr_alloc_peak = atomic_long_read(&heap->total_allocated_peak);
 	if (nr_alloc_cur > nr_alloc_peak)
 		atomic_long_set(&heap->total_allocated_peak, nr_alloc_cur);
-
-	atomic_long_add(len, &total_heap_bytes);
+	track_buffer_created(buffer);
 	return buffer;
 
 err1:
@@ -162,7 +177,7 @@ static void _ion_buffer_destroy(struct ion_buffer *buffer)
 	mutex_lock(&dev->buffer_lock);
 	rb_erase(&buffer->node, &dev->buffers);
 	mutex_unlock(&dev->buffer_lock);
-	atomic_long_sub(buffer->size, &total_heap_bytes);
+	track_buffer_destroyed(buffer);
 
 	if (heap->flags & ION_HEAP_FLAG_DEFER_FREE)
 		ion_heap_freelist_add(heap, buffer);
@@ -389,6 +404,9 @@ static int ion_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 	struct ion_buffer *buffer = dmabuf->priv;
 	struct dma_buf_attachment *att;
 
+	/*
+	 * TODO: Move this elsewhere because we don't always need a vaddr
+	 */
 
 	mutex_lock(&dmabuf->lock);
 	list_for_each_entry(att, &dmabuf->attachments, node) {
@@ -596,7 +614,7 @@ static inline void __ion_account_print_locked(void)
 		pr_info("[%d]       %16s(%5u) %8zu\n", i, ion_size_acc[i].task_comm,
 			ion_size_acc[i].pid, ion_size_acc[i].size / SZ_1K);
 		if (heaviest_size < ion_size_acc[i].size) {
-			heaviest_size = ion_size_acc[i].size ;
+			heaviest_size = ion_size_acc[i].size;
 			heaviest_idx = i;
 		}
 		total += ion_size_acc[i].size;

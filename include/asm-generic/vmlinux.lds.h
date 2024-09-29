@@ -69,10 +69,10 @@
 #if defined(CONFIG_LD_DEAD_CODE_DATA_ELIMINATION) || defined(CONFIG_LTO_CLANG)
 #define TEXT_MAIN .text .text.[0-9a-zA-Z_]*
 #define TEXT_CFI_MAIN .text.[0-9a-zA-Z_]*.cfi
-#define DATA_MAIN .data .data.[0-9a-zA-Z_]* .data..LPBX*
+#define DATA_MAIN .data .data.[0-9a-zA-Z_]* .data..L* .data..compoundliteral*
 #define SDATA_MAIN .sdata .sdata.[0-9a-zA-Z_]*
-#define RODATA_MAIN .rodata .rodata.[0-9a-zA-Z_]*
-#define BSS_MAIN .bss .bss.[0-9a-zA-Z_]*
+#define RODATA_MAIN .rodata .rodata.[0-9a-zA-Z_]* .rodata..L*
+#define BSS_MAIN .bss .bss.[0-9a-zA-Z_]* .bss..compoundliteral*
 #define SBSS_MAIN .sbss .sbss.[0-9a-zA-Z_]*
 #else
 #define TEXT_MAIN .text
@@ -281,7 +281,8 @@
 
 #define PAGE_ALIGNED_DATA(page_align)					\
 	. = ALIGN(page_align);						\
-	*(.data..page_aligned)
+	*(.data..page_aligned)						\
+	. = ALIGN(page_align);
 
 #define READ_MOSTLY_DATA(align)						\
 	. = ALIGN(align);						\
@@ -308,61 +309,24 @@
  */
 #ifndef RO_AFTER_INIT_DATA
 #define RO_AFTER_INIT_DATA						\
+	. = ALIGN(8);							\
 	__start_ro_after_init = .;					\
 	*(.data..ro_after_init)						\
 	__end_ro_after_init = .;
 #endif
 
-#define PG_IDMAP							\
-	. = ALIGN(PAGE_SIZE);					\
-		idmap_pg_dir = .;					\
-	. += IDMAP_DIR_SIZE;
-
-#define PG_SWAP								\
-	. = ALIGN(PAGE_SIZE);					\
-		swapper_pg_dir = .;					\
-	. += SWAPPER_DIR_SIZE;					\
-		swapper_pg_end = .;
-#ifdef CONFIG_ARM64_SW_TTBR0_PAN
-#define PG_RESERVED							\
-	. = ALIGN(PAGE_SIZE);					\
-	reserved_ttbr0 = .;						\
-	. += RESERVED_TTBR0_SIZE;
-#else
-#define PG_RESERVED
-#endif
-
-#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-#define PG_TRAMP							\
-	. = ALIGN(PAGE_SIZE);					\
-	tramp_pg_dir = .;						\
-	. += PAGE_SIZE;
-#else
-#define PG_TRAMP
-#endif
-
-#ifdef CONFIG_RKP
-#define RKP_RO_DATA							\
-	PG_IDMAP								\
-	PG_SWAP									\
-	PG_RESERVED								\
-	PG_TRAMP
-#else
-#define RKP_RO_DATA
-#endif
 
 #ifdef CONFIG_UH
-#define UH_RO_SECTION						\
+#define UH_RO_SECTION							\
 	. = ALIGN(4096);						\
-	.uh_bss       : AT(ADDR(.uh_bss) - LOAD_OFFSET) {	\
-		*(.uh_bss.page_aligned)				\
+	.uh_bss       : AT(ADDR(.uh_bss) - LOAD_OFFSET) {		\
+		*(.uh_bss.page_aligned)					\
 		*(.uh_bss)						\
 	} = 0								\
 									\
-	.uh_ro        : AT(ADDR(.uh_ro) - LOAD_OFFSET) {	\
+	.uh_ro        : AT(ADDR(.uh_ro) - LOAD_OFFSET) {		\
 		*(.rkp_ro)						\
 		*(.kdp_ro)						\
-		RKP_RO_DATA						\
 	}
 #else
 #define UH_RO_SECTION
@@ -389,8 +353,8 @@
 		*(.rodata1)						\
 	}								\
 									\
-	/* uH */					\
-	UH_RO_SECTION					\
+	/* uH */							\
+	UH_RO_SECTION							\
 									\
 	/* PCI quirks */						\
 	.pci_fixup        : AT(ADDR(.pci_fixup) - LOAD_OFFSET) {	\
@@ -421,7 +385,7 @@
 	}								\
 									\
 	/* Built-in firmware blobs */					\
-	.builtin_fw        : AT(ADDR(.builtin_fw) - LOAD_OFFSET) {	\
+	.builtin_fw : AT(ADDR(.builtin_fw) - LOAD_OFFSET) ALIGN(8) {	\
 		__start_builtin_fw = .;					\
 		KEEP(*(.builtin_fw))					\
 		__end_builtin_fw = .;					\
@@ -543,6 +507,15 @@
 	}
 
 /*
+ * Non-instrumentable text section
+ */
+#define NOINSTR_TEXT							\
+		ALIGN_FUNCTION();					\
+		__noinstr_text_start = .;				\
+		*(.noinstr.text)					\
+		__noinstr_text_end = .;
+
+/*
  * .text section. Map to function alignment to avoid address changes
  * during second ld run in second ld pass when generating System.map
  *
@@ -552,8 +525,12 @@
  */
 #define TEXT_TEXT							\
 		ALIGN_FUNCTION();					\
-		*(.text.hot TEXT_MAIN .text.fixup .text.unlikely)	\
+		*(.text.hot .text.hot.*)				\
+		*(TEXT_MAIN .text.fixup)				\
+		*(.text.unlikely .text.unlikely.*)			\
+		*(.text.unknown .text.unknown.*)			\
 		*(TEXT_CFI_MAIN) 					\
+		NOINSTR_TEXT						\
 		*(.text..refcount)					\
 		*(.text..ftrace)					\
 		*(.ref.text)						\
@@ -714,7 +691,9 @@
 	. = ALIGN(bss_align);						\
 	.bss : AT(ADDR(.bss) - LOAD_OFFSET) {				\
 		BSS_FIRST_SECTIONS					\
+		. = ALIGN(PAGE_SIZE);					\
 		*(.bss..page_aligned)					\
+		. = ALIGN(PAGE_SIZE);					\
 		*(.dynbss)						\
 		*(BSS_MAIN)						\
 		*(COMMON)						\
@@ -758,8 +737,13 @@
 		/* DWARF 4 */						\
 		.debug_types	0 : { *(.debug_types) }			\
 		/* DWARF 5 */						\
+		.debug_addr	0 : { *(.debug_addr) }			\
+		.debug_line_str	0 : { *(.debug_line_str) }		\
+		.debug_loclists	0 : { *(.debug_loclists) }		\
 		.debug_macro	0 : { *(.debug_macro) }			\
-		.debug_addr	0 : { *(.debug_addr) }
+		.debug_names	0 : { *(.debug_names) }			\
+		.debug_rnglists	0 : { *(.debug_rnglists) }		\
+		.debug_str_offsets	0 : { *(.debug_str_offsets) }
 
 		/* Stabs debugging sections.  */
 #define STABS_DEBUG							\
@@ -897,6 +881,7 @@
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 #define PERCPU_DECRYPTED_SECTION					\
 	. = ALIGN(PAGE_SIZE);						\
+	*(.data..decrypted)						\
 	*(.data..percpu..decrypted)					\
 	. = ALIGN(PAGE_SIZE);
 #else

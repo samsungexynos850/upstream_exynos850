@@ -172,6 +172,11 @@ int mipi_write(u32 id, u8 cmd_id, const u8 *cmd, u8 offset, int size, u32 option
 			type = MIPI_DSI_DCS_SHORT_WRITE;
 			d0 = (unsigned long)cmd[0];
 			d1 = 0;
+		} else if ((size == 2) && (cmd[0] != 0x35)) {
+			/* 0x35 (TE ON DCS) with short tx makes dsim stuck */
+			type = MIPI_DSI_DCS_SHORT_WRITE_PARAM;
+			d0 = cmd[0];
+			d1 = cmd[1];
 		} else {
 			type = MIPI_DSI_DCS_LONG_WRITE;
 			d0 = (unsigned long)cmd;
@@ -292,6 +297,11 @@ void mipi_lpdt(u32 id, u32 lpdt_on)
 	dsim_reg_set_cmd_transfer_mode(id, lpdt_on);
 }
 
+void mipi_decon_disable(u32 id)
+{
+	decon_update_pwr_state(decon_drvdata[id], DISP_PWR_OFF);
+}
+
 enum dsim_state get_dsim_state(u32 id)
 {
 	struct dsim_device *dsim = get_dsim_drvdata(id);
@@ -319,6 +329,7 @@ static int panel_drv_put_ops(struct exynos_panel_device *panel)
 	mipi_ops.parse_dt = parse_lcd_info;
 	mipi_ops.get_lcd_info = get_lcd_info;
 	mipi_ops.set_lpdt = mipi_lpdt;
+	mipi_ops.decon_disable = mipi_decon_disable;
 
 	v4l2_set_subdev_hostdata(panel->panel_drv_sd, &mipi_ops);
 
@@ -740,3 +751,4 @@ struct exynos_panel_ops common_panel_ops = {
 #endif
 	.mres = common_panel_mres,
 };
+

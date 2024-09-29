@@ -396,8 +396,8 @@ static int dwc3_otg_start_host(struct otg_fsm *fsm, int on)
 		}
 
 		platform_device_del(dwc->xhci);
-		list_clear = 1;
 		dwc->xhci->dev.p->dead = 0;
+		list_clear = 1;
 
 err2:
 		ret = dwc3_otg_phy_enable(fsm, 0, on);
@@ -424,7 +424,6 @@ static int dwc3_otg_start_gadget(struct otg_fsm *fsm, int on)
 
 	if (on) {
 		wake_lock(&dotg->wakelock);
-		dwc->vbus_state = true;
 		ret = dwc3_otg_phy_enable(fsm, 0, on);
 		if (ret) {
 			dev_err(dwc->dev, "%s: failed to reinitialize core\n",
@@ -441,7 +440,6 @@ static int dwc3_otg_start_gadget(struct otg_fsm *fsm, int on)
 		}
 
 	} else {
-		dwc->vbus_state = false;
 		if (dwc->is_not_vbus_pad)
 			dwc3_gadget_disconnect_proc(dwc);
 		/* avoid missing disconnect interrupt */

@@ -2,12 +2,12 @@
 /*
  *  usb notify header
  *
- * Copyright (C) 2011-2020 Samsung, Inc.
+ * Copyright (C) 2011-2021 Samsung, Inc.
  * Author: Dongrak Shin <dongrak.shin@samsung.com>
  *
  */
 
- /* usb notify layer v3.5 */
+ /* usb notify layer v3.6 */
 
 #ifndef __LINUX_USB_NOTIFY_H__
 #define __LINUX_USB_NOTIFY_H__
@@ -125,23 +125,13 @@ enum otg_notify_data_role {
 	HNOTIFY_DFP,
 };
 
-enum usb_restrict_type {
-	USB_SECURE_RESTRICTED,
-	USB_SECURE_RELEASE,
-};
-
-enum usb_restrict_group {
-	USB_GROUP_AUDIO,
-	USB_GROUP_OTEHR,
-	USB_GROUP_MAX,
-};
-
 enum usb_certi_type {
 	USB_CERTI_UNSUPPORT_ACCESSORY,
 	USB_CERTI_NO_RESPONSE,
 	USB_CERTI_HUB_DEPTH_EXCEED,
 	USB_CERTI_HUB_POWER_EXCEED,
 	USB_CERTI_HOST_RESOURCE_EXCEED,
+	USB_CERTI_WARM_RESET,
 };
 
 enum usb_err_type {
@@ -153,14 +143,9 @@ enum usb_itracker_type {
 };
 
 enum usb_current_state {
-	NOTIFY_USB_SUSPENDED,
 	NOTIFY_USB_UNCONFIGURED,
+	NOTIFY_USB_SUSPENDED,
 	NOTIFY_USB_CONFIGURED,
-};
-
-enum otg_notify_illegal_type {
-	NOTIFY_EVENT_AUDIO_DESCRIPTOR,
-	NOTIFY_EVENT_SECURE_DISCONNECTION,
 };
 
 struct otg_notify {
@@ -175,7 +160,6 @@ struct otg_notify {
 	int disable_control;
 	int device_check_sec;
 	int pre_peri_delay_us;
-	int speed;
 	int (*pre_gpio)(int gpio, int use);
 	int (*post_gpio)(int gpio, int use);
 	int (*vbus_drive)(bool enable);
@@ -189,6 +173,7 @@ struct otg_notify {
 	void (*set_ldo_onoff)(void *data, unsigned int onoff);
 	int (*get_gadget_speed)(void);
 	int (*is_skip_list)(int index);
+	int (*usb_maximum_speed)(int speed);
 	void *o_data;
 	void *u_notify;
 };
@@ -220,15 +205,15 @@ extern unsigned long get_cable_type(struct otg_notify *n);
 extern int is_usb_host(struct otg_notify *n);
 extern bool is_blocked(struct otg_notify *n, int type);
 extern bool is_snkdfp_usb_device_connected(struct otg_notify *n);
+extern int get_con_dev_max_speed(struct otg_notify *n);
+extern void set_con_dev_max_speed
+		(struct otg_notify *n, int speed);
 extern int is_known_usbaudio(struct usb_device *dev);
 extern void set_usb_audio_cardnum(int card_num, int bundle, int attach);
 extern void send_usb_audio_uevent(struct usb_device *dev,
 		int cardnum, int attach);
 extern int send_usb_notify_uevent
 		(struct otg_notify *n, char *envp_ext[]);
-extern int detect_illegal_condition(int type);
-extern int check_usbaudio(struct usb_device *dev);
-extern int check_usbgroup(struct usb_device *dev);
 #if defined(CONFIG_USB_HW_PARAM)
 extern unsigned long long *get_hw_param(struct otg_notify *n,
 					enum usb_hw_param index);
@@ -273,6 +258,10 @@ static inline int is_usb_host(struct otg_notify *n) {return 0; }
 static inline bool is_blocked(struct otg_notify *n, int type) {return false; }
 static inline bool is_snkdfp_usb_device_connected(struct otg_notify *n)
 			{return false; }
+static inline int get_con_dev_max_speed(struct otg_notify *n)
+			{return 0; }
+static inline void set_con_dev_max_speed
+		(struct otg_notify *n, int speed) {}
 static inline int is_known_usbaudio(struct usb_device *dev) {return 0; }
 static inline void set_usb_audio_cardnum(int card_num,
 		int bundle, int attach) {}
@@ -280,9 +269,6 @@ static inline void send_usb_audio_uevent(struct usb_device *dev,
 		int cardnum, int attach) {}
 static inline int send_usb_notify_uevent
 			(struct otg_notify *n, char *envp_ext[]) {return 0; }
-static inline int detect_illegal_condition(int type) {return 0; }
-static inline int check_usbaudio(struct usb_device *dev) {return 0; }
-static inline int check_usbgroup(struct usb_device *dev) {return 0; }
 #if defined(CONFIG_USB_HW_PARAM)
 static inline unsigned long long *get_hw_param(struct otg_notify *n,
 			enum usb_hw_param index) {return NULL; }

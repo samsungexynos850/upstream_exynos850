@@ -116,6 +116,7 @@ int is_dvfs_init(struct is_resourcemgr *resourcemgr)
 	dvfs_ctrl->cur_disp_qos = 0;
 	dvfs_ctrl->cur_hpg_qos = 0;
 	dvfs_ctrl->cur_hmp_bst = 0;
+	dvfs_ctrl->cur_cpus = NULL;
 
 	/* init spin_lock for clock gating */
 	mutex_init(&dvfs_ctrl->lock);
@@ -529,6 +530,25 @@ int is_get_qos(struct is_core *core, u32 type, u32 scenario_id)
 	return qos;
 }
 
+const char *is_get_cpus(struct is_core *core, u32 scenario_id)
+{
+	struct exynos_platform_is *pdata;
+	u32 dvfs_idx = core->resourcemgr.dvfs_ctrl.dvfs_table_idx;
+
+	pdata = core->pdata;
+	if (pdata == NULL) {
+		err("pdata is NULL\n");
+		return NULL;
+	}
+
+	if (dvfs_idx >= IS_DVFS_TABLE_IDX_MAX) {
+		err("invalid dvfs index(%d)", dvfs_idx);
+		dvfs_idx = 0;
+	}
+
+	return pdata->dvfs_cpu[dvfs_idx][scenario_id];
+}
+
 int is_set_dvfs(struct is_core *core, struct is_device_ischain *device, u32 scenario_id)
 {
 	int ret = 0;
@@ -540,6 +560,7 @@ int is_set_dvfs(struct is_core *core, struct is_device_ischain *device, u32 scen
 #endif
 	int int_qos, mif_qos, i2c_qos, cam_qos, disp_qos, hpg_qos;
 	char *qos_info;
+	const char *cpus;
 	struct is_resourcemgr *resourcemgr;
 	struct is_dvfs_ctrl *dvfs_ctrl;
 
@@ -563,6 +584,7 @@ int is_set_dvfs(struct is_core *core, struct is_device_ischain *device, u32 scen
 	cam_qos = is_get_qos(core, IS_DVFS_CAM, scenario_id);
 	disp_qos = is_get_qos(core, IS_DVFS_DISP, scenario_id);
 	hpg_qos = is_get_qos(core, IS_DVFS_HPG, scenario_id);
+	cpus = is_get_cpus(core, scenario_id);
 
 #if defined(QOS_INTCAM)
 	if (int_cam_qos < 0) {
@@ -675,6 +697,9 @@ int is_set_dvfs(struct is_core *core, struct is_device_ischain *device, u32 scen
 	}
 #endif
 
+	if (cpus && (!dvfs_ctrl->cur_cpus || strcmp(dvfs_ctrl->cur_cpus, cpus)))
+		dvfs_ctrl->cur_cpus = cpus;
+
 	qos_info = __getname();
 	if (unlikely(!qos_info)) {
 		ret = -ENOMEM;
@@ -689,9 +714,10 @@ int is_set_dvfs(struct is_core *core, struct is_device_ischain *device, u32 scen
 	snprintf(qos_info + strlen(qos_info),
 				PATH_MAX, " TNR(%d),", tnr_qos);
 #endif
-	info("%s INT(%d), MIF(%d), CAM(%d), DISP(%d), I2C(%d), HPG(%d, %d)]\n",
+	info("%s INT(%d), MIF(%d), CAM(%d), DISP(%d), I2C(%d), HPG(%d, %d), CPU(%s)]\n",
 			qos_info, int_qos, mif_qos, cam_qos, disp_qos,
-			i2c_qos, hpg_qos, dvfs_ctrl->cur_hmp_bst);
+			i2c_qos, hpg_qos, dvfs_ctrl->cur_hmp_bst,
+			cpus ? cpus : "");
 	__putname(qos_info);
 exit:
 	return ret;

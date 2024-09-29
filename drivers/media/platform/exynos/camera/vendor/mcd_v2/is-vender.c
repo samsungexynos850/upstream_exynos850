@@ -25,6 +25,12 @@
 #include <linux/file.h>
 #include <linux/slab.h>
 #include <linux/firmware.h>
+
+#ifdef USE_CAMERA_MIPI_CLOCK_VARIATION
+#include <linux/bsearch.h>
+#include <linux/dev_ril_bridge.h>
+#endif
+
 #include "is-binary.h"
 
 #if defined (CONFIG_OIS_USE)
@@ -60,6 +66,17 @@ static u32  rear4_sensor_id;
 static u32  front4_sensor_id;
 static u32  rear_tof_sensor_id;
 static u32  front_tof_sensor_id;
+
+static u32  rear_dualized_sensor_id;
+static u32  front_dualized_sensor_id;
+static u32  rear2_dualized_sensor_id;
+static u32  front2_dualized_sensor_id;
+static u32  rear3_dualized_sensor_id;
+static u32  front3_dualized_sensor_id;
+static u32  rear4_dualized_sensor_id;
+static u32  front4_dualized_sensor_id;
+static u32  rear_dualized_tof_sensor_id;
+static u32  front_dualized_tof_sensor_id;
 
 #ifdef CONFIG_SECURE_CAMERA_USE
 static u32  secure_sensor_id;
@@ -221,8 +238,237 @@ err:
 }
 #endif
 
+#ifdef USE_CAMERA_MIPI_CLOCK_VARIATION
+static struct cam_cp_noti_info g_cp_noti_info;
+static struct mutex g_mipi_mutex;
+static bool g_init_notifier;
+
+/* CP notify format (HEX raw format)
+ * 10 00 AA BB 27 01 03 XX YY YY YY YY ZZ ZZ ZZ ZZ
+ *
+ * 00 10 (0x0010) - len
+ * AA BB - not used
+ * 27 - MAIN CMD (SYSTEM CMD : 0x27)
+ * 01 - SUB CMD (CP Channel Info : 0x01)
+ * 03 - NOTI CMD (0x03)
+ * XX - RAT MODE
+ * YY YY YY YY - BAND MODE
+ * ZZ ZZ ZZ ZZ - FREQ INFO
+ */
+
+static int is_vendor_ril_notifier(struct notifier_block *nb,
+				unsigned long size, void *buf)
+{
+	struct dev_ril_bridge_msg *msg;
+	struct cam_cp_noti_info *cp_noti_info;
+
+	if (!g_init_notifier) {
+		warn("%s: not init ril notifier\n", __func__);
+		return NOTIFY_DONE;
+	}
+
+	info("%s: ril notification size [%ld]\n", __func__, size);
+
+	msg = (struct dev_ril_bridge_msg *)buf;
+
+	if (size == sizeof(struct dev_ril_bridge_msg)
+			&& msg->dev_id == IPC_SYSTEM_CP_CHANNEL_INFO
+			&& msg->data_len == sizeof(struct cam_cp_noti_info)) {
+		cp_noti_info = (struct cam_cp_noti_info *)msg->data;
+
+		mutex_lock(&g_mipi_mutex);
+		memcpy(&g_cp_noti_info, msg->data, sizeof(struct cam_cp_noti_info));
+		mutex_unlock(&g_mipi_mutex);
+
+		info("%s: update mipi channel [%d,%d,%d]\n",
+			__func__, g_cp_noti_info.rat, g_cp_noti_info.band, g_cp_noti_info.channel);
+
+		return NOTIFY_OK;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block g_ril_notifier_block = {
+	.notifier_call = is_vendor_ril_notifier,
+};
+
+static void is_vendor_register_ril_notifier(void)
+{
+	if (!g_init_notifier) {
+		info("%s: register ril notifier\n", __func__);
+
+		mutex_init(&g_mipi_mutex);
+		memset(&g_cp_noti_info, 0, sizeof(struct cam_cp_noti_info));
+
+		register_dev_ril_bridge_event_notifier(&g_ril_notifier_block);
+		g_init_notifier = true;
+	}
+}
+
+static void is_vendor_get_rf_channel(struct cam_cp_noti_info *ch)
+{
+	if (!g_init_notifier) {
+		warn("%s: not init ril notifier\n", __func__);
+		memset(ch, 0, sizeof(struct cam_cp_noti_info));
+		return;
+	}
+
+	mutex_lock(&g_mipi_mutex);
+	memcpy(ch, &g_cp_noti_info, sizeof(struct cam_cp_noti_info));
+	mutex_unlock(&g_mipi_mutex);
+}
+
+static int compare_rf_channel(const void *key, const void *element)
+{
+	struct cam_mipi_channel *k = ((struct cam_mipi_channel *)key);
+	struct cam_mipi_channel *e = ((struct cam_mipi_channel *)element);
+
+	if (k->rat_band < e->rat_band)
+		return -1;
+	else if (k->rat_band > e->rat_band)
+		return 1;
+
+	if (k->channel_max < e->channel_min)
+		return -1;
+	else if (k->channel_min > e->channel_max)
+		return 1;
+
+	return 0;
+}
+
+int is_vendor_select_mipi_by_rf_channel(const struct cam_mipi_channel *channel_list, const int size)
+{
+	struct cam_mipi_channel *result = NULL;
+	struct cam_mipi_channel key;
+	struct cam_cp_noti_info input_ch;
+
+	is_vendor_get_rf_channel(&input_ch);
+
+	key.rat_band = CAM_RAT_BAND(input_ch.rat, input_ch.band);
+	key.channel_min = input_ch.channel;
+	key.channel_max = input_ch.channel;
+
+	info("%s: searching rf channel s [%d,%d,%d]\n",
+		__func__, input_ch.rat, input_ch.band, input_ch.channel);
+
+	result = bsearch(&key,
+			channel_list,
+			size,
+			sizeof(struct cam_mipi_channel),
+			compare_rf_channel);
+
+	if (result == NULL) {
+		info("%s: searching result : not found, use default mipi clock\n", __func__);
+		return 0; /* return default mipi clock index = 0 */
+	}
+
+	info("%s: searching result : [0x%x,(%d-%d)]->(%d)\n", __func__,
+		result->rat_band, result->channel_min, result->channel_max, result->setting_index);
+
+	return result->setting_index;
+}
+
+int is_vendor_verify_mipi_channel(const struct cam_mipi_channel *channel_list, const int size)
+{
+	int i;
+	u16 pre_rat;
+	u16 pre_band;
+	u32 pre_channel_min;
+	u32 pre_channel_max;
+	u16 cur_rat;
+	u16 cur_band;
+	u32 cur_channel_min;
+	u32 cur_channel_max;
+
+	if (channel_list == NULL || size < 2)
+		return 0;
+
+	pre_rat = CAM_GET_RAT(channel_list[0].rat_band);
+	pre_band = CAM_GET_BAND(channel_list[0].rat_band);
+	pre_channel_min = channel_list[0].channel_min;
+	pre_channel_max = channel_list[0].channel_max;
+
+	if (pre_channel_min > pre_channel_max) {
+		panic("min is bigger than max : index=%d, min=%d, max=%d", 0, pre_channel_min, pre_channel_max);
+		return -EINVAL;
+	}
+
+	for (i = 1; i < size; i++) {
+		cur_rat = CAM_GET_RAT(channel_list[i].rat_band);
+		cur_band = CAM_GET_BAND(channel_list[i].rat_band);
+		cur_channel_min = channel_list[i].channel_min;
+		cur_channel_max = channel_list[i].channel_max;
+
+		if (cur_channel_min > cur_channel_max) {
+			panic("min is bigger than max : index=%d, min=%d, max=%d", 0, cur_channel_min, cur_channel_max);
+			return -EINVAL;
+		}
+
+		if (pre_rat > cur_rat) {
+			panic("not sorted rat : index=%d, pre_rat=%d, cur_rat=%d", i, pre_rat, cur_rat);
+			return -EINVAL;
+		}
+
+		if (pre_rat == cur_rat) {
+			if (pre_band > cur_band) {
+				panic("not sorted band : index=%d, pre_band=%d, cur_band=%d", i, pre_band, cur_band);
+				return -EINVAL;
+			}
+
+			if (pre_band == cur_band) {
+				if (pre_channel_max >= cur_channel_min) {
+					panic("overlaped channel range : index=%d, pre_ch=[%d-%d], cur_ch=[%d-%d]",
+						i, pre_channel_min, pre_channel_max, cur_channel_min, cur_channel_max);
+					return -EINVAL;
+				}
+			}
+		}
+
+		pre_rat = cur_rat;
+		pre_band = cur_band;
+		pre_channel_min = cur_channel_min;
+		pre_channel_max = cur_channel_max;
+	}
+
+	return 0;
+}
+
+#endif
+
 void is_vendor_csi_stream_on(struct is_device_csi *csi)
 {
+#ifdef USE_CAMERA_MIPI_CLOCK_VARIATION
+	struct is_device_sensor *device = NULL;
+	struct is_module_enum *module = NULL;
+	struct is_device_sensor_peri *sensor_peri = NULL;
+	struct is_cis *cis = NULL;
+	int ret;
+
+	device = container_of(csi->subdev, struct is_device_sensor, subdev_csi);
+	if (device == NULL) {
+		warn("device is null");
+		return;
+	};
+
+	ret = is_sensor_g_module(device, &module);
+	if (ret) {
+		warn("%s sensor_g_module failed(%d)", __func__, ret);
+		return;
+	}
+
+	sensor_peri = (struct is_device_sensor_peri *)module->private_data;
+	if (sensor_peri == NULL) {
+		warn("sensor_peri is null");
+		return;
+	};
+
+	if (sensor_peri->subdev_cis) {
+		cis = (struct is_cis *)v4l2_get_subdevdata(sensor_peri->subdev_cis);
+		CALL_CISOPS(cis, cis_update_mipi_info, sensor_peri->subdev_cis);
+	}
+#endif
+
 #ifdef USE_CAMERA_HW_BIG_DATA
 	mipi_err_check = false;
 #endif
@@ -368,6 +614,7 @@ int is_vender_probe(struct is_vender *vender)
 		specific->dualized_rom_client[i] = NULL;
 		specific->dualized_rom_cal_map_addr[i] = NULL;
 #endif
+		specific->rom_bank[i] = 0;
 	}
 
 	vender->private_data = specific;
@@ -477,6 +724,56 @@ int is_vender_dt(struct device_node *np)
 		probe_warn("front_tof_sensor_id read is fail(%d)", ret);
 	}
 
+	ret = of_property_read_u32(np, "rear_dualized_sensor_id", &rear_dualized_sensor_id);
+	if (ret) {
+		probe_warn("rear_dualized_sensor_id read is fail(%d)", ret);
+	}
+
+	ret = of_property_read_u32(np, "front_dualized_sensor_id", &front_dualized_sensor_id);
+	if (ret) {
+		probe_warn("front_dualized_sensor_id read is fail(%d)", ret);
+	}
+
+	ret = of_property_read_u32(np, "rear2_dualized_sensor_id", &rear2_dualized_sensor_id);
+	if (ret) {
+		probe_warn("rear2_dualized_sensor_id read is fail(%d)", ret);
+	}
+
+	ret = of_property_read_u32(np, "front2_dualized_sensor_id", &front2_dualized_sensor_id);
+	if (ret) {
+		probe_warn("front2_dualized_sensor_id read is fail(%d)", ret);
+	}
+
+	ret = of_property_read_u32(np, "rear3_dualized_sensor_id", &rear3_dualized_sensor_id);
+	if (ret) {
+		probe_warn("rear3_dualized_sensor_id read is fail(%d)", ret);
+	}
+
+	ret = of_property_read_u32(np, "front3_dualized_sensor_id", &front3_dualized_sensor_id);
+	if (ret) {
+		probe_warn("front3_dualized_sensor_id read is fail(%d)", ret);
+	}
+
+	ret = of_property_read_u32(np, "rear4_dualized_sensor_id", &rear4_dualized_sensor_id);
+	if (ret) {
+		probe_warn("rear4_dualized_sensor_id read is fail(%d)", ret);
+	}
+
+	ret = of_property_read_u32(np, "front4_dualized_sensor_id", &front4_dualized_sensor_id);
+	if (ret) {
+		probe_warn("front4_dualized_sensor_id read is fail(%d)", ret);
+	}
+
+	ret = of_property_read_u32(np, "rear_dualized_tof_sensor_id", &rear_dualized_tof_sensor_id);
+	if (ret) {
+		probe_warn("rear_dualized_tof_sensor_id read is fail(%d)", ret);
+	}
+
+	ret = of_property_read_u32(np, "front_dualized_tof_sensor_id", &front_dualized_tof_sensor_id);
+	if (ret) {
+		probe_warn("front_dualized_tof_sensor_id read is fail(%d)", ret);
+	}
+
 #ifdef CONFIG_SECURE_CAMERA_USE
 	ret = of_property_read_u32(np, "secure_sensor_id", &secure_sensor_id);
 	if (ret) {
@@ -556,20 +853,24 @@ bool is_vender_check_sensor(struct is_core *core)
 	int i = 0;
 	bool ret = false;
 	int retry_count = 20;
+	int sensor_probe_done = 0;
 
 	do {
 		ret = false;
-		for (i = 0; i < IS_VENDOR_SENSOR_COUNT; i++) {
-			if (!test_bit(IS_SENSOR_PROBE, &core->sensor[i].state)) {
-				info("sensor[%d]: no probed\n", i);
-				ret = true;
-				break;
+		sensor_probe_done = 0;
+		for (i = 0; i < IS_SENSOR_COUNT; i++) {
+			if (test_bit(IS_SENSOR_PROBE, &core->sensor[i].state)) {
+				++sensor_probe_done;
 			}
 		}
 
-		if (i == IS_VENDOR_SENSOR_COUNT && ret == false) {
+		if (sensor_probe_done == IS_VENDOR_SENSOR_COUNT) {
 			info("Retry count = %d\n", retry_count);
 			break;
+		}
+		else {
+			info("sensor: not probed\n");
+			ret = true;
 		}
 
 		mdelay(100);
@@ -641,7 +942,11 @@ int is_vender_hw_init(struct is_vender *vender)
 	}
 
 	for (sensor_position = SENSOR_POSITION_REAR; sensor_position < SENSOR_POSITION_MAX; sensor_position++) {
-		if (specific->rom_data[sensor_position].rom_valid == true || specific->rom_share[sensor_position].check_rom_share == true) {
+		if (specific->rom_data[sensor_position].rom_valid == true || specific->rom_share[sensor_position].check_rom_share == true
+#ifdef BOKEH_NO_ROM_SUPPORT
+			|| (specific->sensor_id[sensor_position] != SENSOR_NAME_NOTHING && specific->rom_data[sensor_position].rom_type == ROM_TYPE_NONE)
+#endif
+		) {
 			ret = is_sec_run_fw_sel(dev, sensor_position);
 
 			if (ret) {
@@ -658,6 +963,10 @@ int is_vender_hw_init(struct is_vender *vender)
 	if (ret) {
 		err("is_load_bin_on_boot is fail(%d)", ret);
 	}
+
+#ifdef USE_CAMERA_MIPI_CLOCK_VARIATION
+	is_vendor_register_ril_notifier();
+#endif
 
 	is_load_ctrl_unlock();
 	is_hw_init_running = false;
@@ -1404,6 +1713,53 @@ int is_vender_remove_dump_fw_file(void)
 	remove_dump_fw_file();
 
 	return 0;
+}
+
+int is_vender_get_dualized_sensorid(int position)
+{
+	int ret = SENSOR_NAME_NOTHING;
+
+	if(position >= SENSOR_POSITION_REAR && position < SENSOR_POSITION_MAX) {
+		switch (position) {
+		case SENSOR_POSITION_REAR:
+			ret = rear_dualized_sensor_id;
+			break;
+		case SENSOR_POSITION_FRONT:
+			ret = front_dualized_sensor_id;
+			break;
+		case SENSOR_POSITION_REAR2:
+			ret = rear2_dualized_sensor_id;
+			break;
+		case SENSOR_POSITION_FRONT2:
+			ret = front2_dualized_sensor_id;
+			break;
+		case SENSOR_POSITION_REAR3:
+			ret = rear3_dualized_sensor_id;
+			break;
+		case SENSOR_POSITION_FRONT3:
+			ret = front3_dualized_sensor_id;
+			break;
+		case SENSOR_POSITION_REAR4:
+			ret = rear4_dualized_sensor_id;
+			break;
+		case SENSOR_POSITION_FRONT4:
+			ret = front4_dualized_sensor_id;
+			break;
+		case SENSOR_POSITION_REAR_TOF:
+			ret = rear_dualized_tof_sensor_id;
+			break;
+		case SENSOR_POSITION_FRONT_TOF:
+			ret = front_dualized_tof_sensor_id;
+			break;
+		default:
+			ret = SENSOR_NAME_NOTHING;
+		}
+	}
+	else {
+		err("%s invalid module position(%d)", __func__ , position);
+		ret = -EINVAL;
+	}
+	return ret;
 }
 
 #ifdef USE_TOF_AF

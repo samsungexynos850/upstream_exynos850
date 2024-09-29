@@ -550,5 +550,4 @@ source "drivers/misc/ocxl/Kconfig"
 source "drivers/misc/cardreader/Kconfig"
 source "drivers/misc/samsung/Kconfig"
 source "drivers/misc/tzdev/Kconfig"
-source "drivers/misc/tui/Kconfig"
 endmenu

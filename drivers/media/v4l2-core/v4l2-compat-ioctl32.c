@@ -604,13 +604,15 @@ static int get_v4l2_buffer32(struct v4l2_buffer __user *p64,
 	if (V4L2_TYPE_IS_OUTPUT(type))
 		if (assign_in_user(&p64->bytesused, &p32->bytesused) ||
 		    assign_in_user(&p64->reserved2, &p32->reserved2) ||
-		    assign_in_user(&p64->fence_fd, &p32->fence_fd) ||
 		    assign_in_user(&p64->field, &p32->field) ||
 		    assign_in_user(&p64->timestamp.tv_sec,
 				   &p32->timestamp.tv_sec) ||
 		    assign_in_user(&p64->timestamp.tv_usec,
 				   &p32->timestamp.tv_usec))
 			return -EFAULT;
+
+	if (assign_in_user(&p64->fence_fd, &p32->fence_fd))
+		return -EFAULT;
 
 	if (V4L2_TYPE_IS_MULTIPLANAR(type)) {
 		u32 num_planes = length;

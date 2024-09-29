@@ -1390,6 +1390,10 @@ static inline void kbase_gpu_remove_atom(struct kbase_device *kbdev,
 	if (disjoint)
 		kbase_job_check_enter_disjoint(kbdev, action, katom->core_req,
 									katom);
+
+	/* MALI_SEC_INTEGRATION */
+	KBASE_KTRACE_ADD_JM_SLOT_INFO(kbdev, LSI_KATOM_REMOVED, katom->kctx, katom, 0u, katom->slot_nr, /*info_value*/ 0);
+
 }
 
 static int should_stop_x_dep_slot(struct kbase_jd_atom *katom)

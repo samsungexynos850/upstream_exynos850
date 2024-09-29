@@ -228,7 +228,7 @@ void ion_contig_heap_show_buffers(struct seq_file *s, struct ion_heap *heap,
 			pool_size : (unsigned long)
 			(sg_phys(sorted[i + 1]->sg_table->sgl) - base);
 
-		ion_debug_print(s,"%16s %6u (%16s %6u) %16zu\n",
+		ion_debug_print(s, "%16s %6u (%16s %6u) %16zu\n",
 				sorted[i]->task_comm, sorted[i]->pid,
 				sorted[i]->thread_comm, sorted[i]->tid, sorted[i]->size);
 		ion_debug_print(s,

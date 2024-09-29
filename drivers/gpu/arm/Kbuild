@@ -8,9 +8,13 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 #
+
 ifeq ($(CONFIG_MALI_DDK_VERSION),y)
 	ifeq ($(CONFIG_MALI_BIFROST_R19P0),y)
 		obj-y += b_r19p0/
+	endif
+	ifeq ($(CONFIG_MALI_BIFROST_R25P1),y)
+		obj-y += b_r25p1/
 	endif
 	ifeq ($(CONFIG_MALI_BIFROST_R26P0),y)
 		obj-y += b_r26p0/

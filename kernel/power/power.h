@@ -217,7 +217,7 @@ extern int __pm_notifier_call_chain(unsigned long val, int nr_to_call,
 extern int pm_notifier_call_chain(unsigned long val);
 #ifdef CONFIG_SEC_PM_DEBUG
 extern void *pm_notifier_call_chain_get_callback(int nr_calls);
-#endif
+#endif /* CONFIG_SEC_PM_DEBUG */
 #endif
 
 #ifdef CONFIG_HIGHMEM

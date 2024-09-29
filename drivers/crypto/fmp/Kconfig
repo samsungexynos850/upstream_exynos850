@@ -22,6 +22,15 @@ config EXYNOS_FMP_FIPS
 
 	  To compile this driver as a module, choose M here
 
+config EXYNOS_FMP_ACVP_TEST
+	bool "Samsung EXYNOS FMP Driver for ACVP Test"
+	depends on EXYNOS_FMP_FIPS
+	default n
+	help
+	  Say yes here to build support for FMP (Flash Memory Protector)
+	  ACVP Test validataion.
+	  IF unsure, say N.
+
 choice
 	prompt "Option for self-test failure"
 	depends on EXYNOS_FMP_FIPS

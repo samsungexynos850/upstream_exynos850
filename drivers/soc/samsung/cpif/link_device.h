@@ -7,6 +7,10 @@
 
 bool check_mem_link_tx_pending(struct mem_link_device *mld);
 
+#if IS_ENABLED(CONFIG_SBD_BOOTLOG)
+void shmem_pr_sbdcplog(struct timer_list *t);
+#endif
+
 #ifdef CONFIG_LINK_DEVICE_PCIE
 int request_pcie_msi_int(struct link_device *ld,
 				struct platform_device *pdev);

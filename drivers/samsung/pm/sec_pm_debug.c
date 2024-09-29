@@ -20,7 +20,7 @@
 u8 pmic_onsrc;
 u8 pmic_offsrc;
 
-static unsigned int sleep_count;
+static unsigned long long sleep_count;
 static struct timespec64 total_sleep_time;
 static ktime_t last_monotime; /* monotonic time before last suspend */
 static ktime_t curr_monotime; /* monotonic time after last suspend */
@@ -30,13 +30,13 @@ static ktime_t curr_stime; /* monotonic boottime offset after last suspend */
 static ssize_t sleep_time_sec_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%llu\n", total_sleep_time.tv_sec);
+	return sprintf(buf, "%lld\n", total_sleep_time.tv_sec);
 }
 
 static ssize_t sleep_count_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%u\n", sleep_count);
+	return sprintf(buf, "%llu\n", sleep_count);
 }
 
 static ssize_t pwr_on_off_src_show(struct device *dev,

@@ -134,8 +134,3 @@ config USB_HOST_CERTI
 	 uevent includes information of notification
 	 The usb framework gets this uevent.
 	 It is made by samsung.
-
-config GKI_USB
-	bool "Test feature for GKI"
-	help
-	 If GKI_USB feature is enabled, build for GKI TEST 

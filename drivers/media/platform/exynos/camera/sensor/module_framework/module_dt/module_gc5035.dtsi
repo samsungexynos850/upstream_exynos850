@@ -21,7 +21,7 @@
 	fragment@camera {
 		target-path = "/";
 		__overlay__ {
-			is_sensor_gc5035: is_sensor_gc5035@7E {
+			is_sensor_gc5035: is_sensor_gc5035@6E {
 				compatible = "samsung,sensor-module";
 
 				/* common */
@@ -157,6 +157,7 @@
 
 				power_seq {
 					use = <1>;
+#if 0
 					scenario_normal_on {
 						sensor_scenario = <SENSOR_SCENARIO_NORMAL>;
 						gpio_scenario = <GPIO_SCENARIO_ON>;
@@ -198,6 +199,7 @@
 						/* A start node number should be over the 10 for reserved number 0~9. */
 						/* pname = "name"; 		pin = <act value dealy voltage>;	gpio = <gpx# # 0x1>; */
 					};
+#endif
 				};
 			};
 

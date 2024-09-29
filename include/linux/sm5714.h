@@ -1,8 +1,7 @@
 /*
  *  sm5714.h - mfd driver for SM5714.
  *
- *  Copyright (C) 2020 Samsung Electronics
- *
+ *  Copyright (C) 2022 Samsung Electronics
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as

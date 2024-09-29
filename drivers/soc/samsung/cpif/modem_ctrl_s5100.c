@@ -452,8 +452,6 @@ static int power_on_cp(struct modem_ctl *mc)
 
 	mif_info("%s: +++\n", mc->name);
 
-	mc->receive_first_ipc = 0;
-
 	mif_disable_irq(&mc->s5100_irq_phone_active);
 	mif_disable_irq(&mc->s5100_irq_ap_wakeup);
 	drain_workqueue(mc->wakeup_wq);
@@ -560,8 +558,6 @@ static int power_reset_dump_cp(struct modem_ctl *mc)
 
 	mif_info("%s: +++\n", mc->name);
 
-	mc->receive_first_ipc = 0;
-
 	mc->phone_state = STATE_CRASH_EXIT;
 	mif_disable_irq(&mc->s5100_irq_phone_active);
 	mif_disable_irq(&mc->s5100_irq_ap_wakeup);
@@ -602,8 +598,6 @@ static int power_reset_cp(struct modem_ctl *mc)
 	struct s51xx_pcie *s51xx_pcie = pci_get_drvdata(mc->s51xx_pdev);
 
 	mif_info("%s: +++\n", mc->name);
-
-	mc->receive_first_ipc = 0;
 
 	mc->phone_state = STATE_OFFLINE;
 	pcie_clean_dislink(mc);

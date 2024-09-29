@@ -248,7 +248,7 @@ static ssize_t guid_store(struct device *dev,
 
 DEVICE_ATTR_RW(guid);
 
-#if defined(CONFIG_USB_NOTIFY_PROC_LOG) && IS_MODULE(CONFIG_USB_DWC3)
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
 static bool is_aoa_string_come(int string_index)
 {
 	if ((string_index & (1<<ACCESSORY_STRING_VERSION)) &&
@@ -289,7 +289,7 @@ static int ss_monitor_setup(struct usb_function *f,
 	struct usb_composite_dev *cdev;
 	struct usb_request	*req;
 
-#if defined(CONFIG_USB_NOTIFY_PROC_LOG) &&  IS_MODULE(CONFIG_USB_DWC3)
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
 	char log_buf[30] = {0};
 	char *usb_speed = NULL;
 #endif
@@ -324,6 +324,12 @@ static int ss_monitor_setup(struct usb_function *f,
 			if (ctrl->bRequest == 0xA3) {
 				pr_info("usb: [%s] RECEIVE PC GUID / line[%d]\n",
 							__func__, __LINE__);
+				if (w_length > MAX_GUID_SIZE) {
+					pr_info("usb: [%s] Invalid GUID size / line[%d]\n",
+								__func__, __LINE__);
+					goto unknown;
+				}
+
 				value = w_length;
 				req->complete = mtp_complete_get_guid;
 				req->zero = 0;
@@ -338,7 +344,7 @@ static int ss_monitor_setup(struct usb_function *f,
 			} else {
 				if (ctrl->bRequest == ACCESSORY_START) {
 					ss_monitor->aoa_start_cmd = 1;
-#if defined(CONFIG_USB_NOTIFY_PROC_LOG) && IS_MODULE(CONFIG_USB_DWC3)
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
 					if (!is_aoa_string_come(ss_monitor->accessory_string))
 						store_usblog_notify(NOTIFY_USBMODE_EXTRA,
 							(void *)"AOA_STR_ERR", NULL);
@@ -361,12 +367,10 @@ static int ss_monitor_setup(struct usb_function *f,
 		case USB_REQ_GET_DESCRIPTOR:
 			if (ctrl->bRequestType != USB_DIR_IN)
 				goto unknown;
-#if defined(CONFIG_USB_NOTIFY_PROC_LOG) && IS_MODULE(CONFIG_USB_DWC3)
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
 			switch (w_value >> 8) {
 			case USB_DT_DEVICE:
 				if (w_length == USB_DT_DEVICE_SIZE) {
-					ss_monitor->vbus_current = USB_CURRENT_UNCONFIGURED;
-					schedule_work(&ss_monitor->set_vbus_current_work);
 					usb_speed = get_usb_speed(cdev->gadget->speed);
 					sprintf(log_buf, "USB_STATE=ENUM:GET:DES:%s", usb_speed);
 					pr_info("usb: GET_DES(%s)\n", usb_speed);
@@ -381,13 +385,7 @@ static int ss_monitor_setup(struct usb_function *f,
 			break;
 #endif
 		case USB_REQ_SET_CONFIGURATION:
-#if defined(CONFIG_USB_NOTIFY_PROC_LOG) && IS_MODULE(CONFIG_USB_DWC3)
-			pr_info("usb: SET_CONFIG (%d)\n", w_value);
-			if (cdev->gadget->speed >= USB_SPEED_SUPER)
-				ss_monitor->vbus_current = USB_CURRENT_SUPER_SPEED;
-			else
-				ss_monitor->vbus_current = USB_CURRENT_HIGH_SPEED;
-			schedule_work(&ss_monitor->set_vbus_current_work);
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
 			store_usblog_notify(NOTIFY_USBSTATE,
 				(void *)"USB_STATE=ENUM:SET:CON", NULL);
 #endif
@@ -398,7 +396,7 @@ unknown:
 	return value;
 }
 
-#if defined(CONFIG_USB_NOTIFY_PROC_LOG) && IS_MODULE(CONFIG_USB_DWC3)
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
 static void update_usb_gadet_function(char *f_name, struct f_ss_monitor *p_monitor)
 {
 	if (!strcmp(f_name, "mtp")) {
@@ -523,9 +521,6 @@ static int usb_configuration_name(struct usb_configuration *config, struct usb_f
 static int
 ss_monitor_bind(struct usb_configuration *c, struct usb_function *f)
 {
-#if defined(CONFIG_USB_NOTIFY_PROC_LOG) && IS_MODULE(CONFIG_USB_DWC3)
-	struct f_ss_monitor		*ss_monitor = func_to_ss_monitor(f);
-#endif
 	struct ss_monitor_instance *opts;
 	int	rc = -1;
 
@@ -556,7 +551,7 @@ ss_monitor_bind(struct usb_configuration *c, struct usb_function *f)
 	}
 
 	/* save usb mode information */
-#if defined(CONFIG_USB_NOTIFY_PROC_LOG) && IS_MODULE(CONFIG_USB_DWC3)
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
 	usb_configuration_name(c, f);
 	store_usblog_notify(NOTIFY_USBSTATE,
 		(void *)"USB_STATE=PULLUP:EN:SUCCESS", NULL);
@@ -567,7 +562,7 @@ ss_monitor_bind(struct usb_configuration *c, struct usb_function *f)
 	return 0;
 
 fail:
-#if defined(CONFIG_USB_NOTIFY_PROC_LOG) && IS_MODULE(CONFIG_USB_DWC3)
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
 	store_usblog_notify(NOTIFY_USBSTATE,
 		(void *)"USB_STATE=PULLUP:EN:FAIL", NULL);
 #endif
@@ -583,7 +578,7 @@ ss_monitor_unbind(struct usb_configuration *c, struct usb_function *f)
 
 	opts = container_of(f->fi, struct ss_monitor_instance, func_inst);
 	f->ctrlrequest = NULL;
-#if defined(CONFIG_USB_NOTIFY_PROC_LOG) && IS_MODULE(CONFIG_USB_DWC3)
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
 	store_usblog_notify(NOTIFY_USBSTATE,
 		(void *)"USB_STATE=PULLUP:DIS", NULL);
 #endif

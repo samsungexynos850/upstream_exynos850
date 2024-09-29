@@ -36,6 +36,10 @@ static gpu_dvfs_info gpu_dvfs_table_default[DVFS_TABLE_ROW_MAX];
 
 #include <linux/of_platform.h>
 
+#ifdef CONFIG_EXYNOS9630_BTS
+#include <soc/samsung/bts.h>
+#endif
+
 struct kbase_device *pkbdev;
 static int gpu_debug_level;
 static int gpu_trace_level;
@@ -102,8 +106,6 @@ bool gpu_check_trace_code(int code)
 	case KBASE_KTRACE_CODE(DUMMY):
 		return false;
 	case KBASE_KTRACE_CODE(LSI_CLOCK_VALUE):
-	case KBASE_KTRACE_CODE(LSI_CLOCK_ON):
-	case KBASE_KTRACE_CODE(LSI_CLOCK_OFF):
 	case KBASE_KTRACE_CODE(LSI_GPU_MAX_LOCK):
 	case KBASE_KTRACE_CODE(LSI_GPU_MIN_LOCK):
 	case KBASE_KTRACE_CODE(LSI_SECURE_WORLD_ENTER):
@@ -117,29 +119,18 @@ bool gpu_check_trace_code(int code)
 	case KBASE_KTRACE_CODE(LSI_IFPM_POWER_OFF):
 		level = TRACE_CLK;
 		break;
-	case KBASE_KTRACE_CODE(LSI_VOL_VALUE):
 		level = TRACE_VOL;
 		break;
 	case KBASE_KTRACE_CODE(LSI_GPU_ON):
-	case KBASE_KTRACE_CODE(LSI_WA_EXECUTE):
-	case KBASE_KTRACE_CODE(LSI_WA_EXECUTE_WAIT_POWERUP):
-	case KBASE_KTRACE_CODE(LSI_WA_EXECUTE_SERIALIZE):
-	case KBASE_KTRACE_CODE(LSI_WA_EXECUTE_PARALLEL):
-	case KBASE_KTRACE_CODE(LSI_WA_EXECUTE_EX_SERIALIZE):
 	case KBASE_KTRACE_CODE(LSI_GPU_OFF):
-	case KBASE_KTRACE_CODE(LSI_ZAP_TIMEOUT):
 	case KBASE_KTRACE_CODE(LSI_RESET_GPU_EARLY_DUPE):
 	case KBASE_KTRACE_CODE(LSI_RESET_RACE_DETECTED_EARLY_OUT):
 	case KBASE_KTRACE_CODE(LSI_PM_SUSPEND):
-	case KBASE_KTRACE_CODE(LSI_SUSPEND):
 	case KBASE_KTRACE_CODE(LSI_RESUME):
 	case KBASE_KTRACE_CODE(LSI_GPU_RPM_RESUME_API):
 	case KBASE_KTRACE_CODE(LSI_GPU_RPM_SUSPEND_API):
 	case KBASE_KTRACE_CODE(LSI_SUSPEND_CALLBACK):
-	case KBASE_KTRACE_CODE(LSI_GPU_SOFTSTOP):
-	case KBASE_KTRACE_CODE(LSI_GPU_HARDSTOP):
 	case KBASE_KTRACE_CODE(KBASE_DEVICE_SUSPEND):
-	case KBASE_KTRACE_CODE(KBASE_DEVICE_SUSPEND_RESTORE):
 	case KBASE_KTRACE_CODE(KBASE_DEVICE_RESUME):
 	case KBASE_KTRACE_CODE(KBASE_DEVICE_PM_WAIT_WQ_RUN):
 	case KBASE_KTRACE_CODE(KBASE_DEVICE_PM_WAIT_WQ_QUEUE_WORK):
@@ -327,6 +318,13 @@ static int gpu_dvfs_update_config_data_from_dt(struct kbase_device *kbdev)
 
 #ifdef CONFIG_EXYNOS_BTS
 	gpu_update_config_data_int(np, "gpu_mo_min_clock", &platform->mo_min_clock);
+#ifdef CONFIG_EXYNOS9630_BTS
+	platform->bts_scen_idx = bts_get_scenindex("g3d_performance");
+#endif
+#ifdef CONFIG_MALI_CAMERA_EXT_BTS
+	platform->bts_camera_ext_idx= bts_get_scenindex("camera_ext");
+	platform->is_set_bts_camera_ext= 0;
+#endif
 #endif
 	gpu_update_config_data_int(np, "gpu_boost_gpu_min_lock", &platform->boost_gpu_min_lock);
 	gpu_update_config_data_int(np, "gpu_boost_egl_min_lock", &platform->boost_egl_min_lock);

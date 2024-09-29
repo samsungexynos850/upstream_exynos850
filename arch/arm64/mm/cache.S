@@ -86,7 +86,7 @@ ENDPROC(__flush_dcache_all)
  *
  *	Flush the entire cache system.  The data cache flush is now achieved
  *	using atomic clean / invalidates working outwards from L1 cache. This
- *	is done using Set/Way based cache maintainance instructions.  The
+ *	is done using Set/Way based cache maintenance instructions.  The
  *	instruction cache can still be invalidated back to the point of
  *	unification in a single instruction.
  */
@@ -292,7 +292,7 @@ ENTRY(__inval_dcache_area)
  *	- start   - virtual start address of region
  *	- size    - size in question
  */
-__dma_inv_area:
+ENTRY(__dma_inv_area)
 	add	x1, x1, x0
 	dcache_line_size x2, x3
 	sub	x3, x2, #1
@@ -331,7 +331,7 @@ ENTRY(__clean_dcache_area_poc)
  *	- start   - virtual start address of region
  *	- size    - size in question
  */
-__dma_clean_area:
+ENTRY(__dma_clean_area)
 	dcache_by_line_op cvac, sy, x0, x1, x2, x3
 	ret
 ENDPIPROC(__clean_dcache_area_poc)

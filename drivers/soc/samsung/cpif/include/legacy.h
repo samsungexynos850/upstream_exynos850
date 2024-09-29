@@ -40,7 +40,7 @@ enum legacy_ipc_map {
 	IPC_MAP_HPRIO_RAW,
 #endif
 	IPC_MAP_NORM_RAW,
-	MAX_SIPC_MAP,
+	IPC_MAP_MAX,
 };
 
 
@@ -72,9 +72,7 @@ struct legacy_link_device {
 	u32 __iomem *magic;
 	u32 __iomem *mem_access;
 
-	struct legacy_ipc_device *dev[MAX_SIPC_MAP];
-
-
+	struct legacy_ipc_device *dev[IPC_MAP_MAX];
 };
 
 static inline enum legacy_ipc_map get_mmap_idx(enum sipc_ch_id ch,

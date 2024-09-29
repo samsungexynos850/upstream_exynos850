@@ -119,7 +119,8 @@ static unsigned int init_ctrl_tables(struct sbd_link_device *sl, int num_iodevs,
 
 		/* Skip making rb if mismatch region info */
 		if ((iodevs[i].attrs & IODEV_ATTR(ATTR_OPTION_REGION)) &&
-		    strcmp(iodevs[i].option_region, CONFIG_OPTION_REGION))
+		    strncmp(iodevs[i].option_region, CONFIG_OPTION_REGION,
+				strlen(iodevs[i].option_region)))
 			continue;
 
 		/* Change channel to QoS priority */
@@ -319,6 +320,15 @@ int create_sbd_mem_map(struct sbd_link_device *sl)
 			mif_err("RB[%d:%d][%s] buff_rgn {addr:0x%pK offset:%d size:%u}\n",
 				i, sbd_id2ch(sl, i), udl_str(dir), rb->buff_rgn,
 				calc_offset(rb->buff_rgn, sl->shmem), (rb_len * rb_buff_size));
+
+#if IS_ENABLED(CONFIG_SBD_BOOTLOG)
+			if (rb->buff_rgn + (rb_len * rb_buff_size) >=
+				sl->shmem + sl->shmem_size - SHMEM_BOOTSBDLOG_SIZE) {
+				mif_err("sbd buffer break boot log area\n");
+
+				return -ENOMEM;
+			}
+#endif
 
 			rb->rp = &sl->rp[dir][i];
 			rb->wp = &sl->wp[dir][i];
@@ -566,7 +576,7 @@ static inline void set_skb_priv(struct sbd_ring_buffer *rb, struct sk_buff *skb)
 
 	/* Record the IO device, the link device, etc. into &skb->cb */
 	if (sipc_ps_ch(rb->ch)) {
-		unsigned int ch = (rb->buff_len_array[out] >> 16) & 0xff;
+		unsigned int ch = (rb->buff_len_array[out] >> 16) & 0xffff;
 		skbpriv(skb)->iod = link_get_iod_with_channel(rb->ld, ch);
 		skbpriv(skb)->ld = rb->ld;
 		skbpriv(skb)->sipc_ch = ch;
@@ -582,11 +592,6 @@ struct sk_buff *sbd_pio_rx(struct sbd_ring_buffer *rb)
 	struct sk_buff *skb;
 	unsigned int qlen = rb->len;
 	unsigned int out = *rb->rp;
-
-	if (out >= qlen) {
-		mif_err("out value exceeds ring buffer size\n");
-		return NULL;
-	}
 
 	skb = recv_data(rb, out);
 	if (unlikely(!skb))

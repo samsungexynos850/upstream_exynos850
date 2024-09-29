@@ -195,8 +195,8 @@ static void cqhci_dumpregs(struct cqhci_host *cq_host)
 		CQHCI_DUMP(": ===========================================\n");
 
 #if defined(CONFIG_MMC_TEST_MODE)
-		/* do not recover system if test mode is enabled */
-		BUG();
+	/* do not recover system if test mode is enabled */
+	BUG();
 #endif
 }
 

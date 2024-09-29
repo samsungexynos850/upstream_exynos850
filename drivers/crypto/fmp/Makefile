@@ -16,13 +16,12 @@ obj-$(CONFIG_EXYNOS_FMP_FIPS) += first_file.o
 obj-$(CONFIG_EXYNOS_FMP) += fmp.o
 obj-$(CONFIG_EXYNOS_FMP_FIPS) += fmp_test.o \
 				fmp_fips_main.o \
-				fmp_fips_fops.o \
 				fmp_fips_selftest.o \
 				fmp_fips_integrity.o \
 				hmac-sha256.o \
 				fmp_fips_cipher.o \
 				sha256.o
-
+obj-$(CONFIG_EXYNOS_FMP_ACVP_TEST) += fmp_fips_fops.o
 obj-$(CONFIG_EXYNOS_FMP_FIPS_FUNC_TEST) += fmp_fips_func_test.o
 obj-$(CONFIG_EXYNOS_FMP_FIPS) += last_file.o
 obj-$(CONFIG_EXYNOS_FMP_FIPS) += fips_out.o

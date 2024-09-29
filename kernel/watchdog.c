@@ -211,12 +211,10 @@ static DEFINE_PER_CPU(unsigned long, hrtimer_interrupts);
 static DEFINE_PER_CPU(unsigned long, soft_lockup_hrtimer_cnt);
 static DEFINE_PER_CPU(struct task_struct *, softlockup_task_ptr_saved);
 static DEFINE_PER_CPU(unsigned long, hrtimer_interrupts_saved);
-
 #ifdef CONFIG_SEC_DEBUG_LOCKUP_INFO
 static DEFINE_PER_CPU(struct softlockup_info, percpu_sl_info);
 static void check_softlockup_type(void);
 #endif
-
 static unsigned long soft_lockup_nmi_warn;
 
 static int __init softlockup_panic_setup(char *str)
@@ -631,6 +629,55 @@ int lockup_detector_offline_cpu(unsigned int cpu)
 	return 0;
 }
 
+#ifdef CONFIG_SEC_DEBUG_LOCKUP_INFO
+void sl_softirq_entry(const char *softirq_type, void *fn)
+{
+	struct softlockup_info *sl_info = per_cpu_ptr(&percpu_sl_info, smp_processor_id());
+
+	if (softirq_type) {
+		strncpy(sl_info->softirq_info.softirq_type, softirq_type, sizeof(sl_info->softirq_info.softirq_type) - 1);
+		sl_info->softirq_info.softirq_type[SOFTIRQ_TYPE_LEN - 1] = '\0';
+	}
+	sl_info->softirq_info.last_arrival = local_clock();
+	sl_info->softirq_info.fn = fn;
+}
+
+void sl_softirq_exit(void)
+{
+	struct softlockup_info *sl_info = per_cpu_ptr(&percpu_sl_info, smp_processor_id());
+	sl_info->softirq_info.last_arrival = 0;
+	sl_info->softirq_info.fn = (void *)0;
+	sl_info->softirq_info.softirq_type[0] = '\0';
+}
+
+void check_softlockup_type(void)
+{
+	int cpu = smp_processor_id();
+	struct softlockup_info *sl_info = per_cpu_ptr(&percpu_sl_info, cpu);
+
+	sl_info->preempt_count = preempt_count();
+	if (softirq_count() &&
+		sl_info->softirq_info.last_arrival != 0 && sl_info->softirq_info.fn != NULL) {
+		sl_info->delay_time = local_clock() - sl_info->softirq_info.last_arrival;
+		sl_info->sl_type = SL_SOFTIRQ_STUCK;
+		pr_auto(ASL9, "Softlockup state: %s, Latency: %lluns, Softirq type: %s, Func: %ps, preempt_count : %x\n",
+			sl_to_name[sl_info->sl_type], sl_info->delay_time, sl_info->softirq_info.softirq_type, sl_info->softirq_info.fn, sl_info->preempt_count);
+	} else {
+		secdbg_softlockup_get_info(cpu, sl_info);
+		if (!(preempt_count() & PREEMPT_MASK) || softirq_count())
+			sl_info->sl_type = SL_UNKNOWN_STUCK;
+		pr_auto(ASL9, "Softlockup state: %s, Latency: %lluns, Task: %s, preempt_count: %x\n",
+			sl_to_name[sl_info->sl_type], sl_info->delay_time, sl_info->task_info.task_comm, sl_info->preempt_count);
+	}
+}
+
+unsigned long long get_dss_softlockup_thresh(void)
+{
+	return watchdog_thresh * 2 * NSEC_PER_SEC;
+}
+EXPORT_SYMBOL(get_dss_softlockup_thresh);
+#endif
+
 static void lockup_detector_reconfigure(void)
 {
 	cpus_read_lock();
@@ -675,60 +722,6 @@ static __init void lockup_detector_setup(void)
 	softlockup_initialized = true;
 	mutex_unlock(&watchdog_mutex);
 }
-
-#ifdef CONFIG_SEC_DEBUG_LOCKUP_INFO
-void sl_softirq_entry(const char *softirq_type, void *fn)
-{
-	struct softlockup_info *sl_info = per_cpu_ptr(&percpu_sl_info, smp_processor_id());
-
-	if (softirq_type) {
-		strncpy(sl_info->softirq_info.softirq_type, softirq_type, sizeof(sl_info->softirq_info.softirq_type) - 1);
-		sl_info->softirq_info.softirq_type[SOFTIRQ_TYPE_LEN - 1] = '\0';
-	}
-	sl_info->softirq_info.last_arrival = local_clock();
-	sl_info->softirq_info.fn = fn;
-}
-
-void sl_softirq_exit(void)
-{
-	struct softlockup_info *sl_info = per_cpu_ptr(&percpu_sl_info, smp_processor_id());
-
-	sl_info->softirq_info.last_arrival = 0;
-	sl_info->softirq_info.fn = (void *)0;
-	sl_info->softirq_info.softirq_type[0] = '\0';
-}
-
-void check_softlockup_type(void)
-{
-	int cpu = smp_processor_id();
-	struct softlockup_info *sl_info = per_cpu_ptr(&percpu_sl_info, cpu);
-
-	sl_info->preempt_count = preempt_count();
-	if (softirq_count() &&
-		sl_info->softirq_info.last_arrival != 0 && sl_info->softirq_info.fn != NULL) {
-		sl_info->delay_time = local_clock() - sl_info->softirq_info.last_arrival;
-		sl_info->sl_type = SL_SOFTIRQ_STUCK;
-#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
-		pr_auto(ASL9, "Softlockup state: %s, Latency: %lluns, Softirq type: %s, Func: %pf, preempt_count : %x\n",
-			sl_to_name[sl_info->sl_type], sl_info->delay_time, sl_info->softirq_info.softirq_type, sl_info->softirq_info.fn, sl_info->preempt_count);
-#endif
-	} else {
-		secdbg_softlockup_get_info(cpu, sl_info);
-		if (!(preempt_count() & PREEMPT_MASK) || softirq_count())
-			sl_info->sl_type = SL_UNKNOWN_STUCK;
-#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
-		pr_auto(ASL9, "Softlockup state: %s, Latency: %lluns, Task: %s, preempt_count: %x\n",
-			sl_to_name[sl_info->sl_type], sl_info->delay_time, sl_info->task_info.task_comm, sl_info->preempt_count);
-#endif
-	}
-}
-
-unsigned long long get_dss_softlockup_thresh(void)
-{
-	return watchdog_thresh * 2 * NSEC_PER_SEC;
-}
-EXPORT_SYMBOL(get_dss_softlockup_thresh);
-#endif
 
 #else /* CONFIG_SOFTLOCKUP_DETECTOR */
 static void lockup_detector_reconfigure(void)
@@ -913,7 +906,6 @@ static DEFINE_PER_CPU(bool, watchdog_nmi_touch);
 static cpumask_t __read_mostly watchdog_cpus;
 ATOMIC_NOTIFIER_HEAD(hardlockup_notifier_list);
 EXPORT_SYMBOL(hardlockup_notifier_list);
-
 #ifdef CONFIG_SEC_DEBUG_LOCKUP_INFO
 static void check_hardlockup_type(unsigned int cpu);
 #endif
@@ -1054,13 +1046,11 @@ static void check_hardlockup_type(unsigned int cpu)
 	struct hardlockup_info *hl_info = per_cpu_ptr(&percpu_hl_info, cpu);
 
 	secdbg_hardlockup_get_info(cpu, hl_info);
-
-#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 	if (hl_info->hl_type == HL_TASK_STUCK) {
 		pr_auto(ASL9, "Hardlockup state: %s, Latency: %lluns, TASK: %s\n",
 			hl_to_name[hl_info->hl_type], hl_info->delay_time, hl_info->task_info.task_comm);
 	} else if (hl_info->hl_type == HL_IRQ_STUCK) {
-		pr_auto(ASL9, "Hardlockup state: %s, Latency: %lluns, IRQ: %d, Func: %pf\n",
+		pr_auto(ASL9, "Hardlockup state: %s, Latency: %lluns, IRQ: %d, Func: %ps\n",
 			hl_to_name[hl_info->hl_type], hl_info->delay_time, hl_info->irq_info.irq, hl_info->irq_info.fn);
 	} else if (hl_info->hl_type == HL_IDLE_STUCK) {
 		pr_auto(ASL9, "Hardlockup state: %s, Latency: %lluns, mode: %s\n",
@@ -1069,28 +1059,23 @@ static void check_hardlockup_type(unsigned int cpu)
 		pr_auto(ASL9, "Hardlockup state: %s, Latency: %lluns, CMD: %u\n",
 			hl_to_name[hl_info->hl_type], hl_info->delay_time,  hl_info->smc_info.cmd);
 	} else if (hl_info->hl_type == HL_IRQ_STORM) {
-		pr_auto(ASL9, "Hardlockup state: %s, Latency: %lluns, IRQ : %d, Func: %pf, Avg period: %lluns\n",
+		pr_auto(ASL9, "Hardlockup state: %s, Latency: %lluns, IRQ : %d, Func: %ps, Avg period: %lluns\n",
 			hl_to_name[hl_info->hl_type], hl_info->delay_time, hl_info->irq_info.irq, hl_info->irq_info.fn, hl_info->irq_info.avg_period);
 	} else if (hl_info->hl_type == HL_UNKNOWN_STUCK) {
 		pr_auto(ASL9, "Hardlockup state: %s, Latency: %lluns, TASK: %s\n",
 			hl_to_name[hl_info->hl_type], hl_info->delay_time, hl_info->task_info.task_comm);
 	}
-#endif
 }
-
 void update_hardlockup_type(unsigned int cpu)
 {
 	struct hardlockup_info *hl_info = per_cpu_ptr(&percpu_hl_info, cpu);
 
 	if (hl_info->hl_type == HL_TASK_STUCK && !irqs_disabled()) {
 		hl_info->hl_type = HL_UNKNOWN_STUCK;
-#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
 		pr_auto(ASL9, "Unknown stuck because IRQ was enabled but IRQ was not generated\n");
-#endif
 	}
 }
 EXPORT_SYMBOL(update_hardlockup_type);
-
 unsigned long long get_hardlockup_thresh(void)
 {
 	return (hardlockup_thresh * NSEC_PER_SEC - sample_period);

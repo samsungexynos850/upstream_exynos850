@@ -105,8 +105,12 @@ static int check_usb3_hub(struct usb_device *dev, bool on)
 			bInterfaceClass	= udev->config->interface[0]
 					->cur_altsetting->desc.bInterfaceClass;
 			if (on) {
+#if defined(CONFIG_USB_HOST_SAMSUNG_FEATURE)
+				if (bInterfaceClass == USB_CLASS_AUDIO) {
+#else
 				if ((bInterfaceClass == USB_CLASS_HID) ||
 						(bInterfaceClass == USB_CLASS_AUDIO)) {
+#endif	
 					udev->do_remote_wakeup =
 						(udev->config->desc.bmAttributes &
 						 USB_CONFIG_ATT_WAKEUP) ? 1 : 0;

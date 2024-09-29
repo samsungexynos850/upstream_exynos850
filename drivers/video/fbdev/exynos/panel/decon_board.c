@@ -100,7 +100,7 @@ run_list(dev, "subnode_4"); pre-configured lcd_pin pinctrl at subnode_1 will be 
 
 */
 
-/* #define CONFIG_BOARD_DEBUG */
+//#define CONFIG_BOARD_DEBUG
 
 #define BOARD_DTS_NAME	"decon_board"
 #if defined(CONFIG_EXYNOS_DPU20)
@@ -109,6 +109,7 @@ run_list(dev, "subnode_4"); pre-configured lcd_pin pinctrl at subnode_1 will be 
 #define PANEL_DTS_NAME	"panel-ddi-info"
 #endif
 #define PANEL_LUT_NAME	"panel-lut"
+#define PANEL_PBA_NODE	"panel_not_connected"
 
 #if defined(CONFIG_BOARD_DEBUG)
 #define dbg_none(fmt, ...)		pr_debug(pr_fmt("%s: %3d: %s: " fmt), BOARD_DTS_NAME, __LINE__, __func__, ##__VA_ARGS__)
@@ -659,6 +660,19 @@ struct device_node *of_find_decon_board(struct device *dev)
 	return np;
 }
 
+static int skip_list(const char *node_name, const char *type_name)
+{
+	int ret = 0;
+
+	if (STRNEQ(PANEL_PBA_NODE, node_name))
+		ret = 0;
+	else if (!get_boot_lcdconnected() && !STRNEQ("delay", type_name) && !STRNEQ("timer", type_name))
+		ret = 1;
+
+	return ret;
+}
+
+
 static int make_list(struct device *dev, struct list_head *lh, const char *name)
 {
 	struct device_node *np = NULL;
@@ -691,7 +705,7 @@ static int make_list(struct device *dev, struct list_head *lh, const char *name)
 		of_property_read_string_index(np, "type", i * 2, &type);
 		of_property_read_string_index(np, "type", i * 2 + 1, &subinfo);
 
-		if (!get_boot_lcdconnected() && !STRNEQ("delay", type) && !STRNEQ("timer", type)) {
+		if (skip_list(name, type)) {
 			dbg_info("lcdtype(%d) is invalid, so skip to add %s: %2d: %s\n", get_boot_lcdtype(), name, count, type);
 			continue;
 		}
@@ -758,7 +772,7 @@ static int make_text(struct device *dev, struct list_head *lh, const char *name,
 		type = type_list[i * 2];
 		subinfo = type_list[i * 2 + 1];
 
-		if (!get_boot_lcdconnected() && !STRNEQ("delay", type) && !STRNEQ("timer", type)) {
+		if (skip_list(name, type)) {
 			dbg_info("lcdtype(%d) is invalid, so skip to add %s: %2d: %s\n", get_boot_lcdtype(), name, count, type);
 			continue;
 		}
@@ -1582,6 +1596,16 @@ static int __init panel_lut_ddi_recommend_init(void)
 	return 0;
 }
 
+int panel_clean_board(struct device *dev)
+{
+	if (!get_boot_lcdconnected())
+	{
+		run_list(dev, PANEL_PBA_NODE);
+	}
+	return 0;
+}
+
+
 static int __init decon_board_init(void)
 {
 	panel_lut_ddi_recommend_init();
@@ -1590,38 +1614,14 @@ static int __init decon_board_init(void)
 }
 core_initcall(decon_board_init);
 
-#ifdef CONFIG_EXYNOS_DECON_LCD_A12S_BLIC_DUAL
-static int a12s_regulator_core_initcall(void)
+static int __init decon_board_late_initcall(void)
 {
-	struct device_node *np = NULL;
-	struct property *prop_new =    NULL;
-	int ret = 0;
-
-	if (boot_blic_type != 1)
-		return 0;
-
-	pr_info("%s: ++\n", __func__);
-
-	np = of_find_node_by_name(NULL, "__gpio_lcd_bl_en");
-	if (!np)
-		pr_info("%s: of_find_node_by_name fail(%d)\n", __func__, "__gpio_lcd_bl_en");
-
-	prop_new = kzalloc(sizeof(struct property), GFP_KERNEL);
-	if (!prop_new)
-		return -ENOMEM;
-
-	prop_new->name = "compatible";
-	prop_new->value = "regulator-void";
-	prop_new->length = sizeof("regulator-void");
-
-	ret = of_update_property(np, prop_new);
-	if (ret < 0)
-		pr_info("%s: of_update_property fail(%d)\n", __func__, ret);
-
-	pr_info("%s: --\n", __func__);
+	struct platform_device *pdev = of_find_device_by_path("/panel_drv@0");
+	struct device *dev = pdev ? &(pdev->dev) : NULL;
+	panel_clean_board(dev);
 
 	return 0;
 }
-core_initcall(a12s_regulator_core_initcall);
-#endif
+late_initcall_sync(decon_board_late_initcall);
+
 

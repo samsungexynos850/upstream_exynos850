@@ -280,6 +280,14 @@ struct exynos_context {
 	gpu_attribute *attrib;
 #ifdef CONFIG_EXYNOS_BTS
 	int mo_min_clock;
+#ifdef CONFIG_EXYNOS9630_BTS
+	unsigned int bts_scen_idx;
+	unsigned int is_set_bts; // Check the pair of bts scenario.
+#endif
+#ifdef CONFIG_MALI_CAMERA_EXT_BTS
+	unsigned int bts_camera_ext_idx;
+	unsigned int is_set_bts_camera_ext;
+#endif
 #endif
 	int *save_cpu_max_freq;
 

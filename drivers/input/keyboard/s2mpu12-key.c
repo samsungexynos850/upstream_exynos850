@@ -823,7 +823,7 @@ static int power_keys_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto fail1;
 	}
-	input->name	= "sec-pmic-key";//pdata->name ? : pdev->name;
+	input->name	= "sec-pmic-key"; //pdata->name ? : pdev->name;
 	input->phys	= "s2mpu12-keys/input0";
 	input->dev.parent = dev;
 	input->open	= power_keys_open;

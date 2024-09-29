@@ -118,6 +118,7 @@ int fmp_mmc_init_crypt(struct mmc_host *mmc)
 	};
 
 	mmc->ksm = keyslot_manager_create_passthrough(NULL, &fmp_ksm_ops,
+					BLK_CRYPTO_FEATURE_STANDARD_KEYS,
 					crypto_modes_supported, NULL);
 	if(!mmc->ksm) {
 		pr_info("%s fails to get keyslot manager\n", __func__);

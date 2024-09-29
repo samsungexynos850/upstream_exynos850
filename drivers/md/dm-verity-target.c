@@ -35,7 +35,7 @@
 #define DM_VERITY_OPT_IGN_ZEROES	"ignore_zero_blocks"
 #define DM_VERITY_OPT_AT_MOST_ONCE	"check_at_most_once"
 
-#define DM_VERITY_OPTS_MAX		(2 + DM_VERITY_OPTS_FEC)
+#define DM_VERITY_OPTS_MAX		(3 + DM_VERITY_OPTS_FEC)
 
 static unsigned dm_verity_prefetch_cluster = DM_VERITY_DEFAULT_PREFETCH_SIZE;
 
@@ -578,6 +578,15 @@ static int verity_verify_io(struct dm_verity_io *io)
 }
 
 /*
+ * Skip verity work in response to I/O error when system is shutting down.
+ */
+static inline bool verity_is_system_shutting_down(void)
+{
+	return system_state == SYSTEM_HALT || system_state == SYSTEM_POWER_OFF
+		|| system_state == SYSTEM_RESTART;
+}
+
+/*
  * End one "io" structure with a given error.
  */
 static void verity_finish_io(struct dm_verity_io *io, blk_status_t status)
@@ -606,7 +615,8 @@ static void verity_end_io(struct bio *bio)
 
 	/* SEC: Do not verify RAHEAD bio if status is not OK */
 	if (bio->bi_status &&
-		(!verity_fec_is_enabled(io->v) || (bio->bi_opf & REQ_RAHEAD))) {
+	    (!verity_fec_is_enabled(io->v) || (bio->bi_opf & REQ_RAHEAD) ||
+	     verity_is_system_shutting_down())) {
 		verity_finish_io(io, bio->bi_status);
 		return;
 	}
@@ -718,10 +728,8 @@ static int verity_map(struct dm_target *ti, struct bio *bio)
 	io->orig_bi_end_io = bio->bi_end_io;
 	io->block = bio->bi_iter.bi_sector >> (v->data_dev_block_bits - SECTOR_SHIFT);
 	io->n_blocks = bio->bi_iter.bi_size >> v->data_dev_block_bits;
-
 #ifdef SEC_HEX_DEBUG
 	add_total_blks(io->n_blocks);
-
 	if (get_total_blks() - get_prev_total_blks() > 0x4000) {
 		set_prev_total_blks(get_total_blks());
 		print_blks_cnt(v->data_dev->name);
@@ -1172,7 +1180,6 @@ static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 #ifdef SEC_HEX_DEBUG
 	get_b_info(v->data_dev->name);
 #endif
-
 #ifdef CONFIG_DM_ANDROID_VERITY_AT_MOST_ONCE_DEFAULT_ENABLED
 	if (!v->validated_blocks) {
 		r = verity_alloc_most_once(v);
@@ -1180,7 +1187,6 @@ static int verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 			goto bad;
 	}
 #endif
-
 	v->hash_per_block_bits =
 		__fls((1 << v->hash_dev_block_bits) / v->digest_size);
 

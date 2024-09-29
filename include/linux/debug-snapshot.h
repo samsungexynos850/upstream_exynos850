@@ -137,27 +137,19 @@ extern void secdbg_softlockup_get_info(unsigned int cpu, void *info);
 #define secdbg_hardlockup_get_info(a, b)	do { } while (0)
 #define secdbg_softlockup_get_info(a, b)	do { } while (0)
 #endif
-
 #ifdef CONFIG_SEC_DEBUG_COMPLETE_HINT
 extern u64 secdbg_snapshot_get_hardlatency_info(unsigned int cpu);
 #else
 #define secdbg_snapshot_get_hardlatency_info(a)	do { } while (0)
 #endif
-
 #ifdef CONFIG_SEC_DEBUG_WQ_LOCKUP_INFO
 extern void secdbg_show_sched_info(unsigned int cpu, int count);
 extern int secdbg_show_busy_task(unsigned int cpu, unsigned long long duration, int count);
-extern struct task_struct *get_the_busiest_task(void);
 #else
 #define secdbg_show_sched_info(a, b)	do { } while (0)
 static inline int secdbg_show_busy_task(unsigned int cpu, unsigned long long duration, int count)
 {
 	return -1;
-}
-
-static struct task_struct *get_the_busiest_task(void)
-{
-	return NULL;
 }
 #endif
 
@@ -238,11 +230,9 @@ static inline int dbg_snapshot_get_hardlockup(void)
 {
 	return 0;
 }
-
 #define secdbg_hardlockup_get_info(a, b)	do { } while (0)
 #define secdbg_softlockup_get_info(a, b)	do { } while (0)
 #define secdbg_snapshot_get_hardlatency_info(a)	do { } while (0)
-
 static inline unsigned int dbg_snapshot_get_item_size(char *name)
 {
 	return 0;

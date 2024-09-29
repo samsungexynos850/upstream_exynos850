@@ -112,6 +112,7 @@ inv_pnt:
 #else
 	sub	sp, sp, #S_FRAME_SIZE
 #endif
+
 #ifdef CONFIG_VMAP_STACK
 	/*
 	 * Test whether the SP has overflowed, without corrupting a GPR.

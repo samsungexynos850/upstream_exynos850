@@ -20,6 +20,6 @@ do {								\
 #define systrace_mark_end_debug(fmt, args...)			\
 	__systrace_mark(SYSTRACE_MARK_TYPE_END, fmt, ##args)
 #define systrace_mark_end()					\
-    __systrace_mark(SYSTRACE_MARK_TYPE_END, "")
+	__systrace_mark(SYSTRACE_MARK_TYPE_END, "")
 
 #endif /* _TRACE_SYSTRACE_MARK_H */

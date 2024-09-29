@@ -19,10 +19,6 @@
 #include <linux/unicode.h>
 #include <linux/fscrypt.h>
 
-#ifdef CONFIG_FSCRYPT_SDP
-#include "crypto/sdp/fscrypto_sdp_private.h"
-#endif
-
 #include <linux/uaccess.h>
 
 #include "internal.h"
@@ -808,7 +804,7 @@ int simple_attr_open(struct inode *inode, struct file *file,
 {
 	struct simple_attr *attr;
 
-	attr = kmalloc(sizeof(*attr), GFP_KERNEL);
+	attr = kzalloc(sizeof(*attr), GFP_KERNEL);
 	if (!attr)
 		return -ENOMEM;
 
@@ -848,9 +844,11 @@ ssize_t simple_attr_read(struct file *file, char __user *buf,
 	if (ret)
 		return ret;
 
-	if (*ppos) {		/* continued read */
+	if (*ppos && attr->get_buf[0]) {
+		/* continued read */
 		size = strlen(attr->get_buf);
-	} else {		/* first read */
+	} else {
+		/* first read */
 		u64 val;
 		ret = attr->get(attr->data, &val);
 		if (ret)
@@ -872,7 +870,7 @@ ssize_t simple_attr_write(struct file *file, const char __user *buf,
 			  size_t len, loff_t *ppos)
 {
 	struct simple_attr *attr;
-	u64 val;
+	unsigned long long val;
 	size_t size;
 	ssize_t ret;
 
@@ -890,7 +888,9 @@ ssize_t simple_attr_write(struct file *file, const char __user *buf,
 		goto out;
 
 	attr->set_buf[size] = '\0';
-	val = simple_strtoll(attr->set_buf, NULL, 0);
+	ret = kstrtoull(attr->set_buf, 0, &val);
+	if (ret)
+		goto out;
 	ret = attr->set(attr->data, val);
 	if (ret == 0)
 		ret = len; /* on success, claim we got the whole input */
@@ -1265,17 +1265,6 @@ bool is_empty_dir_inode(struct inode *inode)
 		(inode->i_op == &empty_dir_inode_operations);
 }
 
-#ifdef CONFIG_FSCRYPT_SDP
-static int fscrypt_sdp_d_delete(const struct dentry *dentry)
-{
-	return fscrypt_sdp_d_delete_wrapper(dentry);
-}
-
-static const struct dentry_operations sdp_dentry_ops = {
-	.d_delete	= fscrypt_sdp_d_delete,
-};
-#endif
-
 #ifdef CONFIG_UNICODE
 bool needs_casefold(const struct inode *dir)
 {
@@ -1292,10 +1281,26 @@ int generic_ci_d_compare(const struct dentry *dentry, unsigned int len,
 	const struct super_block *sb = dentry->d_sb;
 	const struct unicode_map *um = sb->s_encoding;
 	struct qstr entry = QSTR_INIT(str, len);
+	char strbuf[DNAME_INLINE_LEN];
 	int ret;
 
 	if (!inode || !needs_casefold(inode))
 		goto fallback;
+
+	/*
+	 * If the dentry name is stored in-line, then it may be concurrently
+	 * modified by a rename.  If this happens, the VFS will eventually retry
+	 * the lookup, so it doesn't matter what ->d_compare() returns.
+	 * However, it's unsafe to call utf8_strncasecmp() with an unstable
+	 * string.  Therefore, we have to copy the name into a temporary buffer.
+	 */
+	if (len <= DNAME_INLINE_LEN - 1) {
+		memcpy(strbuf, str, len);
+		strbuf[len] = 0;
+		entry.name = strbuf;
+		/* prevent compiler from optimizing out the temporary buffer */
+		barrier();
+	}
 
 	ret = utf8_strncasecmp(um, name, &entry);
 	if (ret >= 0)
@@ -1337,18 +1342,12 @@ EXPORT_SYMBOL(generic_ci_d_hash);
 static const struct dentry_operations generic_ci_dentry_ops = {
 	.d_hash = generic_ci_d_hash,
 	.d_compare = generic_ci_d_compare,
-#ifdef CONFIG_FSCRYPT_SDP
-	.d_delete	= fscrypt_sdp_d_delete,
-#endif
 };
 #endif
 
 #ifdef CONFIG_FS_ENCRYPTION
 static const struct dentry_operations generic_encrypted_dentry_ops = {
 	.d_revalidate = fscrypt_d_revalidate,
-#ifdef CONFIG_FSCRYPT_SDP
-	.d_delete	= fscrypt_sdp_d_delete,
-#endif
 };
 #endif
 
@@ -1357,9 +1356,6 @@ static const struct dentry_operations generic_encrypted_ci_dentry_ops = {
 	.d_hash = generic_ci_d_hash,
 	.d_compare = generic_ci_d_compare,
 	.d_revalidate = fscrypt_d_revalidate,
-#ifdef CONFIG_FSCRYPT_SDP
-	.d_delete	= fscrypt_sdp_d_delete,
-#endif
 };
 #endif
 
@@ -1388,12 +1384,6 @@ void generic_set_encrypted_ci_d_ops(struct inode *dir, struct dentry *dentry)
 #ifdef CONFIG_UNICODE
 	if (dir->i_sb->s_encoding) {
 		d_set_d_op(dentry, &generic_ci_dentry_ops);
-		return;
-	}
-#endif
-#ifdef CONFIG_FSCRYPT_SDP
-	if (dir->i_crypt_info) {
-		d_set_d_op(dentry, &sdp_dentry_ops);
 		return;
 	}
 #endif

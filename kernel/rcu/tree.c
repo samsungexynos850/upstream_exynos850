@@ -1420,7 +1420,7 @@ static void print_other_cpu_stall(struct rcu_state *rsp, unsigned long gp_seq)
 		rcu_print_detail_task_stall(rsp);
 	} else {
 		if (rcu_seq_current(&rsp->gp_seq) != gp_seq) {
-			pr_err("INFO: Stall ended before state dump start\n");
+			pr_auto(ASL1, "INFO: Stall ended before state dump start\n");
 		} else {
 			j = jiffies;
 			gpa = READ_ONCE(rsp->gp_activity);
@@ -1464,7 +1464,7 @@ static void print_cpu_stall(struct rcu_state *rsp)
 	 */
 
 	dbg_snapshot_printkl((size_t)rsp->name, (size_t)rsp);
-	pr_auto(ASL1, "INFO: %s self-detected stall on CPU", rsp->name);
+	pr_err("INFO: %s self-detected stall on CPU", rsp->name);
 	print_cpu_stall_info_begin();
 	raw_spin_lock_irqsave_rcu_node(rdp->mynode, flags);
 	print_cpu_stall_info(rsp, smp_processor_id());

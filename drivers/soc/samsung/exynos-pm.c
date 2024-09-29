@@ -287,9 +287,9 @@ int exynos_pm_notify(enum exynos_pm_event event)
 EXPORT_SYMBOL_GPL(exynos_pm_notify);
 #endif /* CONFIG_CPU_IDLE */
 
-#ifdef CONFIG_SEC_GPIO_DVS
+#ifdef CONFIG_PINCTRL_SEC_GPIO_DVS
 extern void gpio_dvs_check_sleepgpio(void);
-#endif
+#endif /* CONFIG_PINCTRL_SEC_GPIO_DVS */
 
 static void print_dbg_subsystem(void)
 {
@@ -336,15 +336,15 @@ static int exynos_pm_syscore_suspend(void)
 		pr_info("%s %s: Enter Suspend scenario. suspend_mode_idx = %d)\n",
 				EXYNOS_PM_PREFIX,__func__, pm_info->suspend_mode_idx);
 	}
-	
-#ifdef CONFIG_SEC_GPIO_DVS
+
+#ifdef CONFIG_PINCTRL_SEC_GPIO_DVS
 	/************************ Caution !!! ****************************/
 	/* This function must be located in appropriate SLEEP position
 	 * in accordance with the specification of each BB vendor.
 	 */
 	/************************ Caution !!! ****************************/
 	gpio_dvs_check_sleepgpio();
-#endif /* CONFIG_SEC_GPIO_DVS */
+#endif /* CONFIG_PINCTRL_SEC_GPIO_DVS */
 
 #define CODEC_IRQ_INT_EN	(1 << 1)
 #define PMIC_IRQ_INT_EN		(1 << 2)

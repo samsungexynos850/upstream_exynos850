@@ -138,11 +138,11 @@ static ssize_t abox_dump_auto_write(struct file *file, const char __user *data,
 	dev_dbg(abox_dump_dev_abox, "%s(%zu, %lld, %d)\n", __func__, count,
 			*ppos, enable);
 
-	p_buffer = buffer = kmalloc(sz_buffer, GFP_KERNEL);
+	p_buffer = buffer = kzalloc(sz_buffer, GFP_KERNEL);
 	if (!buffer)
 		return -ENOMEM;
 
-	ret = simple_write_to_buffer(buffer, sz_buffer, ppos, data, count);
+	ret = simple_write_to_buffer(buffer, sz_buffer - 1, ppos, data, count);
 	if (ret < 0)
 		goto err;
 

@@ -1154,6 +1154,7 @@ static int platform_mif_pmu_reset_release(struct scsc_mif_abs *interface)
                 SCSC_TAG_INFO_DEV(PLAT_MIF, platform->dev,
                         "updated successfully UART_IO_SHARE_CTRL[SEL_TXD_GPIO_1_21]: 0x%x\n", val);
 #endif
+
 		init_done = true;
 
 		goto init_code_done;

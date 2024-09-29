@@ -209,7 +209,6 @@ static int exynos_cs_lockup_handler(struct notifier_block *nb,
 	char buf[KSYM_SYMBOL_LEN];
 	unsigned int *cpu = (unsigned int *)core;
 	int ret = 0;
-
 	pr_auto(ASL5, "CPU[%d] saved pc value\n", *cpu);
 	for (iter = 0; iter < ITERATION; iter++) {
 #ifdef CONFIG_EXYNOS_PMU

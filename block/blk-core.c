@@ -1038,6 +1038,8 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id,
 
 	q->backing_dev_info->ra_pages =
 			(VM_MAX_READAHEAD * 1024) / PAGE_SIZE;
+	q->backing_dev_info->io_pages =
+			(VM_MAX_READAHEAD * 1024) / PAGE_SIZE;
 	q->backing_dev_info->capabilities = BDI_CAP_CGROUP_WRITEBACK;
 	q->backing_dev_info->name = "block";
 	q->node = node_id;
@@ -2777,7 +2779,7 @@ void blk_account_io_done(struct request *req, u64 now)
 		part_round_stats(req->q, cpu, part);
 		part_dec_in_flight(req->q, part, rq_data_dir(req));
 		if (!(req->rq_flags & RQF_STARTED))
-			part_stat_inc(cpu, part, flush_ios);
+		part_stat_inc(cpu, part, flush_ios);
 
 		hd_struct_put(part);
 		part_stat_unlock();
@@ -3007,7 +3009,7 @@ static void blk_dequeue_request(struct request *rq)
 	if (blk_account_rq(rq)) {
 		if (!queue_in_flight(q))
 			q->in_flight_stamp = ktime_get();
-		q->in_flight[rq_is_sync(rq)]++;
+ 		q->in_flight[rq_is_sync(rq)]++;
 	}
 }
 

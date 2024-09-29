@@ -34,6 +34,9 @@
 #ifdef CONFIG_LINK_DEVICE_PCIE
 #include "s51xx_pcie.h"
 #endif
+#if IS_ENABLED(CONFIG_SBD_BOOTLOG)
+#include "link_device.h"
+#endif
 #if defined(CONFIG_SEC_MODEM_S5000AP) && defined(CONFIG_SEC_MODEM_S5100)
 #include <linux/modem_notifier.h>
 #endif
@@ -296,8 +299,6 @@ static int power_on_cp(struct modem_ctl *mc)
 {
 	mif_info("+++\n");
 
-	mc->receive_first_ipc = 0;
-
 #ifndef CONFIG_CP_SECURE_BOOT
 	exynos_cp_init();
 #endif
@@ -367,8 +368,6 @@ static int power_reset_cp(struct modem_ctl *mc)
 
 	mif_info("+++\n");
 
-	mc->receive_first_ipc = 0;
-
 	/* 2cp dump WA */
 	if (timer_pending(&mld->crash_ack_timer))
 		del_timer(&mld->crash_ack_timer);
@@ -415,8 +414,6 @@ static int power_reset_dump_cp(struct modem_ctl *mc)
 	struct mem_link_device *mld = to_mem_link_device(ld);
 
 	mif_info("+++\n");
-
-	mc->receive_first_ipc = 0;
 
 	/* 2cp dump WA */
 	if (timer_pending(&mld->crash_ack_timer))
@@ -530,6 +527,9 @@ static int complete_normal_boot(struct modem_ctl *mc)
 	struct modem_data *modem = mc->mdm_data;
 	struct mem_link_device *mld = modem->mld;
 #endif
+#if IS_ENABLED(CONFIG_SBD_BOOTLOG)
+	struct link_device *ld = get_current_link(mc->bootd);
+#endif
 
 	mif_info("+++\n");
 
@@ -563,6 +563,10 @@ static int complete_normal_boot(struct modem_ctl *mc)
 	update_ctrl_msg(&mld->ap2cp_united_status, 1, mc->sbi_lcd_status_mask,
 			mc->sbi_lcd_status_pos);
 #endif /* CONFIG_CP_LCD_NOTIFIER */
+
+#if IS_ENABLED(CONFIG_SBD_BOOTLOG)
+	mif_add_timer(&ld->cplog_timer, (10 * HZ), shmem_pr_sbdcplog);
+#endif
 
 	mif_info("---\n");
 
@@ -974,8 +978,8 @@ static int cp_itmon_notifier(struct notifier_block *nb,
 	if (IS_ERR_OR_NULL(itmon_data))
 		return NOTIFY_DONE;
 
-	if (itmon_data->port && (strncmp("CP_", itmon_data->port,
-					sizeof("CP_") - 1) == 0)) {
+	if (itmon_data->port && (strncmp("MODEM", itmon_data->port,
+					sizeof("MODEM") - 1) == 0)) {
 		modem_force_crash_exit_ext();
 		mif_info("CP itmon notifier: cp crash request complete\n");
 		return NOTIFY_OK;

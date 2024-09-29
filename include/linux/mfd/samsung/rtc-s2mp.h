@@ -145,7 +145,6 @@ enum {
 	RTC_YEAR,
 	NR_RTC_CNT_REGS,
 };
-
 #endif
 
 #ifdef CONFIG_RTC_HIGH_RES

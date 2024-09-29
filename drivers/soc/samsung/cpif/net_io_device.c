@@ -28,6 +28,7 @@
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/netdevice.h>
+#include <net/tcp.h>
 
 #include "modem_prj.h"
 #include "modem_utils.h"
@@ -218,18 +219,11 @@ static netdev_tx_t vnet_xmit(struct sk_buff *skb, struct net_device *ndev)
 
 	ret = ld->send(ld, iod, skb_new);
 	if (unlikely(ret < 0)) {
-		static DEFINE_RATELIMIT_STATE(_rs, HZ, 100);
-
 		if (ret != -EBUSY) {
 			mif_err_limited("%s->%s: ERR! %s->send fail:%d (tx_bytes:%d len:%d)\n",
-				iod->name, mc->name, ld->name, ret,
-				tx_bytes, count);
-			goto drop;
+					iod->name, mc->name, ld->name, ret,
+					tx_bytes, count);
 		}
-
-		/* do 100-retry for every 1sec */
-		if (__ratelimit(&_rs))
-			goto retry;
 		goto drop;
 	}
 
@@ -274,20 +268,59 @@ drop:
 	return NETDEV_TX_OK;
 }
 
-#if defined(CONFIG_MODEM_IF_LEGACY_QOS) || defined(CONFIG_MODEM_IF_QOS)
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+static bool _is_tcp_ack(struct sk_buff *skb)
+{
+	switch (skb->protocol) {
+	/* TCPv4 ACKs */
+	case htons(ETH_P_IP):
+		if ((ip_hdr(skb)->protocol == IPPROTO_TCP) &&
+			(ntohs(ip_hdr(skb)->tot_len) - (ip_hdr(skb)->ihl << 2) ==
+			 tcp_hdr(skb)->doff << 2) &&
+		    ((tcp_flag_word(tcp_hdr(skb)) &
+		      cpu_to_be32(0x00FF0000)) == TCP_FLAG_ACK))
+			return true;
+		break;
+
+	/* TCPv6 ACKs */
+	case htons(ETH_P_IPV6):
+		if ((ipv6_hdr(skb)->nexthdr == IPPROTO_TCP) &&
+			(ntohs(ipv6_hdr(skb)->payload_len) ==
+			 (tcp_hdr(skb)->doff) << 2) &&
+		    ((tcp_flag_word(tcp_hdr(skb)) &
+		      cpu_to_be32(0x00FF0000)) == TCP_FLAG_ACK))
+			return true;
+		break;
+	}
+
+	return false;
+}
+
+static inline bool is_tcp_ack(struct sk_buff *skb)
+{
+	if (skb_is_tcp_pure_ack(skb))
+		return true;
+
+	if (unlikely(_is_tcp_ack(skb)))
+		return true;
+
+	return false;
+}
+
+#if defined(CONFIG_MODEM_IF_QOS)
 static u16 vnet_select_queue(struct net_device *dev, struct sk_buff *skb,
 		struct net_device *sb_dev, select_queue_fallback_t fallback)
-#else
-static u16 vnet_select_queue(struct net_device *dev, struct sk_buff *skb,
-		void *accel_priv, select_queue_fallback_t fallback)
-#endif
 {
-#if defined(CONFIG_MODEM_IF_QOS)
-	return (skb && skb->priomark == RAW_HPRIO) ? 1 : 0;
-#elif defined(CONFIG_MODEM_IF_LEGACY_QOS)
-	return ((skb && skb->truesize == 2) || (skb && skb->sk && cpif_qos_get_node(skb->sk->sk_uid.val))) ? 1 : 0;
+	if (!skb)
+		return 0;
+
+	if (is_tcp_ack(skb))
+		return 1;
+
+#if defined(CONFIG_MODEM_IF_LEGACY_QOS)
+	if (skb->sk && cpif_qos_get_node(skb->sk->sk_uid.val))
+		return 1;
 #endif
+	return 0;
 }
 #endif
 
@@ -295,7 +328,7 @@ static const struct net_device_ops vnet_ops = {
 	.ndo_open = vnet_open,
 	.ndo_stop = vnet_stop,
 	.ndo_start_xmit = vnet_xmit,
-#if defined(CONFIG_MODEM_IF_LEGACY_QOS) || defined(CONFIG_MODEM_IF_QOS)
+#if defined(CONFIG_MODEM_IF_QOS)
 	.ndo_select_queue = vnet_select_queue,
 #endif
 };

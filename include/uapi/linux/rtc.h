@@ -44,6 +44,7 @@ struct rtc_hrtime {
 	int tm_isdst;
 };
 #endif /* CONFIG_RTC_HIGH_RES */
+
 /*
  * This data structure is inspired by the EFI (v0.92) wakeup
  * alarm API.

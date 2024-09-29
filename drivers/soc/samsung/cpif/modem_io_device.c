@@ -509,10 +509,9 @@ static int rx_demux(struct link_device *ld, struct sk_buff *skb)
 
 	switch (skb_ld->protocol) {
 	case PROTOCOL_SIPC:
-		if (skb_ld->is_fmt_ch(ch)) {
-			iod->mc->receive_first_ipc = 1;
+		if (skb_ld->is_fmt_ch(ch))
 			return rx_fmt_ipc(skb);
-		} else if (skb_ld->is_ps_ch(ch))
+		else if (skb_ld->is_ps_ch(ch))
 			return rx_multi_pdp(skb);
 		else
 			return rx_raw_misc(skb);

@@ -79,6 +79,24 @@ static DECLARE_RWSEM(namespace_sem);
 struct kobject *fs_kobj;
 EXPORT_SYMBOL_GPL(fs_kobj);
 
+/*
+ * vfsmount lock may be taken for read to prevent changes to the
+ * vfsmount hash, ie. during mountpoint lookups or walking back
+ * up the tree.
+ *
+ * It should be taken for write in all cases where the vfsmount
+ * tree or hash is modified or when a vfsmount structure is modified.
+ */
+__cacheline_aligned_in_smp DEFINE_SEQLOCK(mount_lock);
+
+static inline struct hlist_head *m_hash(struct vfsmount *mnt, struct dentry *dentry)
+{
+	unsigned long tmp = ((unsigned long)mnt / L1_CACHE_BYTES);
+	tmp += ((unsigned long)dentry / L1_CACHE_BYTES);
+	tmp = tmp + (tmp >> m_hash_shift);
+	return &mount_hashtable[tmp & m_hash_mask];
+}
+
 enum {
 	UMOUNT_STATUS_ADD_TASK = 0,
 	UMOUNT_STATUS_REMAIN_NS,
@@ -133,24 +151,6 @@ static inline void sys_umount_trace_print(struct mount *mnt, int flags)
 			sb->s_id, MAJOR(bd_dev), MINOR(bd_dev), mnt_flags,
 			flags, umount_exit_str[sys_umount_trace_status]);
 	}
-}
-
-/*
- * vfsmount lock may be taken for read to prevent changes to the
- * vfsmount hash, ie. during mountpoint lookups or walking back
- * up the tree.
- *
- * It should be taken for write in all cases where the vfsmount
- * tree or hash is modified or when a vfsmount structure is modified.
- */
-__cacheline_aligned_in_smp DEFINE_SEQLOCK(mount_lock);
-
-static inline struct hlist_head *m_hash(struct vfsmount *mnt, struct dentry *dentry)
-{
-	unsigned long tmp = ((unsigned long)mnt / L1_CACHE_BYTES);
-	tmp += ((unsigned long)dentry / L1_CACHE_BYTES);
-	tmp = tmp + (tmp >> m_hash_shift);
-	return &mount_hashtable[tmp & m_hash_mask];
 }
 
 static inline struct hlist_head *mp_hash(struct dentry *dentry)
@@ -3584,8 +3584,8 @@ SYSCALL_DEFINE2(pivot_root, const char __user *, new_root,
 	/* make certain new is below the root */
 	if (!is_path_reachable(new_mnt, new.dentry, &root))
 		goto out4;
-	root_mp->m_count++; /* pin it so it won't go away */
 	lock_mount_hash();
+	root_mp->m_count++; /* pin it so it won't go away */
 	detach_mnt(new_mnt, &parent_path);
 	detach_mnt(root_mnt, &root_parent);
 #ifdef CONFIG_KDP_NS

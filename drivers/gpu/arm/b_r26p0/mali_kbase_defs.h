@@ -1,6 +1,6 @@
 /*
  *
- * (C) COPYRIGHT 2011-2023 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2011-2020 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -125,11 +125,6 @@
  * Minimum size in bytes of a MMU lock region, as a logarithm
  */
 #define KBASE_LOCK_REGION_MIN_SIZE_LOG2 (15)
-
-/**
- * Maximum number of GPU memory region zones
- */
-#define KBASE_REG_ZONE_MAX 4ul
 
 #include "mali_kbase_hwaccess_defs.h"
 
@@ -293,7 +288,7 @@ struct kbase_as {
  *                        it is NULL
  */
 struct kbase_mmu_table {
-	u64 *mmu_teardown_pages[MIDGARD_MMU_BOTTOMLEVEL];
+	u64 *mmu_teardown_pages;
 	struct mutex mmu_lock;
 	phys_addr_t pgd;
 	u8 group_id;
@@ -577,11 +572,8 @@ struct kbase_devfreq_opp {
  * @entry_set_ate:    program the pte to be a valid address translation entry to
  *                    encode the physical address of the actual page being mapped.
  * @entry_set_pte:    program the pte to be a valid entry to encode the physical
- *                    address of the next lower level page table and also update
- *                    the number of valid entries.
- * @entries_invalidate: clear out or invalidate a range of ptes.
- * @get_num_valid_entries: returns the number of valid entries for a specific pgd.
- * @set_num_valid_entries: sets the number of valid entries for a specific pgd
+ *                    address of the next lower level page table.
+ * @entry_invalidate: clear out or invalidate the pte.
  * @flags:            bitmask of MMU mode flags. Refer to KBASE_MMU_MODE_ constants.
  */
 struct kbase_mmu_mode {
@@ -597,10 +589,7 @@ struct kbase_mmu_mode {
 	void (*entry_set_ate)(u64 *entry, struct tagged_addr phy,
 			unsigned long flags, int level);
 	void (*entry_set_pte)(u64 *entry, phys_addr_t phy);
-    void (*entries_invalidate)(u64 *entry, u32 count);
-	unsigned int (*get_num_valid_entries)(u64 *pgd);
-	void (*set_num_valid_entries)(u64 *pgd,
-				      unsigned int num_of_valid_entries);
+	void (*entry_invalidate)(u64 *entry);
 	unsigned long flags;
 };
 
@@ -1336,21 +1325,6 @@ struct kbase_sub_alloc {
 };
 
 /**
- * struct kbase_reg_zone - Information about GPU memory region zones
- * @base_pfn: Page Frame Number in GPU virtual address space for the start of
- *            the Zone
- * @va_size_pages: Size of the Zone in pages
- *
- * Track information about a zone KBASE_REG_ZONE() and related macros.
- * In future, this could also store the &rb_root that are currently in
- * &kbase_context
- */
-struct kbase_reg_zone {
-	u64 base_pfn;
-	u64 va_size_pages;
-};
-
-/**
  * struct kbase_context - Kernel base context
  *
  * @filp:                 Pointer to the struct file corresponding to device file
@@ -1400,7 +1374,6 @@ struct kbase_reg_zone {
  * @reg_rbtree_exec:      RB tree of the memory regions allocated from the EXEC_VA
  *                        zone of the GPU virtual address space. Used for GPU-executable
  *                        allocations which don't need the SAME_VA property.
- * @reg_zone:             Zone information for the reg_rbtree_<...> members.
  * @cookies:              Bitmask containing of BITS_PER_LONG bits, used mainly for
  *                        SAME_VA allocations to defer the reservation of memory region
  *                        (from the GPU virtual address space) from base_mem_alloc
@@ -1470,13 +1443,14 @@ struct kbase_reg_zone {
  *                        Generally the reference count is incremented when the context
  *                        is scheduled in and an atom is pulled from the context's per
  *                        slot runnable tree.
+ * @mm_update_lock:       lock used for handling of special tracking page.
  * @process_mm:           Pointer to the memory descriptor of the process which
  *                        created the context. Used for accounting the physical
  *                        pages used for GPU allocations, done for the context,
- *                        to the memory consumed by the process. A reference is taken
- *                        on this descriptor for the Userspace created contexts so that
- *                        Kbase can safely access it to update the memory usage counters.
- *                        The reference is dropped on context termination.
+ *                        to the memory consumed by the process.
+ * @same_va_end:          End address of the SAME_VA zone (in 4KB page units)
+ * @exec_va_start:        Start address of the EXEC_VA zone (in 4KB page units)
+ *                        or U64_MAX if the EXEC_VA zone is uninitialized.
  * @gpu_va_end:           End address of the GPU va space (in 4KB page units)
  * @jit_va:               Indicates if a JIT_VA zone has been created.
  * @mem_profile_data:     Buffer containing the profiling information provided by
@@ -1605,10 +1579,7 @@ struct kbase_reg_zone {
  * @kinstr_jm:            Kernel job manager instrumentation context handle
  * @tl_kctx_list_node:    List item into the device timeline's list of
  *                        contexts, for timeline summarization.
- * @task:                 Pointer to the task structure of the main thread of the process
- *                        that created the Kbase context. It would be set only for the
- *                        contexts created by the Userspace and not for the contexts
- *                        created internally by the Kbase.
+ *
  * A kernel base context is an entity among which the GPU is scheduled.
  * Each context has its own GPU address space.
  * Up to one context can be created for each client that opens the device file
@@ -1643,7 +1614,6 @@ struct kbase_context {
 	struct rb_root reg_rbtree_same;
 	struct rb_root reg_rbtree_custom;
 	struct rb_root reg_rbtree_exec;
-	struct kbase_reg_zone reg_zone[KBASE_REG_ZONE_MAX];
 
 	struct kbase_jd_context jctx;
 	struct jsctx_queue jsctx_queue
@@ -1702,7 +1672,10 @@ struct kbase_context {
 
 	atomic_t refcount;
 
-        struct mm_struct *process_mm;
+	spinlock_t         mm_update_lock;
+	struct mm_struct __rcu *process_mm;
+	u64 same_va_end;
+	u64 exec_va_start;
 	u64 gpu_va_end;
 	bool jit_va;
 
@@ -1758,13 +1731,8 @@ struct kbase_context {
 #ifdef CONFIG_MALI_SEC_VK_BOOST
 	bool ctx_vk_need_qos;
 #endif
-
-	/* MALI_SEC_INTEGRATION */
-	u64 mem_usage;
-
 	struct kbase_kinstr_jm *kinstr_jm;
 	struct list_head tl_kctx_list_node;
-        struct task_struct *task;
 };
 
 #ifdef CONFIG_MALI_CINSTR_GWT
@@ -1811,7 +1779,8 @@ struct kbasep_gwt_list_element {
  */
 struct kbase_ctx_ext_res_meta {
 	struct list_head ext_res_node;
-    struct kbase_va_region *reg;
+	struct kbase_mem_phy_alloc *alloc;
+	u64 gpu_addr;
 	u32 ref;
 };
 
@@ -1839,24 +1808,6 @@ static inline bool kbase_device_is_cpu_coherent(struct kbase_device *kbdev)
 		return true;
 
 	return false;
-}
-
-/**
- * kbase_get_lock_region_min_size_log2 - Returns the minimum size of the MMU lock
- * region, as a logarithm
- *
- * @gpu_props:   GPU properties
- *
- * Return: the minimum size of the MMU lock region as dictated by the corresponding
- * arch spec.
- */
-static inline u64 kbase_get_lock_region_min_size_log2(struct kbase_gpu_props const *gpu_props)
-{
-	if (GPU_ID2_MODEL_MATCH_VALUE(gpu_props->props.core_props.product_id) >=
-	    GPU_ID2_MODEL_MAKE(12, 0))
-		return 12; /* 4 kB */
-
-	return 15; /* 32 kB */
 }
 
 /* Conversion helpers for setting up high resolution timers */

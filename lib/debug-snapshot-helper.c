@@ -554,7 +554,6 @@ int dbg_snapshot_post_panic(void)
 			dbg_snapshot_spin_func();
 		}
 	}
-
 #if defined(CONFIG_SEC_DEBUG)
 	secdbg_base_post_panic_handler();
 #endif

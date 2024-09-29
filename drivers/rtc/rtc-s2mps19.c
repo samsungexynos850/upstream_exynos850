@@ -25,12 +25,6 @@
 #include <linux/mfd/samsung/s2mps19.h>
 #include <linux/mfd/samsung/s2mps19-regulator.h>
 
-#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
-#include <linux/sec_debug.h>
-
-static unsigned long smpl_warn_number;
-#endif
-
 /*#define CONFIG_WEEKDAY_ALARM_ENABLE*/
 
 struct s2m_rtc_info {
@@ -546,10 +540,6 @@ static void exynos_smpl_warn_work(struct work_struct *work)
 		exynos9830_smpl_warn_sw_release();
 #endif
 		enable_irq(info->smpl_irq);
-#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
-		smpl_warn_number++;
-		secdbg_exin_set_smpl(smpl_warn_number);
-#endif
 	}
 }
 

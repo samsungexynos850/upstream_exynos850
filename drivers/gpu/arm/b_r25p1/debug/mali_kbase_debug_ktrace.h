@@ -107,11 +107,6 @@ void kbasep_ktrace_dump(struct kbase_device *kbdev);
 	kbasep_ktrace_add(kbdev, KBASE_KTRACE_CODE(code), kctx, 0, \
 			info_val) \
 
-/* MALI_SEC_INTEGRATION */
-#define KBASE_KTRACE_RBUF_ADD_EXYNOS(kbdev, code, kctx, info_val)     \
-        kbasep_ktrace_add(kbdev, KBASE_KTRACE_CODE(code), kctx, 0, \
-                        info_val) \
-
 #define KBASE_KTRACE_RBUF_CLEAR(kbdev) \
 	kbasep_ktrace_clear(kbdev)
 
@@ -128,16 +123,6 @@ void kbasep_ktrace_dump(struct kbase_device *kbdev);
 		CSTD_UNUSED(info_val); \
 		CSTD_NOP(0); \
 	} while (0)
-
-/* MALI_SEC_INTEGRATION */
-#define KBASE_KTRACE_RBUF_ADD_EXYNOS(kbdev, code, kctx, info_val) \
-        do { \
-                CSTD_UNUSED(kbdev); \
-                CSTD_NOP(code); \
-                CSTD_UNUSED(kctx); \
-                CSTD_UNUSED(info_val); \
-                CSTD_NOP(0); \
-        } while (0)
 
 #define KBASE_KTRACE_RBUF_CLEAR(kbdev) \
 	do { \
@@ -160,10 +145,6 @@ void kbasep_ktrace_dump(struct kbase_device *kbdev);
 #define KBASE_KTRACE_FTRACE_ADD(kbdev, code, kctx, info_val) \
 	trace_mali_##code(info_val)
 
-/* MALI_SEC_INTEGRATION */
-#define KBASE_KTRACE_FTRACE_ADD_EXYNOS(kbdev, code, kctx, info_val) \
-        trace_mali_##code(info_val)
-
 #else /* KBASE_KTRACE_TARGET_FTRACE */
 #define KBASE_KTRACE_FTRACE_ADD(kbdev, code, kctx, info_val) \
 	do { \
@@ -173,16 +154,6 @@ void kbasep_ktrace_dump(struct kbase_device *kbdev);
 		CSTD_UNUSED(info_val); \
 		CSTD_NOP(0); \
 	} while (0)
-
-/* MALI_SEC_INTEGRATION */
-#define KBASE_KTRACE_FTRACE_ADD_EXYNOS(kbdev, code, kctx, info_val) \
-        do { \
-                CSTD_UNUSED(kbdev); \
-                CSTD_NOP(code); \
-                CSTD_UNUSED(kctx); \
-                CSTD_UNUSED(info_val); \
-                CSTD_NOP(0); \
-        } while (0)
 #endif /* KBASE_KTRACE_TARGET_FTRACE */
 
 /* No 'clear' implementation for ftrace yet */
@@ -230,8 +201,8 @@ void kbasep_ktrace_dump(struct kbase_device *kbdev);
 	do { \
 		/* capture values that could come from non-pure function calls */ \
 		u64 __info_val = info_val; \
-                KBASE_KTRACE_RBUF_ADD_EXYNOS(kbdev, code, kctx, __info_val); \
-                KBASE_KTRACE_FTRACE_ADD_EXYNOS(kbdev, code, kctx, __info_val); \
+                KBASE_KTRACE_RBUF_ADD(kbdev, code, kctx, __info_val); \
+                KBASE_KTRACE_FTRACE_ADD(kbdev, code, kctx, __info_val); \
 	} while (0)
 
 /**

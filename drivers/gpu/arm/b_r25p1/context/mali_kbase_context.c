@@ -116,7 +116,7 @@ void kbase_context_common_term(struct kbase_context *kctx)
 	list_del(&kctx->kctx_list_link);
 	mutex_unlock(&kctx->kbdev->kctx_list_lock);
 
-	KBASE_KTRACE_ADD(kctx->kbdev, CORE_CTX_DESTROY, kctx, 0u);
+	KBASE_KTRACE_ADD(kctx->kbdev, CORE_CTX_DESTROY, kctx, kctx->tgid);
 
 	/* Flush the timeline stream, so the user can see the termination
 	 * tracepoints being fired.

@@ -8,9 +8,6 @@ menu "File systems"
 config DCACHE_WORD_ACCESS
        bool
 
-config INTERRUPTIBLE_SYNC
-    bool "Support interruptible sync for Samsung Mobile Device"
-
 if BLOCK
 
 config FS_IOMAP
@@ -36,6 +33,7 @@ source "fs/ocfs2/Kconfig"
 source "fs/btrfs/Kconfig"
 source "fs/nilfs2/Kconfig"
 source "fs/f2fs/Kconfig"
+source "fs/erofs/Kconfig"
 
 config FS_DAX
 	bool "Direct Access (DAX) support"
@@ -241,7 +239,6 @@ source "fs/orangefs/Kconfig"
 source "fs/adfs/Kconfig"
 source "fs/affs/Kconfig"
 source "fs/ecryptfs/Kconfig"
-source "fs/sdcardfs/Kconfig"
 source "fs/hfs/Kconfig"
 source "fs/hfsplus/Kconfig"
 source "fs/befs/Kconfig"

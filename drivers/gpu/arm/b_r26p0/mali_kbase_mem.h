@@ -1,6 +1,6 @@
 /*
  *
- * (C) COPYRIGHT 2010-2023 ARM Limited. All rights reserved.
+ * (C) COPYRIGHT 2010-2020 ARM Limited. All rights reserved.
  *
  * This program is free software and is provided to you under the terms of the
  * GNU General Public License version 2 as published by the Free Software
@@ -311,13 +311,8 @@ struct kbase_va_region {
 #define KBASE_REG_SHARE_BOTH        (1ul << 10)
 
 /* Space for 4 different zones */
-#define KBASE_REG_ZONE_MASK         ((KBASE_REG_ZONE_MAX - 1ul) << 11)
-#define KBASE_REG_ZONE(x)           (((x) & (KBASE_REG_ZONE_MAX - 1ul)) << 11)
-#define KBASE_REG_ZONE_IDX(x)       (((x) & KBASE_REG_ZONE_MASK) >> 11)
-
-#if ((KBASE_REG_ZONE_MAX - 1) & 0x3) != (KBASE_REG_ZONE_MAX - 1)
-#error KBASE_REG_ZONE_MAX too large for allocation of KBASE_REG_<...> bits
-#endif
+#define KBASE_REG_ZONE_MASK         (3ul << 11)
+#define KBASE_REG_ZONE(x)           (((x) & 3) << 11)
 
 /* GPU read access */
 #define KBASE_REG_GPU_RD            (1ul<<13)
@@ -805,9 +800,7 @@ void kbase_mem_pool_free_locked(struct kbase_mem_pool *pool, struct page *p,
  * @pages:    Pointer to array where the physical address of the allocated
  *            pages will be stored.
  * @partial_allowed: If fewer pages allocated is allowed
- * @page_owner: Pointer to the task that created the Kbase context for which
- *              the pages are being allocated. It can be NULL if the pages
- *              won't be associated with any Kbase context.
+ *
  * Like kbase_mem_pool_alloc() but optimized for allocating many pages.
  *
  * Return:
@@ -823,7 +816,7 @@ void kbase_mem_pool_free_locked(struct kbase_mem_pool *pool, struct page *p,
  * this lock, it should use kbase_mem_pool_alloc_pages_locked() instead.
  */
 int kbase_mem_pool_alloc_pages(struct kbase_mem_pool *pool, size_t nr_4k_pages,
-		struct tagged_addr *pages, bool partial_allowed, struct task_struct *page_owner);
+		struct tagged_addr *pages, bool partial_allowed);
 
 /**
  * kbase_mem_pool_alloc_pages_locked - Allocate pages from memory pool
@@ -935,15 +928,13 @@ void kbase_mem_pool_set_max_size(struct kbase_mem_pool *pool, size_t max_size);
  * kbase_mem_pool_grow - Grow the pool
  * @pool:       Memory pool to grow
  * @nr_to_grow: Number of pages to add to the pool
- * @page_owner: Pointer to the task that created the Kbase context for which
- *              the memory pool is being grown. It can be NULL if the pages
- *              to be allocated won't be associated with any Kbase context.
+ *
  * Adds @nr_to_grow pages to the pool. Note that this may cause the pool to
  * become larger than the maximum size specified.
  *
  * Returns: 0 on success, -ENOMEM if unable to allocate sufficent pages
  */
-int kbase_mem_pool_grow(struct kbase_mem_pool *pool, size_t nr_to_grow,struct task_struct *page_owner);
+int kbase_mem_pool_grow(struct kbase_mem_pool *pool, size_t nr_to_grow);
 
 /**
  * kbase_mem_pool_trim - Grow or shrink the pool to a new size
@@ -1100,9 +1091,7 @@ int kbase_alloc_phy_pages(struct kbase_va_region *reg, size_t vsize, size_t size
  *
  * Call kbase_add_va_region() and map the region on the GPU.
  */
-int kbase_gpu_mmap(struct kbase_context *kctx, struct kbase_va_region *reg,
-		   u64 addr, size_t nr_pages, size_t align,
-		   enum kbase_caller_mmu_sync_info mmu_sync_info);
+int kbase_gpu_mmap(struct kbase_context *kctx, struct kbase_va_region *reg, u64 addr, size_t nr_pages, size_t align);
 
 /**
  * @brief Remove the region from the GPU and unregister it.
@@ -1154,7 +1143,6 @@ void kbase_mmu_disable_as(struct kbase_device *kbdev, int as_nr);
 
 void kbase_mmu_interrupt(struct kbase_device *kbdev, u32 irq_stat);
 
-#if defined(CONFIG_MALI_VECTOR_DUMP)
 /** Dump the MMU tables to a buffer
  *
  * This function allocates a buffer (of @c nr_pages pages) to hold a dump of the MMU tables and fills it. If the
@@ -1171,7 +1159,7 @@ void kbase_mmu_interrupt(struct kbase_device *kbdev, u32 irq_stat);
  * small)
  */
 void *kbase_mmu_dump(struct kbase_context *kctx, int nr_pages);
-#endif
+
 /**
  * kbase_sync_now - Perform cache maintenance on a memory region
  *
@@ -1714,28 +1702,25 @@ bool kbase_has_exec_va_zone(struct kbase_context *kctx);
 /**
  * kbase_map_external_resource - Map an external resource to the GPU.
  * @kctx:              kbase context.
- * @reg:               External resource to map.
+ * @reg:               The region to map.
  * @locked_mm:         The mm_struct which has been locked for this operation.
  *
- * On successful mapping, the VA region and the gpu_alloc refcounts will be
- * increased, making it safe to use and store both values directly.
- *
- * Return: Zero on success, or negative error code.
+ * Return: The physical allocation which backs the region on success or NULL
+ * on failure.
  */
-int kbase_map_external_resource(struct kbase_context *kctx, struct kbase_va_region *reg,
-				struct mm_struct *locked_mm);
+struct kbase_mem_phy_alloc *kbase_map_external_resource(
+		struct kbase_context *kctx, struct kbase_va_region *reg,
+		struct mm_struct *locked_mm);
 
 /**
  * kbase_unmap_external_resource - Unmap an external resource from the GPU.
  * @kctx:  kbase context.
- * @reg:   VA region corresponding to external resource
- *
- * On successful unmapping, the VA region and the gpu_alloc refcounts will
- * be decreased. If the refcount reaches zero, both @reg and the corresponding
- * allocation may be freed, so using them after returning from this function
- * requires the caller to explicitly check their state.
+ * @reg:   The region to unmap or NULL if it has already been released.
+ * @alloc: The physical allocation being unmapped.
  */
-void kbase_unmap_external_resource(struct kbase_context *kctx, struct kbase_va_region *reg);
+void kbase_unmap_external_resource(struct kbase_context *kctx,
+		struct kbase_va_region *reg, struct kbase_mem_phy_alloc *alloc);
+
 
 /**
  * kbase_jd_user_buf_pin_pages - Pin the pages of a user buffer.
@@ -1904,108 +1889,5 @@ int kbase_mem_do_sync_imported(struct kbase_context *kctx,
 int kbase_mem_copy_to_pinned_user_pages(struct page **dest_pages,
 		void *src_page, size_t *to_copy, unsigned int nr_pages,
 		unsigned int *target_page_nr, size_t offset);
-
-/**
- * kbase_ctx_reg_zone_end_pfn - return the end Page Frame Number of @zone
- * @zone: zone to query
- *
- * Return: The end of the zone corresponding to @zone
- */
-static inline u64 kbase_reg_zone_end_pfn(struct kbase_reg_zone *zone)
-{
-	return zone->base_pfn + zone->va_size_pages;
-}
-
-/**
- * kbase_ctx_reg_zone_init - initialize a zone in @kctx
- * @kctx: Pointer to kbase context
- * @zone_bits: A KBASE_REG_ZONE_<...> to initialize
- * @base_pfn: Page Frame Number in GPU virtual address space for the start of
- *            the Zone
- * @va_size_pages: Size of the Zone in pages
- */
-static inline void kbase_ctx_reg_zone_init(struct kbase_context *kctx,
-					   unsigned long zone_bits,
-					   u64 base_pfn, u64 va_size_pages)
-{
-	struct kbase_reg_zone *zone;
-
-	lockdep_assert_held(&kctx->reg_lock);
-	WARN_ON((zone_bits & KBASE_REG_ZONE_MASK) != zone_bits);
-
-	zone = &kctx->reg_zone[KBASE_REG_ZONE_IDX(zone_bits)];
-	*zone = (struct kbase_reg_zone){
-		.base_pfn = base_pfn, .va_size_pages = va_size_pages,
-	};
-}
-
-/**
- * kbase_ctx_reg_zone_get_nolock - get a zone from @kctx where the caller does
- *                                 not have @kctx 's region lock
- * @kctx: Pointer to kbase context
- * @zone_bits: A KBASE_REG_ZONE_<...> to retrieve
- *
- * This should only be used in performance-critical paths where the code is
- * resilient to a race with the zone changing.
- *
- * Return: The zone corresponding to @zone_bits
- */
-static inline struct kbase_reg_zone *
-kbase_ctx_reg_zone_get_nolock(struct kbase_context *kctx,
-			      unsigned long zone_bits)
-{
-	WARN_ON((zone_bits & KBASE_REG_ZONE_MASK) != zone_bits);
-
-	return &kctx->reg_zone[KBASE_REG_ZONE_IDX(zone_bits)];
-}
-
-/**
- * kbase_ctx_reg_zone_get - get a zone from @kctx
- * @kctx: Pointer to kbase context
- * @zone_bits: A KBASE_REG_ZONE_<...> to retrieve
- *
- * The get is not refcounted - there is no corresponding 'put' operation
- *
- * Return: The zone corresponding to @zone_bits
- */
-static inline struct kbase_reg_zone *
-kbase_ctx_reg_zone_get(struct kbase_context *kctx, unsigned long zone_bits)
-{
-	lockdep_assert_held(&kctx->reg_lock);
-	WARN_ON((zone_bits & KBASE_REG_ZONE_MASK) != zone_bits);
-
-	return &kctx->reg_zone[KBASE_REG_ZONE_IDX(zone_bits)];
-}
-
-/*
- * kbase_mem_mmgrab - Wrapper function to take reference on mm_struct of current process
- */
-static inline void kbase_mem_mmgrab(void)
-{
-        /* This merely takes a reference on the memory descriptor structure
-        * i.e. mm_struct of current process and not on its address space and
-        * so won't block the freeing of address space on process exit.
-        */
-#if KERNEL_VERSION(4, 11, 0) > LINUX_VERSION_CODE
-        atomic_inc(&current->mm->mm_count);
-#else
-        mmgrab(current->mm);
-#endif
-}
-/**
- * kbase_mem_allow_alloc - Check if allocation of GPU memory is allowed
- * @kctx: Pointer to kbase context
- *
- * Don't allow the allocation of GPU memory if the ioctl has been issued
- * from the forked child process using the mali device file fd inherited from
- * the parent process.
- *
- * Return: true if allocation is allowed.
- */
-static inline bool kbase_mem_allow_alloc(struct kbase_context *kctx)
-{
-        return (kctx->process_mm == current->mm);
-}
-
 
 #endif				/* _KBASE_MEM_H_ */

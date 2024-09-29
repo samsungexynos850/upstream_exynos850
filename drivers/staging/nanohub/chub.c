@@ -42,9 +42,7 @@
 #include "main.h"
 #endif
 
-#ifdef CONFIG_SENSORS_SSP
-#include "../../sensorhub/ssp_platform.h"
-#elif defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 #include "../../sensorhub/vendor/shub_helper.h"
 #endif
 
@@ -90,7 +88,7 @@ static int chub_wait_event(struct chub_alive *event, int timeout)
 						 msecs_to_jiffies(timeout));
 }
 
-#if defined(CONFIG_SENSORS_SSP) || defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 int contexthub_get_token(struct contexthub_ipc_info *ipc)
 #else
 static int contexthub_get_token(struct contexthub_ipc_info *ipc)
@@ -103,7 +101,7 @@ static int contexthub_get_token(struct contexthub_ipc_info *ipc)
 	return 0;
 }
 
-#if defined(CONFIG_SENSORS_SSP) || defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 void contexthub_put_token(struct contexthub_ipc_info *ipc)
 #else
 static void contexthub_put_token(struct contexthub_ipc_info *ipc)
@@ -961,7 +959,7 @@ int contexthub_poweron(struct contexthub_ipc_info *ipc)
 {
 	int ret = 0;
 	struct device *dev = ipc->dev;
-#if !defined(CONFIG_SENSORS_SSP) && !defined(CONFIG_SHUB)
+#if !defined(CONFIG_SHUB)
 	struct chub_bootargs *map;
 #endif
 
@@ -982,7 +980,7 @@ int contexthub_poweron(struct contexthub_ipc_info *ipc)
 			return ret;
 		}
 
-#if !defined(CONFIG_SENSORS_SSP) && !defined(CONFIG_SHUB)
+#if !defined(CONFIG_SHUB)
 		if (!strcmp(ipc->os_name, "os.checked_0.bin") || ipc->os_name[0] != 'o') {
 			map = ipc_get_base(IPC_REG_BL_MAP);
 			ipc->sel_os = !(map->bootmode);
@@ -1203,10 +1201,7 @@ out:
 	__pm_relax(&ipc->ws_reset);
 	atomic_dec(&ipc->in_reset);
 
-#ifdef CONFIG_SENSORS_SSP
-	if (!ret)
-		ssp_platform_start_refrsh_task();
-#elif defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 	if (!ret)
 		shub_start_refresh_task();
 #endif
@@ -1224,18 +1219,13 @@ int contexthub_download_image(struct contexthub_ipc_info *ipc, enum ipc_region r
 
 	if (reg == IPC_REG_BL) {
 		dev_info(ipc->dev, "%s: download bl\n", __func__);
-#if defined(CONFIG_SENSORS_SSP)
-		ret = request_firmware(&entry, SSP_BOOTLOADER_FILE, ipc->dev);
-#elif defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 		ret = request_firmware(&entry, BOOTLOADER_FILE, ipc->dev);
 #else
 		ret = request_firmware(&entry, "bl.unchecked.bin", ipc->dev);
 #endif
 	} else if (reg == IPC_REG_OS) {
-#ifdef CONFIG_SENSORS_SSP
-		ret = ssp_download_firmware(ipc_get_base(reg));
-		return ret;
-#elif defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 		ret = shub_download_firmware(ipc_get_base(reg));
 		return ret;
 #else
@@ -1294,7 +1284,7 @@ static void handle_irq(struct contexthub_ipc_info *ipc, enum irq_evt_chub evt)
 		break;
 	default:
 		if (evt < IRQ_EVT_CH_MAX) {
-#if defined(CONFIG_SENSORS_SSP) || defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 			int size = 0;
 			char rx_buf[PACKET_SIZE_MAX] = {0,};
 			void *raw_rx_buf = 0;
@@ -1302,11 +1292,7 @@ static void handle_irq(struct contexthub_ipc_info *ipc, enum irq_evt_chub evt)
 			raw_rx_buf = ipc_read_data(IPC_DATA_C2A, &size);
 			if (size > 0 && raw_rx_buf) {
 				memcpy_fromio(rx_buf, (void *)raw_rx_buf, size);
-#if defined(CONFIG_SENSORS_SSP)
-				ssp_handle_recv_packet(rx_buf, size);
-#else
 				shub_handle_recv_packet(rx_buf, size);
-#endif
 			}
 			/* check : ipc_read err handle */
 
@@ -1586,7 +1572,7 @@ static __init int contexthub_ipc_hw_init(struct platform_device *pdev,
 	}
 
 	/* request irq handler */
-#if defined(CONFIG_SENSORS_SSP) || defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 	ret = devm_request_threaded_irq(dev, chub->irq_mailbox, NULL, contexthub_irq_handler,
 			       IRQF_ONESHOT, dev_name(dev), chub);
 #else
@@ -1734,12 +1720,7 @@ static ssize_t chub_poweron(struct device *dev,
 	struct contexthub_ipc_info *ipc = dev_get_drvdata(dev);
 	int ret = contexthub_poweron(ipc);
 
-#ifdef CONFIG_SENSORS_SSP
-	if (ret < 0)
-		dev_err(dev, "poweron failed %d\n", ret);
-	else
-		ssp_platform_start_refrsh_task();
-#elif defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 	if (ret < 0)
 		dev_err(dev, "poweron failed %d\n", ret);
 	else
@@ -1800,9 +1781,9 @@ static int chub_panic_handler(struct notifier_block *nb,
 }
 
 static struct notifier_block chub_panic_notifier = {
-	.notifier_call  = chub_panic_handler,
-	.next           = NULL,
-	.priority       = 0     /* priority: INT_MAX >= x >= 0 */
+        .notifier_call  = chub_panic_handler,
+        .next           = NULL,
+        .priority       = 0     /* priority: INT_MAX >= x >= 0 */
 };
 
 static int contexthub_ipc_probe(struct platform_device *pdev)
@@ -1849,16 +1830,7 @@ static int contexthub_ipc_probe(struct platform_device *pdev)
 	chub->data->irq1 = IRQ_EVT_A2C_WAKEUP;
 	chub->data->irq2 = 0;
 #endif
-#ifdef CONFIG_SENSORS_SSP
-	ret = ssp_device_probe(pdev);
-	if (ret < 0) {
-		dev_err(&pdev->dev, "%s failed to probe ssp %d\n",
-			__func__, ret);
-		goto err;
-	}
-	ssp_platform_init(chub);
-	ssp_set_firmware_name(chub->os_name);
-#elif defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 	ret = sensorhub_device_probe(pdev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "%s failed to probe shub %d\n",
@@ -1929,9 +1901,7 @@ static int contexthub_ipc_remove(struct platform_device *pdev)
 	struct contexthub_ipc_info *chub = platform_get_drvdata(pdev);
 
 	wakeup_source_trash(&chub->ws_reset);
-#ifdef CONFIG_SENSORS_SSP
-	ssp_device_remove(pdev);
-#elif defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 	sensorhub_device_shutdown(pdev);
 #endif
 	return 0;
@@ -2012,9 +1982,7 @@ static int contexthub_prepare(struct device *dev)
 	pr_info("%s\n", __func__);
 	ipc_hw_write_shared_reg(AP, AP_PREPARE, SR_3);
 	ipc_hw_gen_interrupt(AP, IRQ_EVT_CHUB_ALIVE);
-#ifdef CONFIG_SENSORS_SSP
-	ssp_device_suspend(dev);
-#elif defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 	sensorhub_device_prepare(dev);
 #endif
 
@@ -2032,9 +2000,7 @@ static void contexthub_complete(struct device *dev)
 	disable_irq(ipc->irq_mailbox);
 	contexthub_alive_noirq(ipc, AP_COMPLETE);
 	enable_irq(ipc->irq_mailbox);
-#ifdef CONFIG_SENSORS_SSP
-	ssp_device_resume(dev);
-#elif defined(CONFIG_SHUB)
+#ifdef CONFIG_SHUB
 	sensorhub_device_complete(dev);
 #endif
 }

@@ -40,6 +40,7 @@ struct sec_ttf_data {
 	unsigned int ttf_dc25_charge_current;
 	unsigned int ttf_dc45_charge_current;
 	unsigned int ttf_predict_wc20_charge_current;
+	unsigned int ttf_fpdo_dc_charge_current;
 
 	struct sec_cv_slope *cv_data;
 	int cv_data_length;
@@ -50,10 +51,11 @@ struct sec_ttf_data {
 
 int sec_calc_ttf(struct sec_battery_info * battery, unsigned int ttf_curr);
 extern void sec_bat_calc_time_to_full(struct sec_battery_info * battery);
+void sec_bat_predict_wc20_time_to_full_current(struct sec_battery_info *battery, int rx_power);
 extern void sec_bat_time_to_full_work(struct work_struct *work);
 extern void ttf_init(struct sec_battery_info *battery);
 extern void ttf_work_start(struct sec_battery_info *battery);
-extern int ttf_display(struct sec_battery_info *battery);
+extern int ttf_display(unsigned int capacity, int bat_sts, int thermal_zone, int time);
 #ifdef CONFIG_OF
 int sec_ttf_parse_dt(struct sec_battery_info *battery);
 #endif

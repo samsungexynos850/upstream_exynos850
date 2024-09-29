@@ -196,5 +196,5 @@ config SCSC_MEMLOG
 config SCSC_MX152_EXT_DUAL_FEM
 	bool "Enable dual fem for MX152"
 	default n
-	help
+	---help---
 		Enable dual fem for MX152

@@ -31,6 +31,7 @@
 #if defined(CONFIG_CAL_IF)
 #include <soc/samsung/cal-if.h>
 #endif
+#include <linux/sec_debug.h>
 
 #if defined(CONFIG_SOC_EXYNOS3830) && defined(CONFIG_ARM_EXYNOS_DEVFREQ)
 #include <dt-bindings/soc/samsung/exynos3830-devfreq.h>
@@ -51,6 +52,7 @@
 #include "decon.h"
 #include "dsim.h"
 #include "./panels/exynos_panel_drv.h"
+
 
 int dsim_log_level = 6;
 
@@ -438,6 +440,24 @@ err_exit:
 
 }
 
+static bool __wait_send_cmds(struct dsim_device *dsim)
+{
+	bool empty;
+
+	empty = dsim_is_fifo_empty_status(dsim);
+
+	if (!empty)
+		return false;
+
+	if (dsim->wait_lp11) {
+		if (dsim_reg_get_datalane_status(dsim->id) !=
+				DSIM_DATALANE_STATUS_STOPDATA)
+			return true;
+	}
+
+	return false;
+}
+
 int dsim_write_data(struct dsim_device *dsim, u32 id, unsigned long d0, u32 d1, bool wait_empty)
 {
 	int ret = 0;
@@ -453,6 +473,7 @@ int dsim_write_data(struct dsim_device *dsim, u32 id, unsigned long d0, u32 d1, 
 		ret = -EINVAL;
 		goto err_exit;
 	}
+	dsi_write_data_dump(dsim, id, d0, d1);
 
 	reinit_completion(&dsim->ph_wr_comp);
 	dsim_reg_clear_int(dsim->id, DSIM_INTSRC_SFR_PH_FIFO_EMPTY);
@@ -533,7 +554,7 @@ int dsim_write_data(struct dsim_device *dsim, u32 id, unsigned long d0, u32 d1, 
 
 	if (wait_empty) {
 		do {
-			if (dsim_is_fifo_empty_status(dsim))
+			if (!__wait_send_cmds(dsim))
 				break;
 			udelay(10);
 		} while (cnt--);
@@ -600,8 +621,12 @@ int dsim_read_data(struct dsim_device *dsim, u32 id, u32 addr, u32 cnt, u8 *buf)
 		if (ret == DSIM_DATALANE_STATUS_BTA) {
 			if (decon && decon_reg_get_run_status(decon->id))
 				dpu_hw_recovery_process(decon);
-			else
-				dsim_reg_recovery_process(dsim);
+			else {
+				if (decon && ktime_to_ms(decon->vsync.timestamp) != 0)
+					dsim_reg_recovery_process(dsim);
+				else
+					pr_warn("skip recovery, timestamp is 0\n");
+			}
 		} else {
 			dsim_err("datalane status is %d\n", ret);
 		}
@@ -807,6 +832,16 @@ exit:
 #endif
 #endif
 
+int dsim_set_wait_lp11_after_cmds(struct dsim_device *dsim, bool en)
+{
+	if (!dsim)
+		return -EINVAL;
+
+	dsim_info("DSIM wait LP11 after sending cmds(%d)\n", en);
+	dsim->wait_lp11 = en;
+	return 0;
+}
+
 #if defined(CONFIG_EXYNOS_BTS)
 static void dsim_bts_print_info(struct bts_decon_info *info)
 {
@@ -852,13 +887,14 @@ static void dsim_underrun_info(struct dsim_device *dsim)
 		decon = get_decon_drvdata(i);
 
 		if (decon) {
-			dsim_info("\tDECON%d: bw(%u %u), disp(%u %u), p(%u)\n",
+			dsim_info("\tDECON%d: bw(%u %u), disp(%u %u), p(%u), L(%u)\n",
 					decon->id,
 					decon->bts.prev_total_bw,
 					decon->bts.total_bw,
 					decon->bts.prev_max_disp_freq,
 					decon->bts.max_disp_freq,
-					decon->bts.peak);
+					decon->bts.peak,
+					decon->bts.prev_minlock_stage);
 			dsim_bts_print_info(&decon->bts.bts_info);
 		}
 	}
@@ -904,15 +940,25 @@ static irqreturn_t dsim_irq_handler(int irq, void *dev_id)
 	if (int_src & DSIM_INTSRC_UNDER_RUN) {
 		dsim->total_underrun_cnt++;
 		dsim->continuous_underrun_cnt++;
-		dsim_info("dsim%d underrun irq occurs total(%d) cont(%d)\n", dsim->id,
-				dsim->total_underrun_cnt, dsim->continuous_underrun_cnt);
-		dsim_underrun_info(dsim);
+		if (dsim->continuous_underrun_cnt == 1) {
+			dsim_info("dsim%d underrun irq occurs total(%d) cont(%d)\n", dsim->id,
+					dsim->total_underrun_cnt, dsim->continuous_underrun_cnt);
+			dsim_underrun_info(dsim);
+		}
+
+		if (!dsim->panel)
+			goto exit;
 
 		if (dsim->panel->lcd_info.mode == DECON_VIDEO_MODE) {
-			line_cnt = dsim_reg_get_linecount(dsim->id, dsim->panel->lcd_info.mode);
-			dsim_info("dsim%d line_count: (%08x)\n", dsim->id, line_cnt);
+			if (dsim->continuous_underrun_cnt == 1) {
+				line_cnt = dsim_reg_get_linecount(dsim->id, dsim->panel->lcd_info.mode);
+				dsim_info("dsim%d line_count: (%08x)\n", dsim->id, line_cnt);
+			}
 			if (decon && dsim->continuous_underrun_max > 0 &&
 					(dsim->continuous_underrun_cnt >= dsim->continuous_underrun_max)) {
+				dsim_info("dsim%d underrun irq occurs total(%d) cont(%d)\n", dsim->id,
+					dsim->total_underrun_cnt, dsim->continuous_underrun_cnt);
+				dsim_underrun_info(dsim);
 				decon_dump(decon, false);
 				dsim_dump(dsim, false);
 				BUG();
@@ -929,6 +975,8 @@ static irqreturn_t dsim_irq_handler(int irq, void *dev_id)
 		}
 	}
 
+
+exit:
 	spin_unlock(&dsim->slock);
 
 	return IRQ_HANDLED;
@@ -1378,11 +1426,17 @@ static int dsim_set_freq_hop(struct dsim_device *dsim, struct decon_freq_hop *fr
 
 static int dsim_free_fb_resource(struct dsim_device *dsim)
 {
+	int upload_mode = secdbg_mode_enter_upload();
+
 	/* unmap */
 	iovmm_unmap_oto(dsim->dev, dsim->fb_handover.phys_addr);
 
-	/* unreserve memory */
-	of_reserved_mem_device_release(dsim->dev);
+	if (upload_mode) {
+		dsim_info("%s: rmem_release skip! upload_mode:(%d)\n", __func__, upload_mode);
+	} else {
+		/* unreserve memory */
+		of_reserved_mem_device_release(dsim->dev);
+	}
 
 	/* update state */
 	dsim->fb_handover.reserved = false;
@@ -2059,6 +2113,7 @@ static int dsim_register_panel(struct dsim_device *dsim)
 		dsim->clks.esc_clk = dsim->panel->lcd_info.esc_clk;
 		dsim->data_lane_cnt = dsim->panel->lcd_info.data_lane;
 		dsim->continuous_underrun_max = dsim->panel->lcd_info.continuous_underrun_max;
+		dsim->wait_lp11 = dsim->panel->lcd_info.wait_lp11;
 		dsim_info("panel is already found in panel driver\n");
 		return 0;
 	}
@@ -2383,3 +2438,4 @@ RESERVEDMEM_OF_DECLARE(fb_handover, "exynos,fb_handover", fb_handover_setup);
 MODULE_AUTHOR("Yeongran Shin <yr613.shin@samsung.com>");
 MODULE_DESCRIPTION("Samusung EXYNOS DSIM driver");
 MODULE_LICENSE("GPL");
+

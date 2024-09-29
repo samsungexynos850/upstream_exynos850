@@ -724,8 +724,7 @@ static void itmon_report_traceinfo(struct itmon_dev *itmon,
 	if (!traceinfo->dirty)
 		return;
 
-	pr_auto(ASL3,
-		"\n--------------------------------------------------------------------------\n"
+	pr_auto(ASL3, "\n--------------------------------------------------------------------------\n"
 		"      Transaction Information\n\n"
 		"      > Master         : %s %s\n"
 		"      > Target         : %s\n"
@@ -754,8 +753,7 @@ static void itmon_report_traceinfo(struct itmon_dev *itmon,
 	if (node) {
 		struct itmon_tracedata *tracedata = &node->tracedata;
 
-		pr_auto(ASL3,
-			"\n      > Size           : %u bytes x %u burst => %u bytes\n"
+		pr_auto(ASL3, "\n      > Size           : %u bytes x %u burst => %u bytes\n"
 			"      > Burst Type     : %u (0:FIXED, 1:INCR, 2:WRAP)\n"
 			"      > Level          : %s\n"
 			"      > Protection     : %s\n",
@@ -766,8 +764,7 @@ static void itmon_report_traceinfo(struct itmon_dev *itmon,
 			(BIT_AXPROT(tracedata->ext_info_2) & 0x2) ? "Non-secure access" : "Secure access");
 
 		group = node->group;
-		pr_auto(ASL3,
-			"\n      > Path Type      : %s\n"
+		pr_auto(ASL3, "\n      > Path Type      : %s\n"
 			"--------------------------------------------------------------------------\n",
 			itmon_pathtype[traceinfo->path_type == -1 ? group->bus_type : traceinfo->path_type]);
 
@@ -785,8 +782,7 @@ static void itmon_report_pathinfo(struct itmon_dev *itmon,
 	struct itmon_traceinfo *traceinfo = &pdata->traceinfo[trans_type];
 
 	if (!traceinfo->path_dirty) {
-		pr_auto(ASL3,
-			"\n--------------------------------------------------------------------------\n"
+		pr_auto(ASL3, "\n--------------------------------------------------------------------------\n"
 			"      ITMON Report (%s)\n"
 			"--------------------------------------------------------------------------\n"
 			"      PATH Information\n\n",
@@ -795,23 +791,19 @@ static void itmon_report_pathinfo(struct itmon_dev *itmon,
 	}
 	switch (node->type) {
 	case M_NODE:
-		pr_auto(ASL3,
-			"\n      > %14s, %8s(0x%08X)\n",
+		pr_auto(ASL3, "\n      > %14s, %8s(0x%08X)\n",
 			node->name, "M_NODE", node->phy_regs + tracedata->offset);
 		break;
 	case T_S_NODE:
-		pr_auto(ASL3,
-			"\n      > %14s, %8s(0x%08X)\n",
+		pr_auto(ASL3, "\n      > %14s, %8s(0x%08X)\n",
 			node->name, "T_S_NODE", node->phy_regs + tracedata->offset);
 		break;
 	case T_M_NODE:
-		pr_auto(ASL3,
-			"\n      > %14s, %8s(0x%08X)\n",
+		pr_auto(ASL3, "\n      > %14s, %8s(0x%08X)\n",
 			node->name, "T_M_NODE", node->phy_regs + tracedata->offset);
 		break;
 	case S_NODE:
-		pr_auto(ASL3,
-			"\n      > %14s, %8s(0x%08X)\n",
+		pr_auto(ASL3, "\n      > %14s, %8s(0x%08X)\n",
 			node->name, "S_NODE", node->phy_regs + tracedata->offset);
 		break;
 	}
@@ -1016,8 +1008,7 @@ static void itmon_route_tracedata(struct itmon_dev *itmon)
 
 	if (pdata->traceinfo[TRANS_TYPE_READ].dirty ||
 		pdata->traceinfo[TRANS_TYPE_WRITE].dirty)
-		pr_auto(ASL3,
-			"\n      Raw Register Information(ITMON Internal Information)\n\n");
+		pr_err("\n      Raw Register Information(ITMON Internal Information)\n\n");
 
 	for (trans_type = 0; trans_type < TRANS_TYPE_NUM; trans_type++) {
 		for (i = M_NODE; i < NODE_TYPE; i++) {
@@ -1081,8 +1072,7 @@ static void itmon_trace_data(struct itmon_dev *itmon,
 		/* Only NOT S-Node is able to make log to registers */
 		break;
 	default:
-		pr_auto(ASL3,
-			"Unknown Error - node:%s offset:%u\n", node->name, offset);
+		pr_auto(ASL3, "Unknown Error - node:%s offset:%u\n", node->name, offset);
 		break;
 	}
 
@@ -1109,8 +1099,7 @@ static void itmon_trace_data(struct itmon_dev *itmon,
 
 		list_add(&new_node->list, &pdata->tracelist[read]);
 	} else {
-		pr_auto(ASL3,
-			"failed to kmalloc for %s node %x offset\n",
+		pr_auto(ASL3, "failed to kmalloc for %s node %x offset\n",
 			node->name, offset);
 	}
 }

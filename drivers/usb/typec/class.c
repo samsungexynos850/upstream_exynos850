@@ -502,8 +502,10 @@ typec_register_altmode(struct device *parent,
 	int ret;
 
 	alt = kzalloc(sizeof(*alt), GFP_KERNEL);
-	if (!alt)
+	if (!alt) {
+		altmode_id_remove(parent, id);
 		return ERR_PTR(-ENOMEM);
+	}
 
 	alt->adev.svid = desc->svid;
 	alt->adev.mode = desc->mode;
@@ -586,8 +588,7 @@ static ssize_t supports_usb_power_delivery_show(struct device *dev,
 {
 	struct typec_partner *p = to_typec_partner(dev);
 
-	pr_info("%s usb_pd=%d\n", __func__, p->usb_pd);
-
+	pr_info("%s: %s\n", __func__, p->usb_pd ? "yes" : "no");
 	return sprintf(buf, "%s\n", p->usb_pd ? "yes" : "no");
 }
 static DEVICE_ATTR_RO(supports_usb_power_delivery);
@@ -712,7 +713,7 @@ void typec_unregister_partner(struct typec_partner *partner)
 
 	if (!IS_ERR_OR_NULL(partner)) {
 		device_unregister(&partner->dev);
-#if defined(CONFIG_USB_NOTIFY_LAYER)	
+#if defined(CONFIG_USB_NOTIFY_LAYER)
 		if (o_notify)
 			send_otg_notify(o_notify, NOTIFY_EVENT_PD_CONTRACT, 0);
 #endif
@@ -976,13 +977,14 @@ preferred_role_store(struct device *dev, struct device_attribute *attr,
 	int role;
 	int ret;
 
+	pr_info("%s %s +\n", __func__, buf);
 	if (port->cap->type != TYPEC_PORT_DRP) {
-		dev_dbg(dev, "Preferred role only supported with DRP ports\n");
+		dev_err(dev, "Preferred role only supported with DRP ports\n");
 		return -EOPNOTSUPP;
 	}
 
 	if (!port->cap->try_role) {
-		dev_dbg(dev, "Setting preferred role not supported\n");
+		dev_err(dev, "Setting preferred role not supported\n");
 		return -EOPNOTSUPP;
 	}
 
@@ -999,6 +1001,7 @@ preferred_role_store(struct device *dev, struct device_attribute *attr,
 		return ret;
 
 	port->prefer_role = role;
+	pr_info("%s-\n", __func__);
 	return size;
 }
 
@@ -1025,8 +1028,9 @@ static ssize_t data_role_store(struct device *dev,
 	struct typec_port *port = to_typec_port(dev);
 	int ret;
 
+	pr_info("%s %s +\n", __func__, buf);
 	if (!port->cap->dr_set) {
-		dev_dbg(dev, "data role swapping not supported\n");
+		dev_err(dev, "data role swapping not supported\n");
 		return -EOPNOTSUPP;
 	}
 
@@ -1047,6 +1051,7 @@ static ssize_t data_role_store(struct device *dev,
 	ret = size;
 unlock_and_ret:
 	mutex_unlock(&port->port_type_lock);
+	pr_info("%s-\n", __func__);
 	return ret;
 }
 
@@ -1070,18 +1075,19 @@ static ssize_t power_role_store(struct device *dev,
 	struct typec_port *port = to_typec_port(dev);
 	int ret;
 
+	pr_info("%s %s +\n", __func__, buf);
 	if (!port->cap->pd_revision) {
-		dev_dbg(dev, "USB Power Delivery not supported\n");
+		dev_err(dev, "USB Power Delivery not supported\n");
 		return -EOPNOTSUPP;
 	}
 
 	if (!port->cap->pr_set) {
-		dev_dbg(dev, "power role swapping not supported\n");
+		dev_err(dev, "power role swapping not supported\n");
 		return -EOPNOTSUPP;
 	}
 
 	if (port->pwr_opmode != TYPEC_PWR_MODE_PD) {
-		dev_dbg(dev, "partner unable to swap power role\n");
+		dev_err(dev, "partner unable to swap power role\n");
 		return -EIO;
 	}
 
@@ -1091,7 +1097,7 @@ static ssize_t power_role_store(struct device *dev,
 
 	mutex_lock(&port->port_type_lock);
 	if (port->port_type != TYPEC_PORT_DRP) {
-		dev_dbg(dev, "port type fixed at \"%s\"",
+		dev_err(dev, "port type fixed at \"%s\"",
 			     typec_port_power_roles[port->port_type]);
 		ret = -EOPNOTSUPP;
 		goto unlock_and_ret;
@@ -1104,6 +1110,7 @@ static ssize_t power_role_store(struct device *dev,
 	ret = size;
 unlock_and_ret:
 	mutex_unlock(&port->port_type_lock);
+	pr_info("%s-\n", __func__);
 	return ret;
 }
 
@@ -1128,25 +1135,26 @@ port_type_store(struct device *dev, struct device_attribute *attr,
 	int ret;
 	enum typec_port_type type;
 
+	pr_info("%s %s +\n", __func__, buf);
 	if (!port->cap->port_type_set || port->cap->type != TYPEC_PORT_DRP) {
-		dev_dbg(dev, "changing port type not supported\n");
+		dev_err(dev, "changing port type not supported\n");
 		return -EOPNOTSUPP;
 	}
 
 	ret = sysfs_match_string(typec_port_power_roles, buf);
-	if (ret < 0)
+	if (ret < 0) {
+		pr_err("%s error -\n", __func__);
 		return ret;
+	}
 
 	type = ret;
 	mutex_lock(&port->port_type_lock);
 	pr_info("%s port_type : %d, type : %d\n", 
 		__func__, port->port_type, type);
-#if 0 /* logically, we don't need to compare previous role */
 	if (port->port_type == type) {
 		ret = size;
 		goto unlock_and_ret;
 	}
-#endif
 	ret = port->cap->port_type_set(port->cap, type);
 	if (ret)
 		goto unlock_and_ret;
@@ -1156,6 +1164,7 @@ port_type_store(struct device *dev, struct device_attribute *attr,
 
 unlock_and_ret:
 	mutex_unlock(&port->port_type_lock);
+	pr_info("%s -\n", __func__);
 	return ret;
 }
 
@@ -1199,12 +1208,12 @@ static ssize_t vconn_source_store(struct device *dev,
 	int ret;
 
 	if (!port->cap->pd_revision) {
-		dev_dbg(dev, "VCONN swap depends on USB Power Delivery\n");
+		dev_err(dev, "VCONN swap depends on USB Power Delivery\n");
 		return -EOPNOTSUPP;
 	}
 
 	if (!port->cap->vconn_set) {
-		dev_dbg(dev, "VCONN swapping not supported\n");
+		dev_err(dev, "VCONN swapping not supported\n");
 		return -EOPNOTSUPP;
 	}
 
@@ -1332,7 +1341,6 @@ void typec_set_data_role(struct typec_port *port, enum typec_data_role role)
 		return;
 
 	port->data_role = role;
-	pr_info("%s data_role=%d\n", __func__, port->data_role);
 	sysfs_notify(&port->dev.kobj, NULL, "data_role");
 	kobject_uevent(&port->dev.kobj, KOBJ_CHANGE);
 }
@@ -1351,7 +1359,6 @@ void typec_set_pwr_role(struct typec_port *port, enum typec_role role)
 		return;
 
 	port->pwr_role = role;
-	pr_info("%s pwr_role=%d\n", __func__, port->pwr_role);
 	sysfs_notify(&port->dev.kobj, NULL, "power_role");
 	kobject_uevent(&port->dev.kobj, KOBJ_CHANGE);
 }
@@ -1407,15 +1414,11 @@ void typec_set_pwr_opmode(struct typec_port *port,
 	}
 #endif
 	pr_info("%s pwr_opmode=%d opmode=%d\n", __func__, port->pwr_opmode, opmode);
-
 	if (port->pwr_opmode == opmode)
 		return;
 
 	port->pwr_opmode = opmode;
 	sysfs_notify(&port->dev.kobj, NULL, "power_operation_mode");
-#if !IS_ENABLED(CONFIG_USB_HOST_SAMSUNG_FEATURE)
-	kobject_uevent(&port->dev.kobj, KOBJ_CHANGE);
-#endif
 
 	partner_dev = device_find_child(&port->dev, NULL, partner_match);
 	if (partner_dev) {
@@ -1428,9 +1431,7 @@ void typec_set_pwr_opmode(struct typec_port *port,
 		}
 		put_device(partner_dev);
 	}
-#if IS_ENABLED(CONFIG_USB_HOST_SAMSUNG_FEATURE)
 	kobject_uevent(&port->dev.kobj, KOBJ_CHANGE);
-#endif
 }
 EXPORT_SYMBOL_GPL(typec_set_pwr_opmode);
 

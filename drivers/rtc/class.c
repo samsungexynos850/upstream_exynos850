@@ -366,6 +366,11 @@ struct rtc_device *rtc_device_register(const char *name, struct device *dev,
 	dev_info(dev, "rtc core: registered %s as %s\n",
 			name, dev_name(&rtc->dev));
 
+#ifdef CONFIG_RTC_HCTOSYS_DEVICE
+	if (!strcmp(dev_name(&rtc->dev), CONFIG_RTC_HCTOSYS_DEVICE))
+		rtc_hctosys();
+#endif
+
 	return rtc;
 
 exit_ida:
@@ -551,6 +556,11 @@ int __rtc_register_device(struct module *owner, struct rtc_device *rtc)
 	rtc->registered = true;
 	dev_info(rtc->dev.parent, "registered as %s\n",
 		 dev_name(&rtc->dev));
+
+#ifdef CONFIG_RTC_HCTOSYS_DEVICE
+	if (!strcmp(dev_name(&rtc->dev), CONFIG_RTC_HCTOSYS_DEVICE))
+		rtc_hctosys();
+#endif
 
 	return 0;
 }

@@ -26,9 +26,6 @@
 #include <linux/ratelimit.h>
 #include <crypto/skcipher.h>
 #include "fscrypt_private.h"
-#ifdef CONFIG_FSCRYPT_SDP
-#include "sdp/sdp_crypto.h"
-#endif
 
 static unsigned int num_prealloc_crypto_pages = 32;
 
@@ -56,6 +53,7 @@ struct page *fscrypt_alloc_bounce_page(gfp_t gfp_flags)
 
 /**
  * fscrypt_free_bounce_page() - free a ciphertext bounce page
+ * @bounce_page: the bounce page to free, or NULL
  *
  * Free a bounce page that was allocated by fscrypt_encrypt_pagecache_blocks(),
  * or by fscrypt_alloc_bounce_page() directly.
@@ -111,9 +109,6 @@ int fscrypt_crypt_block(const struct inode *inode, fscrypt_direction_t rw,
 	struct fscrypt_info *ci = inode->i_crypt_info;
 	struct crypto_skcipher *tfm = ci->ci_key.tfm;
 	int res = 0;
-#ifdef CONFIG_FSCRYPT_SDP
-	sdp_fs_command_t *cmd = NULL;
-#endif
 
 	if (WARN_ON_ONCE(len <= 0))
 		return -EINVAL;
@@ -143,33 +138,14 @@ int fscrypt_crypt_block(const struct inode *inode, fscrypt_direction_t rw,
 	if (res) {
 		fscrypt_err(inode, "%scryption failed for block %llu: %d",
 			    (rw == FS_DECRYPT ? "De" : "En"), lblk_num, res);
-#ifdef CONFIG_FSCRYPT_SDP
-		if (ci->ci_sdp_info) {
-			if (ci->ci_sdp_info->sdp_flags & SDP_DEK_IS_SENSITIVE) {
-				printk("Record audit log in case of a failure during en/decryption of sensitive file\n");
-				if (rw == FS_DECRYPT) {
-					cmd = sdp_fs_command_alloc(FSOP_AUDIT_FAIL_DECRYPT,
-					current->tgid, ci->ci_sdp_info->engine_id, -1, inode->i_ino, res,
-							GFP_KERNEL);
-				} else {
-					cmd = sdp_fs_command_alloc(FSOP_AUDIT_FAIL_ENCRYPT,
-					current->tgid, ci->ci_sdp_info->engine_id, -1, inode->i_ino, res,
-							GFP_KERNEL);
-				}
-				if (cmd) {
-					sdp_fs_request(cmd, NULL);
-					sdp_fs_command_free(cmd);
-				}
-			}
-		}
-#endif
 		return res;
 	}
 	return 0;
 }
 
 /**
- * fscrypt_encrypt_pagecache_blocks() - Encrypt filesystem blocks from a pagecache page
+ * fscrypt_encrypt_pagecache_blocks() - Encrypt filesystem blocks from a
+ *					pagecache page
  * @page:      The locked pagecache page containing the block(s) to encrypt
  * @len:       Total size of the block(s) to encrypt.  Must be a nonzero
  *		multiple of the filesystem's block size.
@@ -259,7 +235,8 @@ int fscrypt_encrypt_block_inplace(const struct inode *inode, struct page *page,
 EXPORT_SYMBOL(fscrypt_encrypt_block_inplace);
 
 /**
- * fscrypt_decrypt_pagecache_blocks() - Decrypt filesystem blocks in a pagecache page
+ * fscrypt_decrypt_pagecache_blocks() - Decrypt filesystem blocks in a
+ *					pagecache page
  * @page:      The locked pagecache page containing the block(s) to decrypt
  * @len:       Total size of the block(s) to decrypt.  Must be a nonzero
  *		multiple of the filesystem's block size.
@@ -383,6 +360,8 @@ void fscrypt_msg(const struct inode *inode, const char *level,
 
 /**
  * fscrypt_init() - Set up for fs encryption.
+ *
+ * Return: 0 on success; -errno on failure
  */
 static int __init fscrypt_init(void)
 {
@@ -410,11 +389,6 @@ static int __init fscrypt_init(void)
 	if (err)
 		goto fail_free_info;
 
-#ifdef CONFIG_FSCRYPT_SDP
-	sdp_crypto_init();
-	if (!fscrypt_sdp_init_sdp_info_cachep())
-		goto fail_free_info;
-#endif
 	return 0;
 
 fail_free_info:

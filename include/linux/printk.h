@@ -9,6 +9,7 @@
 #include <linux/cache.h>
 
 extern const char linux_banner[];
+extern const char *linux_banner_ptr;
 extern const char linux_proc_banner[];
 
 #define PRINTK_MAX_SINGLE_HEADER_LEN 2
@@ -209,7 +210,6 @@ __printf(1, 2) void dump_stack_set_arch_desc(const char *fmt, ...);
 void dump_stack_print_info(const char *log_lvl);
 void show_regs_print_info(const char *log_lvl);
 extern asmlinkage void dump_stack(void) __cold;
-extern void printk_safe_init(void);
 extern void printk_safe_flush(void);
 extern void printk_safe_flush_on_panic(void);
 #else
@@ -276,10 +276,6 @@ static inline asmlinkage void dump_stack(void)
 {
 }
 
-static inline void printk_safe_init(void)
-{
-}
-
 static inline void printk_safe_flush(void)
 {
 }
@@ -325,14 +321,12 @@ extern int kptr_restrict;
 	printk(KERN_CONT fmt, ##__VA_ARGS__)
 
 #ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
-
 #define pr_auto(index, fmt, ...) \
 	printk(KERN_AUTO index pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_auto_disable(index) \
 	secdbg_comm_log_disable(index)
 #define pr_auto_once(index) \
 	secdbg_comm_log_once(index)
-
 #define ASL1	KERN_AUTO1
 #define ASL2	KERN_AUTO2
 #define ASL3	KERN_AUTO3
@@ -342,14 +336,12 @@ extern int kptr_restrict;
 #define ASL7	KERN_AUTO7
 #define ASL8	KERN_AUTO8
 #define ASL9	KERN_AUTO9
-
 #else
 /* TODO : retain the original log level */
 #define pr_auto(level, fmt, ...) \
 	printk(KERN_EMERG pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_auto_disable(index) do { } while (0)
 #define pr_auto_once(index) do { } while (0)
-
 #endif
 
 /* pr_devel() should produce zero code unless DEBUG is defined */

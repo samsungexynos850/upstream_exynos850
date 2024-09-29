@@ -1289,7 +1289,7 @@ static int find_recessive_cpu(struct task_struct *task)
 		return best_cpu;
 	}
 	/* update the per-cpu local_cpu_mask (lowest_mask) */
-	cpupri_find(&task_rq(task)->rd->cpupri, task, lowest_mask, NULL);
+	cpupri_find(&task_rq(task)->rd->cpupri, task, lowest_mask);
 	cpumask_and(&candidate_cpus, lowest_mask, cpu_active_mask);
 	cpumask_and(&candidate_cpus, &candidate_cpus, emstune_cpus_allowed(task));
 

@@ -28,10 +28,17 @@
 #include <linux/io.h>
 #include <linux/mutex.h>
 #include <linux/interrupt.h>
+#ifdef CONFIG_DRV_SAMSUNG_PMIC
 #include <linux/regulator/pmic_class.h>
+#endif /* CONFIG_DRV_SAMSUNG_PMIC */
 #ifdef CONFIG_SEC_PM_DEBUG
 #include <linux/sec_pm_debug.h>
 #endif /* CONFIG_SEC_PM_DEBUG */
+#if IS_ENABLED(CONFIG_SEC_PM)
+#include <linux/sec_class.h>
+
+static bool chg_det_en;
+#endif /* CONFIG_SEC_PM */
 
 #ifdef CONFIG_SEC_PMIC_PWRKEY
 extern int (*pmic_key_get_pwrkey)(void);
@@ -446,6 +453,10 @@ static int s2mpu12_pmic_dt_parse_pdata(struct s2mpu12_dev *iodev,
 		dev_err(iodev->dev, "could not find pmic sub-node\n");
 		return -ENODEV;
 	}
+
+#if IS_ENABLED(CONFIG_SEC_PM)
+	chg_det_en = of_property_read_bool(pmic_np, "chg_det_en");
+#endif
 
 	pdata->loop_bw_en = false;
 	if (of_get_property(pmic_np, "pmic_loop_bw", NULL))
@@ -893,6 +904,37 @@ err:
 	return -1;
 }
 
+#if IS_ENABLED(CONFIG_SEC_PM)
+static ssize_t chg_det_show(struct device *dev, struct device_attribute *attr,
+		char *buf)
+{
+	int ret, chg_det;
+	u8 val;
+	struct s2mpu12_info *s2mpu12 = static_info;
+
+	ret = s2mpu12_read_reg(s2mpu12->i2c, S2MPU12_PMIC_STATUS1, &val);
+	if (ret)
+		chg_det = -1;
+	else
+		chg_det = !!(val & (1 << 2));
+
+	pr_info("%s: ap pmic chg det: %d\n", __func__, chg_det);
+
+	return sprintf(buf, "%d\n", chg_det);
+}
+
+static DEVICE_ATTR_RO(chg_det);
+
+static struct attribute *ap_pmic_attributes[] = {
+	&dev_attr_chg_det.attr,
+	NULL
+};
+
+static const struct attribute_group ap_pmic_attr_group = {
+	.attrs = ap_pmic_attributes,
+};
+#endif /* CONFIG_SEC_PM */
+
 static int s2mpu12_lower_loop_BW(struct s2mpu12_info *s2mpu12, bool loop_bw_en)
 {
 	int ret = 0;
@@ -951,7 +993,7 @@ static int s2mpu12_pmic_probe(struct platform_device *pdev)
 	static_info = s2mpu12;
 
 	platform_set_drvdata(pdev, s2mpu12);
-	
+
 #ifdef CONFIG_SEC_PM_DEBUG
 	ret = s2mpu12_read_reg(s2mpu12->i2c, S2MPU12_PMIC_PWRONSRC,
 			&pmic_onsrc);
@@ -1043,6 +1085,16 @@ static int s2mpu12_pmic_probe(struct platform_device *pdev)
 	pmic_key_get_pwrkey = s2mpu12_read_pwron_status;
 #endif
 
+#if IS_ENABLED(CONFIG_SEC_PM)
+	if (chg_det_en) {
+		iodev->ap_pmic_dev = sec_device_create(NULL, "ap_pmic");
+
+		ret = sysfs_create_group(&iodev->ap_pmic_dev->kobj, &ap_pmic_attr_group);
+		if (ret)
+			dev_err(&pdev->dev, "failed to create ap_pmic sysfs group\n");
+	}
+#endif /* CONFIG_SEC_PM */
+
 	ret = s2mpu12_lower_loop_BW(s2mpu12, pdata->loop_bw_en);
 	if (ret < 0)
 		goto err;
@@ -1064,6 +1116,10 @@ static int s2mpu12_pmic_remove(struct platform_device *pdev)
 	for (i = 0; i < S2MPU12_REGULATOR_MAX; i++)
 		regulator_unregister(s2mpu12->rdev[i]);
 
+#if IS_ENABLED(CONFIG_SEC_PM)
+	if (!IS_ERR_OR_NULL(s2mpu12->iodev->ap_pmic_dev))
+		sec_device_destroy(s2mpu12->iodev->ap_pmic_dev->devt);
+#endif /* CONFIG_SEC_PM */
 #ifdef CONFIG_DRV_SAMSUNG_PMIC
 	pmic_device_destroy(s2mpu12->dev->devt);
 #endif

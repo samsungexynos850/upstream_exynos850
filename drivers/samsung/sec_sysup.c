@@ -26,9 +26,9 @@
 #define SEC_PARAM_EXTRA_MAX		10240
 #define SEC_PARAM_STR_MAX		2048
 
-static unsigned long edtbo_ver = 0;
-static unsigned long edtbo_offset = 0;
-static unsigned long param_offset = 0;
+static unsigned long edtbo_ver;
+static unsigned long edtbo_offset;
+static unsigned long param_offset;
 
 static int __init init_sysup_edtbo(char *str)
 {
@@ -211,7 +211,7 @@ static int __init sec_sysup_init(void)
 	pr_info("%s: start\n", __func__);
 
 	dev = sec_device_create(NULL, "sec_sysup");
-	if(!dev)
+	if (!dev)
 		pr_err("%s : sec device create failed!\n", __func__);
 
 	ret = sysfs_create_group(&dev->kobj, &sec_sysup_attr_group);

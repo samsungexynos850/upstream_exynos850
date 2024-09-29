@@ -838,6 +838,7 @@ struct ddi_properties {
 	u32 init_seq_by_lpdt;
 	u8 delay_cmd;
 	u32 delay_duration;
+	bool wait_tx_done;
 };
 
 struct common_panel_info {
@@ -959,6 +960,8 @@ enum {
 };
 #endif
 
+//#define DEBUG_PANEL	1
+
 #ifdef CONFIG_SUPPORT_GRAM_CHECKSUM
 enum {
 	GRAM_CHKSUM_OFF,
@@ -1037,7 +1040,7 @@ enum {
 };
 
 #define MAX_PANEL (32)
-#define MAX_PANEL_DDI (16)
+#define MAX_PANEL_DDI (8)
 #define MAX_PANEL_LUT (128)
 
 enum {

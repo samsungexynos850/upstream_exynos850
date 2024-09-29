@@ -253,7 +253,7 @@ int sec_perf_latencychecker_enable(unsigned int cpu)
 {
 	__touch_latencychecker();
 
-	if(cpumask_test_cpu((cpu), &online_cpus))
+	if (cpumask_test_cpu((cpu), &online_cpus))
 		cpumask_set_cpu(cpu, &latencychecker_cpus);
 
 	return 0;
@@ -261,7 +261,7 @@ int sec_perf_latencychecker_enable(unsigned int cpu)
 
 int sec_perf_latencychecker_disable(unsigned int cpu)
 {
-	if(cpumask_test_cpu((cpu), &online_cpus))
+	if (cpumask_test_cpu((cpu), &online_cpus))
 		cpumask_clear_cpu(cpu, &latencychecker_cpus);
 
 	return 0;

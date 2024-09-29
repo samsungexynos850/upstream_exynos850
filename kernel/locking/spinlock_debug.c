@@ -15,7 +15,6 @@
 
 #ifdef CONFIG_SEC_DEBUG_SPINBUG_PANIC
 static int skip_panic;
-
 void spin_debug_skip_panic(void)
 {
 	skip_panic = 1;

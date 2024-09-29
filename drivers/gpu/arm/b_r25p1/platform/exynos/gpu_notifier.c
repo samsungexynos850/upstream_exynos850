@@ -36,9 +36,56 @@
 #include <linux/exynos-busmon.h>
 #endif
 
+#ifdef CONFIG_MALI_PM_QOS
+#include <linux/pm_qos.h>
+#endif
+
 #include <linux/oom.h>
 
+#if !defined(CONFIG_MALI_EXYNOS_SECURE_RENDERING_UNSUPPORTED) && defined(CONFIG_SOC_EXYNOS9630)
+#include <linux/smc.h>
+#endif
+
 extern struct kbase_device *pkbdev;
+
+#ifdef CONFIG_MALI_PM_QOS
+static int gpu_pm_qos_notifier(struct notifier_block *nb,
+		unsigned long val, void *v)
+{
+	int pm_qos_class = *((int *)v);
+
+	GPU_LOG(DVFS_ERROR, DUMMY, 0u, 0u, "%s: update GPU PM Qos class %d to %ld kHz\n", __func__, pm_qos_class, val);
+
+	if (pm_qos_class == PM_QOS_GPU_THROUGHPUT_MAX) {
+		/* TO DO FOR MAX LOCK */
+		if ( val > 0)
+			gpu_dvfs_clock_lock(GPU_DVFS_MAX_LOCK, PMQOS_LOCK, val);
+		else
+			gpu_dvfs_clock_lock(GPU_DVFS_MAX_UNLOCK, PMQOS_LOCK, -1);
+	} else if (pm_qos_class == PM_QOS_GPU_THROUGHPUT_MIN) {
+		/* TO DO FOR MIN LOCK */
+		if ( val > 0)
+			gpu_dvfs_clock_lock(GPU_DVFS_MIN_LOCK, PMQOS_LOCK, val);
+		else
+			gpu_dvfs_clock_lock(GPU_DVFS_MIN_UNLOCK, PMQOS_LOCK, -1);
+	} else {
+		/* invalid PM QoS class */
+		return -EINVAL;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block gpu_min_qos_notifier = {
+	.notifier_call = gpu_pm_qos_notifier,
+	.priority = INT_MAX,
+};
+
+static struct notifier_block gpu_max_qos_notifier = {
+	.notifier_call = gpu_pm_qos_notifier,
+	.priority = INT_MAX,
+};
+#endif
 
 #if defined (CONFIG_EXYNOS_THERMAL) && defined(CONFIG_GPU_THERMAL)
 static void gpu_tmu_normal_work(struct kbase_device *kbdev)
@@ -105,8 +152,6 @@ static int gpu_power_on(struct kbase_device *kbdev)
 	if (!platform)
 		return -ENODEV;
 
-	GPU_LOG(DVFS_INFO, LSI_GPU_RPM_RESUME_API, ret, kbdev->pm.backend.metrics.timer_active, "power on\n");  /* ret : already power on?,  timer_active : timer enable */
-
 #ifdef CONFIG_MALI_RT_PM
 	if (!platform->inter_frame_pm_status)
 		gpu_control_disable_customization(kbdev);
@@ -120,7 +165,7 @@ static int gpu_power_on(struct kbase_device *kbdev)
 #endif
 
 
-	GPU_LOG(DVFS_INFO, LSI_GPU_RPM_RESUME_API, ret, 0u, "power on\n");
+	GPU_LOG(DVFS_INFO, LSI_GPU_RPM_RESUME_API, 0u, ret, "power on\n");
 
 	if (ret > 0) {
 #ifdef CONFIG_MALI_DVFS
@@ -161,7 +206,7 @@ static void gpu_power_off(struct kbase_device *kbdev)
 #endif
 #endif
 	platform->power_runtime_suspend_ret = ret;
-	GPU_LOG(DVFS_INFO, LSI_GPU_RPM_SUSPEND_API, ret, 0u, "power off\n");
+	GPU_LOG(DVFS_INFO, LSI_GPU_RPM_SUSPEND_API, 0u, ret, "power off\n");
 }
 
 static void gpu_power_suspend(struct kbase_device *kbdev)
@@ -184,7 +229,7 @@ static void gpu_power_suspend(struct kbase_device *kbdev)
 #endif
 
 	platform->power_runtime_suspend_ret = ret;
-	GPU_LOG(DVFS_INFO, LSI_SUSPEND_CALLBACK, ret, 0u, "power suspend\n");
+	GPU_LOG(DVFS_INFO, LSI_SUSPEND_CALLBACK, 0u, ret, "power suspend\n");
 }
 
 #ifdef CONFIG_MALI_RT_PM
@@ -209,16 +254,8 @@ static int gpu_pm_notifier(struct notifier_block *nb, unsigned long event, void 
 
 	switch (event) {
 	case PM_SUSPEND_PREPARE:
-		if (platform) {
-			GPU_LOG(DVFS_DEBUG, LSI_SUSPEND, platform->power_runtime_suspend_ret, platform->power_runtime_resume_ret, \
-					"%s: suspend event\n", __func__);
-		}
 		break;
 	case PM_POST_SUSPEND:
-		if (platform) {
-			GPU_LOG(DVFS_DEBUG, LSI_RESUME, platform->power_runtime_suspend_ret, platform->power_runtime_resume_ret, \
-					"%s: resume event\n", __func__);
-		}
 		break;
 	default:
 		break;
@@ -294,6 +331,11 @@ static int pm_callback_runtime_on(struct kbase_device *kbdev)
 #endif
 	gpu_dvfs_start_env_data_gathering(kbdev);
 	platform->power_status = true;
+
+#if !defined(CONFIG_MALI_EXYNOS_SECURE_RENDERING_UNSUPPORTED) && defined(CONFIG_SOC_EXYNOS9630)
+	exynos_smc(SMC_DRM_G3D_PPCFW_RESTORE, 0, 0, 0);
+#endif
+
 #if 0
 #ifdef CONFIG_MALI_DVFS
 #ifdef CONFIG_MALI_SEC_CL_BOOST
@@ -329,6 +371,11 @@ static void pm_callback_runtime_off(struct kbase_device *kbdev)
 	if (!platform->early_clk_gating_status)
 		gpu_control_disable_clock(kbdev);
 #endif /* CONFIG_MALI_DVFS */
+
+
+#if !defined(CONFIG_MALI_EXYNOS_SECURE_RENDERING_UNSUPPORTED) && defined(CONFIG_SOC_EXYNOS9630)
+	exynos_smc(SMC_DRM_G3D_POWER_OFF, 0, 0, 0);
+#endif
 
 #if defined(CONFIG_SOC_EXYNOS7420) || defined(CONFIG_SOC_EXYNOS7890)
 	preload_balance_setup(kbdev);
@@ -430,6 +477,11 @@ int gpu_notifier_init(struct kbase_device *kbdev)
 		return -1;
 #endif /* CONFIG_MALI_RT_PM */
 
+#ifdef CONFIG_MALI_PM_QOS
+	pm_qos_add_notifier(PM_QOS_GPU_THROUGHPUT_MAX, &gpu_max_qos_notifier);
+	pm_qos_add_notifier(PM_QOS_GPU_THROUGHPUT_MIN, &gpu_min_qos_notifier);
+#endif
+
 #ifdef CONFIG_EXYNOS_BUSMONITOR
 	busmon_notifier_chain_register(&gpu_noc_nb);
 #endif
@@ -451,5 +503,9 @@ void gpu_notifier_term(void)
 #ifdef CONFIG_MALI_RT_PM
 	unregister_pm_notifier(&gpu_pm_nb);
 #endif /* CONFIG_MALI_RT_PM */
+#ifdef CONFIG_MALI_PM_QOS
+	pm_qos_remove_notifier(PM_QOS_GPU_THROUGHPUT_MAX, &gpu_max_qos_notifier);
+	pm_qos_remove_notifier(PM_QOS_GPU_THROUGHPUT_MIN, &gpu_min_qos_notifier);
+#endif
 	return;
 }

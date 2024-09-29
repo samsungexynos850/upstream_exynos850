@@ -17,7 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-#include <linux/mfd/slsi/s2mu106/s2mu106.h>
+#include <linux/mfd/samsung/s2mu106.h>
 #include <linux/power/s2mu106_pmeter.h>
 #include <linux/version.h>
 #include <linux/module.h>

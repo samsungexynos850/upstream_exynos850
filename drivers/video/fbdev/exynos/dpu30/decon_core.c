@@ -1667,7 +1667,6 @@ static bool is_decon_win_state_vrr(struct decon_device *decon,
 		(state == DECON_WIN_STATE_VRR_PASSIVEMODE));
 }
 
-
 static int decon_set_win_buffer(struct decon_device *decon,
 		struct decon_win_config *config,
 		struct decon_reg_data *regs, int idx)
@@ -2499,11 +2498,11 @@ static void decon_update_regs(struct decon_device *decon,
 			req_no_buffers = 1;
 			if (decon->lcd_info->fps != regs->fps)
 				dpu_update_fps(decon, regs->fps);
-			
+
 			decon_wait_for_vsync(decon, VSYNC_TIMEOUT_MSEC);
 			goto end_fps;
-		}		
-		
+		}
+
 		decon_save_cur_buf_info(decon, regs);
 		decon_wait_for_vsync(decon, VSYNC_TIMEOUT_MSEC);
 		goto end;
@@ -2965,10 +2964,9 @@ static int decon_set_win_config(struct decon_device *decon,
 
 	kthread_queue_work(&decon->up.worker, &decon->up.work);
 
-
 	if (is_decon_win_state_vrr(decon, win_data->config[DECON_WIN_UPDATE_IDX].state) &&
-		(win_data->fps != 0) && (decon->lcd_info->fps != win_data->fps))
-		kthread_flush_worker(&decon->up.worker);
+	(win_data->fps != 0) && (decon->lcd_info->fps != win_data->fps))
+	kthread_flush_worker(&decon->up.worker);
 
 	/**
 	 * The code is moved here because the DPU driver may get a wrong fd
@@ -2999,7 +2997,6 @@ err_prepare:
 	}
 	win_data->retire_fence = -1;
 	win_data->extra.remained_frames = -1;
-
 	for (i = 0; i < decon->dt.max_win; i++)
 		for (j = 0; j < regs->plane_cnt[i]; ++j)
 			decon_free_unused_buf(decon, regs, i, j);
@@ -3216,7 +3213,6 @@ static int decon_ioctl(struct fb_info *info, unsigned int cmd,
 	struct dpp_restrictions_info __user *argp_res;
 	struct decon_color_mode_info cm_info;
 	struct dpp_ch_restriction dpp_ch_restriction;
-	struct decon_edid_data edid_data;
 	int ret = 0;
 	u32 crtc;
 	bool active;
@@ -3567,18 +3563,11 @@ static int decon_ioctl(struct fb_info *info, unsigned int cmd,
 		break;
 
 	case EXYNOS_GET_EDID:
-		if (decon->dt.out_type == DECON_OUT_DSI) {
-			memset(&edid_data, 0, sizeof(struct decon_edid_data));
-			decon_get_edid(decon, &edid_data);
-			if (copy_to_user((struct decon_edid_data __user *)arg,
-					&edid_data, sizeof(edid_data))) {
-				ret = -EFAULT;
-				break;
-			}
-		} else {
-			ret = -EFAULT;
-		}
-
+		/*
+		 * Because MST feature could not be supported in this product,
+		 * Returning EDID doesn't need for DSI
+		 */
+		ret = -EFAULT;
 		break;
 
 	case EXYNOS_GET_DISPLAY_MODE_NUM:
@@ -4279,6 +4268,13 @@ static void decon_parse_dt(struct decon_device *decon)
 		decon->pm_domain = exynos_pd_lookup_name(decon->dt.pd_name);
 	}
 #endif
+
+	if (!of_property_read_u32(dev->of_node, "mif_freq", &decon->dt.mif_freq))
+		decon_info("mif_freq(Khz): %u\n", decon->dt.mif_freq);
+	else {
+		decon->dt.mif_freq = 0;
+		decon_info("mif_freq is not found in dt\n");
+	}
 }
 
 static int decon_init_resources(struct decon_device *decon,
@@ -4476,6 +4472,16 @@ static int decon_initial_display(struct decon_device *decon, bool is_colormap)
 			decon_bypass_on(decon);
 		}
 
+		if (decon_is_bypass(decon)) {
+			if (!decon_reg_get_run_status(decon->id)) {
+				if (dsim->fb_handover.reserved)
+					v4l2_subdev_call(decon->out_sd[0], core, ioctl,
+							DSIM_IOC_FREE_FB_RES, NULL);
+			} else {
+				decon_info("decon-%d:bypass on, but running. keep handover rmem.\n", decon->id);
+			}
+		}
+
 		goto decon_init_done;
 	}
 #endif
@@ -4610,7 +4616,7 @@ static int decon_probe(struct platform_device *pdev)
 	decon_create_timeline(decon, device_name);
 
 	/* systrace */
-	decon_systrace_enable = 0;
+	decon_systrace_enable = 1;
 	decon->systrace.pid = 0;
 
 	/* debug trivial */

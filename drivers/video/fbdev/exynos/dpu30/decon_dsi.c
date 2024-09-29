@@ -1223,6 +1223,10 @@ int decon_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 	if (decon_check_limitation(decon, decon->dt.dft_win, &config) < 0)
 		return -EINVAL;
 
+	#if defined(CONFIG_EXYNOS_BTS)
+	    decon->bts.ops->bts_acquire_bw(decon);
+	#endif
+
 	decon_hiber_block_exit(decon);
 
 	decon_to_psr_info(decon, &psr);

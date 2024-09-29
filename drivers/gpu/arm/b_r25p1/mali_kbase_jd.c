@@ -912,13 +912,6 @@ static bool jd_submit_atom(struct kbase_context *const kctx,
 	katom->will_fail_event_code = BASE_JD_EVENT_NOT_STARTED;
 	katom->softjob_data = NULL;
 
-	if (!(katom->core_req & BASE_JD_REQ_SOFT_JOB)) {
-		if (!kbase_js_is_atom_valid(kctx->kbdev, katom)) {
-			katom->event_code = BASE_JD_EVENT_JOB_INVALID;
-			return jd_done_nolock(katom, NULL);
-		}
-	}
-
 	trace_sysgraph(SGR_ARRIVE, kctx->id, user_atom->atom_number);
 
 #if MALI_JIT_PRESSURE_LIMIT

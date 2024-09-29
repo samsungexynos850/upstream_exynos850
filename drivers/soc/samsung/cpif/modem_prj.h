@@ -256,7 +256,7 @@ struct __packed sipc_fmt_hdr {
 #define sipc5_is_not_reserved_channel(ch) \
 	((ch) != 0 && (ch) != 5 && (ch) != 6 && (ch) != 27 && (ch) != 255)
 
-#if defined(CONFIG_MODEM_IF_LEGACY_QOS) || defined(CONFIG_MODEM_IF_QOS)
+#if defined(CONFIG_MODEM_IF_QOS)
 #define MAX_NDEV_TX_Q 2
 #else
 #define MAX_NDEV_TX_Q 1
@@ -566,6 +566,11 @@ struct link_device {
 #ifdef CONFIG_LINK_DEVICE_PCIE
 	int (*register_pcie)(struct link_device *ld);
 #endif
+
+#if IS_ENABLED(CONFIG_SBD_BOOTLOG)
+	/* print cp boot/main logs */
+	struct timer_list cplog_timer;
+#endif
 };
 
 #if defined(CONFIG_MODEM_IF_NET_GRO)
@@ -815,8 +820,6 @@ struct modem_ctl {
 	void (*modem_complete)(struct modem_ctl *mc);
 
 	struct notifier_block lcd_notifier;
-
-	int receive_first_ipc;
 };
 
 static inline bool cp_offline(struct modem_ctl *mc)

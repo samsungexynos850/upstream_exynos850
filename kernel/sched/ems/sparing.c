@@ -44,7 +44,7 @@ static void __ecs_update_system_status(struct ecs_domain *domain)
 	unsigned int util_sum = 0, util_avg, nr_running_sum = 0, num_of_cpus = 0;
 
 	for_each_cpu_and(cpu, &domain->cpus, cpu_online_mask) {
-		util_sum += ml_cpu_util(cpu);
+		util_sum += ml_cpu_util(cpu) + cpu_util_rt(cpu_rq(cpu));
 		num_of_cpus++;
 		nr_running_sum += cpu_rq(cpu)->nr_running;
 	}

@@ -772,6 +772,9 @@ void thermal_cooling_device_stats_update(struct thermal_cooling_device *cdev,
 {
 	struct cooling_dev_stats *stats = cdev->stats;
 
+	if (!stats)
+		return;
+
 	spin_lock(&stats->lock);
 
 	if (stats->state == new_state)
@@ -977,6 +980,26 @@ trip_point_show(struct device *dev, struct device_attribute *attr, char *buf)
 		return sprintf(buf, "-1\n");
 	else
 		return sprintf(buf, "%d\n", instance->trip);
+}
+
+ssize_t trip_point_store(struct device *dev, struct device_attribute *attr,
+			 const char *buf, size_t count)
+{
+	struct thermal_instance *instance;
+	int ret, trip;
+
+	ret = kstrtoint(buf, 0, &trip);
+	if (ret)
+		return ret;
+
+	instance = container_of(attr, struct thermal_instance, attr);
+
+	if (trip >= instance->tz->trips || trip < THERMAL_TRIPS_NONE)
+		return -EINVAL;
+
+	instance->trip = trip;
+
+	return count;
 }
 
 ssize_t

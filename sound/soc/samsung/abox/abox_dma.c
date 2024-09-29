@@ -918,6 +918,87 @@ struct snd_soc_dai *abox_dma_get_dai(struct device *dev, enum abox_dma_dai type)
 	return ERR_PTR(-EINVAL);
 }
 
+int abox_dma_can_close(struct snd_soc_pcm_runtime *rtd, int stream)
+{
+	int rdir = stream == SNDRV_PCM_STREAM_PLAYBACK ?
+		SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
+
+	switch (rtd->dpcm[rdir].state) {
+	case SND_SOC_DPCM_STATE_OPEN:
+	case SND_SOC_DPCM_STATE_HW_PARAMS:
+	case SND_SOC_DPCM_STATE_PREPARE:
+	case SND_SOC_DPCM_STATE_START:
+	case SND_SOC_DPCM_STATE_STOP:
+	case SND_SOC_DPCM_STATE_PAUSED:
+	case SND_SOC_DPCM_STATE_SUSPEND:
+	case SND_SOC_DPCM_STATE_HW_FREE:
+		return 0;
+	default:
+		return 1;
+	}
+}
+
+int abox_dma_can_free(struct snd_soc_pcm_runtime *rtd, int stream)
+{
+	int rdir = stream == SNDRV_PCM_STREAM_PLAYBACK ?
+		SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
+
+	switch (rtd->dpcm[rdir].state) {
+	case SND_SOC_DPCM_STATE_HW_PARAMS:
+	case SND_SOC_DPCM_STATE_PREPARE:
+	case SND_SOC_DPCM_STATE_START:
+	case SND_SOC_DPCM_STATE_STOP:
+	case SND_SOC_DPCM_STATE_PAUSED:
+	case SND_SOC_DPCM_STATE_SUSPEND:
+		return 0;
+	default:
+		return 1;
+	}
+}
+
+int abox_dma_can_stop(struct snd_soc_pcm_runtime *rtd, int stream)
+{
+	int rdir = stream == SNDRV_PCM_STREAM_PLAYBACK ?
+		SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
+
+	switch (rtd->dpcm[rdir].state) {
+	case SND_SOC_DPCM_STATE_START:
+	case SND_SOC_DPCM_STATE_PAUSED:
+	case SND_SOC_DPCM_STATE_SUSPEND:
+		return 0;
+	default:
+		return 1;
+	}
+}
+
+int abox_dma_can_start(struct snd_soc_pcm_runtime *rtd, int stream)
+{
+	int rdir = stream == SNDRV_PCM_STREAM_PLAYBACK ?
+		SNDRV_PCM_STREAM_CAPTURE : SNDRV_PCM_STREAM_PLAYBACK;
+
+	switch (rtd->dpcm[rdir].state) {
+	case SND_SOC_DPCM_STATE_START:
+		return 0;
+	default:
+		return 1;
+	}
+}
+
+int abox_dma_can_prepare(struct snd_soc_pcm_runtime *rtd, int stream)
+{
+	return abox_dma_can_start(rtd, stream);
+}
+
+int abox_dma_can_params(struct snd_soc_pcm_runtime *rtd, int stream)
+{
+	return abox_dma_can_free(rtd, stream);
+}
+
+int abox_dma_can_open(struct snd_soc_pcm_runtime *rtd, int stream)
+{
+	return abox_dma_can_close(rtd, stream);
+}
+
 static unsigned int abox_dma_get_dst_format(struct abox_dma_data *data)
 {
 	unsigned int width, channels;

@@ -142,7 +142,6 @@ static int try_to_freeze_tasks(bool user_only)
 			}
 		}
 		read_unlock(&tasklist_lock);
-
 		secdbg_exin_set_unfz(sys_state[system_state], -1);
 		if (IS_ENABLED(CONFIG_SEC_DEBUG_FAIL_TO_FREEZE_PANIC))
 			panic("fail to freeze tasks: %s", secdbg_exin_get_unfz());
@@ -150,10 +149,8 @@ static int try_to_freeze_tasks(bool user_only)
 		pr_cont("(elapsed %d.%03d seconds) ", elapsed_msecs / 1000,
 			elapsed_msecs % 1000);
 	}
-
 	secdbg_base_set_unfrozen_task((uint64_t)NULL);
 	secdbg_base_set_unfrozen_task_count((uint64_t)0);
-
 	return todo ? -EBUSY : 0;
 }
 

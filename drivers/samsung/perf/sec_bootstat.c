@@ -87,6 +87,9 @@ static struct boot_event boot_events[] = {
 	{"!@Boot_DEBUG: Launcher.onResume()",},
 	{"!@Boot_DEBUG: Launcher.LoaderTask.run() start",},
 	{"!@Boot_DEBUG: Launcher - FinishFirstBind",},
+#ifdef CONFIG_SEC_FACTORY
+	{"!@Boot: Factory Process [Boot Completed]",},
+#endif /* CONFIG_SEC_FACTORY */
 };
 
 #define MAX_LENGTH_OF_BOOTING_LOG 90
@@ -108,10 +111,10 @@ struct systemserver_init_time_entry {
 	char buf[MAX_LENGTH_OF_SYSTEMSERVER_LOG];
 };
 
-static bool bootcompleted = false;
-static bool ebs_finished = false;
-unsigned long long boot_complete_time = 0;
-static int events_ebs = 0;
+static bool bootcompleted;
+static bool ebs_finished;
+unsigned long long boot_complete_time;
+static int events_ebs;
 
 LIST_HEAD(device_init_time_list);
 LIST_HEAD(systemserver_init_time_list);
@@ -175,23 +178,22 @@ void sec_bootstat_add(const char *c)
 	}
 
 	// Collect Boot_EBS from java side
-	if (!ebs_finished && events_ebs < MAX_EVENTS_EBS){
+	if (!ebs_finished && events_ebs < MAX_EVENTS_EBS) {
 		if (!strncmp(c, "!@Boot_EBS: ", 12)) {
 			sec_enhanced_boot_stat_record(c + 12);
 			return;
-		}
-		else if (!strncmp(c, "!@Boot_EBS_", 11)) {
+		} else if (!strncmp(c, "!@Boot_EBS_", 11)) {
 			sec_enhanced_boot_stat_record(c);
 			return;
 		}
 	}
 
-	if(!bootcompleted && !strncmp(c, "!@Boot_SystemServer: ", 21)){
+	if (!bootcompleted && !strncmp(c, "!@Boot_SystemServer: ", 21)) {
 		struct systemserver_init_time_entry *entry;
 		entry = kmalloc(sizeof(*entry), GFP_KERNEL);
 		if (!entry)
 			return;
-		strncpy(entry->buf,c+ 21, MAX_LENGTH_OF_SYSTEMSERVER_LOG);
+		strncpy(entry->buf, c + 21, MAX_LENGTH_OF_SYSTEMSERVER_LOG);
 		entry->buf[MAX_LENGTH_OF_SYSTEMSERVER_LOG-1] = '\0';
 		list_add(&entry->next, &systemserver_init_time_list);
 		return;
@@ -210,7 +212,7 @@ void sec_bootstat_add(const char *c)
 				sec_bootstat_get_thermal(boot_events[i].temp);
 			}
 			// careful check bootcomplete message index 9
-			if(i == 9) {
+			if (i == 9) {
 				bootcompleted = true;
 				boot_complete_time = local_clock();
 				do_div(boot_complete_time, 1000000);
@@ -290,7 +292,7 @@ static int sec_boot_stat_proc_show(struct seq_file *m, void *v)
 	seq_puts(m, "---------------------------------------------------------------------------------------------------------------\n");
 	seq_puts(m, "SystemServer services that took long time\n\n");
 	list_for_each_entry (systemserver_entry, &systemserver_init_time_list, next)
-		seq_printf(m, "%s\n",systemserver_entry->buf);
+		seq_printf(m, "%s\n", systemserver_entry->buf);
 
 	return 0;
 }
@@ -317,13 +319,12 @@ static int sec_enhanced_boot_stat_proc_show(struct seq_file *m, void *v)
 	seq_puts(m, "-----------------------------------------------------------------------------------------------------------------------\n");
 	seq_puts(m, "FRAMEWORK\n");
 	seq_puts(m, "-----------------------------------------------------------------------------------------------------------------------\n");
-	list_for_each_entry_reverse (entry, &enhanced_boot_time_list, next){
+	list_for_each_entry_reverse (entry, &enhanced_boot_time_list, next) {
 		if (entry->buf[0] == '!') {
 			seq_printf(m, "%-90s %6u %6u %6u %4d %4d\n", entry->buf, entry->time + mct_start, entry->time, entry->time - last_time,
 			entry->freq[0] / 1000, entry->freq[1] / 1000);
 			last_time = entry->time;
-		}
-		else {
+		} else {
 			seq_printf(m, "%-90s %6u %6u %11d %4d\n", entry->buf, entry->time + mct_start, entry->time, entry->freq[0] / 1000, entry->freq[1] / 1000);
 		}
 	}
@@ -364,8 +365,7 @@ static ssize_t store_boot_stat(struct device *dev, struct device_attribute *attr
 		if (!strncmp(buf, "!@Boot_EBS: ", 12)) {
 			sec_enhanced_boot_stat_record(buf + 12);
 			return count;
-		}
-		else if (!strncmp(buf, "!@Boot_EBS_", 11)) {
+		} else if (!strncmp(buf, "!@Boot_EBS_", 11)) {
 			sec_enhanced_boot_stat_record(buf);
 			return count;
 		}

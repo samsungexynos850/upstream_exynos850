@@ -33,8 +33,6 @@
 
 #define DUMMY_JOB_WA_BINARY_NAME "valhall-1691526.wa"
 
-#include "./platform/exynos/mali_kbase_platform.h"
-
 struct wa_header {
 	u16 signature;
 	u16 version;
@@ -164,12 +162,8 @@ int kbase_dummy_job_wa_execute(struct kbase_device *kbdev, u64 cores)
 	u32 old_gpu_mask;
 	u32 old_job_mask;
 
-	struct exynos_context *platform = NULL;
-
 	if (!kbdev)
 		return -EFAULT;
-
-	platform = (struct exynos_context*)kbdev->platform_context;
 
 	if (!kbdev->dummy_job_wa.ctx)
 		return -EFAULT;
@@ -189,7 +183,6 @@ int kbase_dummy_job_wa_execute(struct kbase_device *kbdev, u64 cores)
 	kbase_reg_write(kbdev, SHADER_PWRON_HI, (cores >> 32));
 
 	if (kbdev->dummy_job_wa.flags & KBASE_DUMMY_JOB_WA_FLAG_WAIT_POWERUP) {
-		GPU_LOG(DVFS_DEBUG, LSI_WA_EXECUTE_WAIT_POWERUP, kbdev->dummy_job_wa.flags, 0u, "wait power-up in %s\n", __func__);
 		/* wait for power-ups */
 		wait(kbdev, SHADER_READY_LO, (cores & U32_MAX), true);
 		if (cores >> 32)
@@ -198,7 +191,7 @@ int kbase_dummy_job_wa_execute(struct kbase_device *kbdev, u64 cores)
 
 	if (kbdev->dummy_job_wa.flags & KBASE_DUMMY_JOB_WA_FLAG_SERIALIZE) {
 		int i;
-		GPU_LOG(DVFS_DEBUG, LSI_WA_EXECUTE_SERIALIZE, kbdev->dummy_job_wa.flags, 0u, "seriailize in %s\n", __func__);
+
 		/* do for each requested core */
 		for (i = 0; i < sizeof(cores) * 8; i++) {
 			u64 affinity;
@@ -214,7 +207,6 @@ int kbase_dummy_job_wa_execute(struct kbase_device *kbdev, u64 cores)
 		}
 
 	} else {
-		GPU_LOG(DVFS_DEBUG, LSI_WA_EXECUTE_PARALLEL, kbdev->dummy_job_wa.flags, 0u, "parallel in %s\n", __func__);
 		if (run_job(kbdev, as, slot, cores, jc))
 			failed++;
 		runs++;

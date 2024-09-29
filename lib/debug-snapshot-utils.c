@@ -97,14 +97,6 @@ void dbg_snapshot_hook_hardlockup_entry(void *v_regs)
 					"\n------------------------------------------------------------------------------\n\n",
 					(dss_desc.allcorelockup_detected) ? "All Core" : "Core", cpu,
 					cpumask_pr_args((cpumask_t *)&dss_desc.hardlockup_core_mask));
-
-#if defined(CONFIG_HARDLOCKUP_DETECTOR_OTHER_CPU) && defined(CONFIG_SEC_DEBUG_LOCKUP_INFO)
-		update_hardlockup_type(cpu);
-#endif
-
-#ifdef CONFIG_SEC_DEBUG_EXTRA_INFO
-		secdbg_exin_set_backtrace_cpu(v_regs, cpu);
-#endif
 	}
 }
 

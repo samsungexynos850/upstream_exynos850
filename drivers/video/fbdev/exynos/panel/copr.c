@@ -1221,7 +1221,7 @@ static int copr_register_fb(struct copr_info *copr)
 {
 	memset(&copr->fb_notif, 0, sizeof(copr->fb_notif));
 	copr->fb_notif.notifier_call = copr_fb_notifier_callback;
-	return fb_register_client(&copr->fb_notif);
+	return decon_register_notifier(&copr->fb_notif);
 }
 
 int copr_probe(struct panel_device *panel, struct panel_copr_data *copr_data)

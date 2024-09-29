@@ -200,7 +200,7 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
 	 * Initialise and allocate the transmit and temporary
 	 * buffer.
 	 */
-	page = get_zeroed_page(GFP_KERNEL);
+	page = __get_free_pages(GFP_KERNEL|__GFP_ZERO|__GFP_COMP, 2);
 	if (!page)
 		return -ENOMEM;
 
@@ -215,7 +215,7 @@ static int uart_port_startup(struct tty_struct *tty, struct uart_state *state,
 		 * Do not free() the page under the port lock, see
 		 * uart_shutdown().
 		 */
-		free_page(page);
+		free_pages(page, 2);
 	}
 
 	retval = uport->ops->startup(uport);
@@ -318,7 +318,7 @@ static void uart_shutdown(struct tty_struct *tty, struct uart_state *state)
 	uart_port_unlock(uport, flags);
 
 	if (xmit_buf)
-		free_page((unsigned long)xmit_buf);
+		free_pages((unsigned long)xmit_buf, 2);
 }
 
 /**
@@ -1424,6 +1424,10 @@ static void uart_set_ldisc(struct tty_struct *tty)
 {
 	struct uart_state *state = tty->driver_data;
 	struct uart_port *uport;
+	struct tty_port *port = &state->port;
+
+	if (!tty_port_initialized(port))
+		return;
 
 	mutex_lock(&state->port.mutex);
 	uport = uart_port_check(state);
@@ -2558,6 +2562,7 @@ struct tty_driver *uart_console_device(struct console *co, int *index)
 	*index = co->index;
 	return p->tty_driver;
 }
+EXPORT_SYMBOL_GPL(uart_console_device);
 
 static ssize_t uart_get_attr_uartclk(struct device *dev,
 	struct device_attribute *attr, char *buf)

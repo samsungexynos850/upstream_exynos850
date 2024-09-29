@@ -19,16 +19,18 @@
 #define USE_TZ_CONTROLLED_MEM_ATTRIBUTE
 #endif
 
-#if defined(CONFIG_CAMERA_AAS_V21S)
-#include "is-vendor-config_aas_v21s.h"
-#elif defined(CONFIG_CAMERA_XXT_V5)
-#include "is-vendor-config_xxt_v5.h"
-#elif defined(CONFIG_CAMERA_MMT_V12)
-#include "is-vendor-config_mmt_v12.h"
-#elif defined(CONFIG_CAMERA_AAU_V12S)
-#include "is-vendor-config_aau_v12s.h"
+#if defined(CONFIG_CAMERA_HTV_V00)
+#include "is-vendor-config_htv_v00.h"
+#elif defined(CONFIG_CAMERA_AAV_V13)
+#include "is-vendor-config_aav_v13.h"
+#elif defined(CONFIG_CAMERA_MMV_V13)
+#include "is-vendor-config_mmv_v13.h"
+#elif defined(CONFIG_CAMERA_AAV_V04S)
+#include "is-vendor-config_aav_v04s.h"
+#elif defined(CONFIG_CAMERA_AAV_V14)
+#include "is-vendor-config_aav_v14.h"
 #else
-#include "is-vendor-config_xxt_v5.h"
+#include "is-vendor-config_default.h"
 #endif
 
 #endif

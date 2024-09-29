@@ -204,8 +204,8 @@ struct dw_mci {
 	struct tasklet_struct	tasklet;
 	u32 tasklet_state;
 	struct work_struct card_work;
-	u32 card_detect_cnt;
 	struct work_struct card_det_work;
+	u32 card_detect_cnt;
 	unsigned long		pending_events;
 	unsigned long		completed_events;
 	enum dw_mci_state	state;
@@ -291,6 +291,10 @@ struct dw_mci {
 	bool has_cqe;
 	bool cqe_on;
 	struct cqhci_host *cq_host;
+#if defined(CONFIG_BCM43456)
+	u32 store_best_samples;
+	bool tuned;
+#endif /* CONFIG_BCM43456 */
 };
 
 /* DMA ops for Internal/External DMAC interface */
@@ -376,6 +380,12 @@ struct dw_mci_board {
 
 	enum dw_mci_cd_types cd_type;
 	struct reset_control *rstc;
+#if defined(CONFIG_BCM43456)
+	int (*ext_cd_init)(void (*notify_func)
+		(void *dev_id, int state), void *dev_id, struct mmc_host *mmc);
+	int (*ext_cd_cleanup)(void (*notify_func)
+	(void *dev_id, int state), void *dev_id);
+#endif /* CONFIG_BCM43456 */
 	struct dw_mci_dma_ops *dma_ops;
 	struct dma_pdata *data;
 	struct block_settings *blk_settings;

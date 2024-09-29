@@ -270,7 +270,7 @@ const u32 dphy_timing[][10] = {
 	{1060, 42, 16, 15, 55, 43, 6, 48, 31, 6},
 	{1050, 42, 16, 15, 54, 42, 6, 47, 31, 6},
 	{1040, 42, 15, 15, 54, 42, 6, 47, 31, 6},
-	{1030, 41, 15, 15, 54, 42, 6, 47, 30, 6},
+	{1030, 41, 15, 15, 54, 34, 6, 47, 25, 6},
 	{1020, 41, 15, 15, 53, 41, 6, 46, 30, 6},
 	{1010, 40, 15, 15, 53, 41, 6, 46, 30, 5},
 	{1000, 40, 15, 15, 52, 40, 6, 45, 29, 5},
@@ -1675,7 +1675,7 @@ static void dsim_reg_set_config(u32 id, struct exynos_panel_info *lcd_info,
 		dsim_reg_set_cmd_ctrl(id, lcd_info, clks);
 	} else if (lcd_info->mode == DECON_VIDEO_MODE) {
 		dsim_reg_set_hperiod(id, lcd_info);
-		dsim_reg_set_vstatus_int(id, DSIM_VSYNC);
+		dsim_reg_set_vstatus_int(id, DSIM_VFP);
 	}
 
 	/* dsim_reg_enable_shadow_read(id, 1); */

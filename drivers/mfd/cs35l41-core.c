@@ -26,6 +26,9 @@
 
 static const struct mfd_cell cs35l41_devs[] = {
 	{ .name = "cs35l41-codec", },
+	{ .name = "cs35l41-cal", },
+	{ .name = "cs35l41-bd", },
+	{ .name = "cs35l41-pwr", },
 };
 
 static const char * const cs35l41_supplies[] = {
@@ -43,14 +46,6 @@ int cs35l41_dev_init(struct cs35l41_data *cs35l41)
 	if (dev_get_platdata(cs35l41->dev))
 		memcpy(&cs35l41->pdata, dev_get_platdata(cs35l41->dev),
 		       sizeof(cs35l41->pdata));
-
-	cs35l41->mfd_class = class_create(THIS_MODULE,
-				dev_name(cs35l41->dev));
-	if (IS_ERR(cs35l41->mfd_class)) {
-		ret = PTR_ERR(cs35l41->mfd_class);
-		dev_err(cs35l41->dev, "err class create\n");
-		return -EINVAL;
-	}
 
 	for (i = 0; i < ARRAY_SIZE(cs35l41_supplies); i++)
 		cs35l41->supplies[i].supply = cs35l41_supplies[i];

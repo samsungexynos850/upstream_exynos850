@@ -34,6 +34,9 @@
 #include <linux/poll.h>
 #include <linux/reservation.h>
 #include <linux/mm.h>
+#include <linux/sched/signal.h>
+#include <linux/fdtable.h>
+#include <linux/list_sort.h>
 #include <linux/mount.h>
 
 #include <uapi/linux/dma-buf.h>
@@ -128,6 +131,7 @@ static int dma_buf_release(struct inode *inode, struct file *file)
 
 	module_put(dmabuf->owner);
 	kfree(dmabuf->exp_name);
+	kfree(dmabuf->name);
 	kfree(dmabuf);
 	return 0;
 }
@@ -429,19 +433,14 @@ static long dma_buf_ioctl(struct file *file,
 	case DMA_BUF_IOCTL_CONTAINER_GET_MASK:
 		return dmabuf_container_get_mask_user(dmabuf, arg);
 	case DMA_BUF_IOCTL_TRACK:
-
-#ifdef CONFIG_DMABUF_TRACE
 		return dmabuf_trace_track_buffer(dmabuf);
-#else
-		return -ENOTTY;
-#endif
 	case DMA_BUF_IOCTL_UNTRACK:
-#ifdef CONFIG_DMABUF_TRACE
 		return dmabuf_trace_untrack_buffer(dmabuf);
-#else
-		return -ENOTTY;
-#endif
-	case DMA_BUF_SET_NAME:
+
+
+	case DMA_BUF_SET_NAME_A:
+	case DMA_BUF_SET_NAME_B:
+
 		return dma_buf_set_name(dmabuf, (const char __user *)arg);
 
 	default:
@@ -1357,6 +1356,18 @@ int dma_buf_get_flags(struct dma_buf *dmabuf, unsigned long *flags)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(dma_buf_get_flags);
+
+int dma_buf_get_uuid(struct dma_buf *dmabuf, uuid_t *uuid)
+{
+	if (WARN_ON(!dmabuf) || !uuid)
+		return -EINVAL;
+
+	if (!dmabuf->ops->get_uuid)
+		return -ENODEV;
+
+	return dmabuf->ops->get_uuid(dmabuf, uuid);
+}
+EXPORT_SYMBOL_GPL(dma_buf_get_uuid);
 
 #ifdef CONFIG_DEBUG_FS
 static int dma_buf_debug_show(struct seq_file *s, void *unused)

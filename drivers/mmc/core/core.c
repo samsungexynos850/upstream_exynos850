@@ -50,17 +50,14 @@
 #include "sd_ops.h"
 #include "sdio_ops.h"
 
-#ifdef CONFIG_MMC_SUPPORT_STLOG
-#include <linux/fslog.h>
-#else
-#define ST_LOG(fmt, ...)
-#endif
-
 /* The max erase timeout, used when host->max_busy_timeout isn't specified */
 #define MMC_ERASE_TIMEOUT_MS	(60 * 1000) /* 60 s */
-
+#if defined(CONFIG_BCM43456)
+extern void dhd_wlan_power(int);
+static const unsigned freqs[] = { 400000, 400000, 300000, 200000, 100000 };
+#else
 static const unsigned freqs[] = { 400000, 300000, 200000, 100000 };
-
+#endif /* CONFIG_BCM43456 */
 /*
  * Enabling software CRCs on the data blocks can be a significant (30%)
  * performance cost, and for other reasons may not always be desired.
@@ -1038,11 +1035,14 @@ int mmc_execute_tuning(struct mmc_card *card)
 
 	err = host->ops->execute_tuning(host, opcode);
 
-	if (err)
+	if (err) {
 		pr_err("%s: tuning execution failed: %d\n",
 			mmc_hostname(host), err);
-	else
+	} else {
+		host->retune_now = 0;
+		host->need_retune = 0;
 		mmc_retune_enable(host);
+	}
 
 	return err;
 }
@@ -1540,6 +1540,18 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage)
 
 }
 
+#if defined(CONFIG_BCM43456)
+void mmc_set_initial_signal_voltage(struct mmc_host *host)
+{
+	/* Try to set signal voltage to 1.8V but fall back to 3.3v or 1.2v */
+	if (!mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_180))
+		dev_dbg(mmc_dev(host), "Initial signal voltage of 1.8v\n");
+	else if (!mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330))
+		dev_dbg(mmc_dev(host), "Initial signal voltage of 3.3v\n");
+ 	else if (!mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_120))
+ 		dev_dbg(mmc_dev(host), "Initial signal voltage of 1.2v\n");
+ }
+#else
 void mmc_set_initial_signal_voltage(struct mmc_host *host)
 {
 	/* Try to set signal voltage to 3.3V but fall back to 1.8v or 1.2v */
@@ -1550,6 +1562,7 @@ void mmc_set_initial_signal_voltage(struct mmc_host *host)
 	else if (!mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_120))
 		dev_dbg(mmc_dev(host), "Initial signal voltage of 1.2v\n");
 }
+#endif /* CONFIG_BCM43456 */
 
 int mmc_host_set_uhs_voltage(struct mmc_host *host)
 {
@@ -2144,8 +2157,11 @@ static int mmc_do_erase(struct mmc_card *card, unsigned int from,
 	 * the erase operation does not exceed the max_busy_timeout, we should
 	 * use R1B response. Or we need to prevent the host from doing hw busy
 	 * detection, which is done by converting to a R1 response instead.
+	 * Note, some hosts requires R1B, which also means they are on their own
+	 * when it comes to deal with the busy timeout.
 	 */
-	if (card->host->max_busy_timeout &&
+	if (!(card->host->caps & MMC_CAP_NEED_RSP_BUSY) &&
+	    card->host->max_busy_timeout &&
 	    busy_timeout > card->host->max_busy_timeout) {
 		cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
 	} else {
@@ -2366,8 +2382,8 @@ int mmc_can_sanitize(struct mmc_card *card)
 	if (card->ext_csd.sec_feature_support & EXT_CSD_SEC_SANITIZE)
 		return 1;
 #else
-	/* Do Not use Sanitize */
-	return 0;
+		/* Do Not use Sanitize */
+		return 0;
 #endif /* CONFIG_MMC_SANITIZE */
 }
 EXPORT_SYMBOL(mmc_can_sanitize);
@@ -2658,12 +2674,12 @@ int _mmc_detect_card_removed(struct mmc_host *host)
 	 */
 	if (!ret && host->ops->get_cd && !host->ops->get_cd(host)) {
 		mmc_detect_change(host, msecs_to_jiffies(200));
-		pr_err("%s: card removed too slowly\n", mmc_hostname(host));
+		pr_debug("%s: card removed too slowly\n", mmc_hostname(host));
 	}
 
 	if (ret) {
 		mmc_card_set_removed(host->card);
-		pr_err("%s: card remove detected\n", mmc_hostname(host));
+		pr_debug("%s: card remove detected\n", mmc_hostname(host));
 		ST_LOG("<%s> %s: card remove detected\n", __func__, mmc_hostname(host));
 	}
 
@@ -2713,7 +2729,6 @@ void mmc_rescan(struct work_struct *work)
 	struct mmc_host *host =
 		container_of(work, struct mmc_host, detect.work);
 	int i;
-	bool extend_wakelock = false;
 
 	if (host->rescan_disable)
 		return;
@@ -2721,8 +2736,6 @@ void mmc_rescan(struct work_struct *work)
 	/* check if hw interrupt is triggered */
 	if (!host->trigger_card_event && !host->card) {
 		pr_err("%s: no detect irq, skipping mmc_rescan\n", mmc_hostname(host));
-		if (wake_lock_active(&host->detect_wake_lock))
-			wake_unlock(&host->detect_wake_lock);
 		return;
 	}
 
@@ -2786,11 +2799,15 @@ void mmc_rescan(struct work_struct *work)
 	}
 
 	for (i = 0; i < ARRAY_SIZE(freqs); i++) {
-		if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min))) {
-			extend_wakelock = true;
+		if (!mmc_rescan_try_freq(host, max(freqs[i], host->f_min)))
 			break;
-		}
-
+#if defined(CONFIG_BCM43456)
+        if ((host->caps2 & MMC_CAP2_NO_SD) && (host->caps2 & MMC_CAP2_NO_MMC)) {
+			dhd_wlan_power(0);
+			msleep(100);
+			dhd_wlan_power(1);
+        }
+#endif /* CONFIG_BCM43456 */
 		if (freqs[i] <= host->f_min)
 			break;
 	}
@@ -2798,11 +2815,8 @@ void mmc_rescan(struct work_struct *work)
 	/* runtime_pm disable */
 	host->ops->runtime_pm_control(host, 0);
  out:
-	if (extend_wakelock && !host->rescan_disable)
+	if (!host->rescan_disable)
 		wake_lock_timeout(&host->detect_wake_lock, HZ / 2);
-	else if (wake_lock_active(&host->detect_wake_lock))
-		wake_unlock(&host->detect_wake_lock);
-
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
 }
@@ -2832,13 +2846,13 @@ void mmc_start_host(struct mmc_host *host)
 			mmc_power_up(host, host->ocr_avail);
 			mmc_release_host(host);
 		}
-
-		if (host->caps2 & MMC_CAP2_SKIP_INIT_SCAN)
-			pr_debug("%s skip mmc detect change\n", mmc_hostname(host));
-		else {
-			mmc_gpiod_request_cd_irq(host);
-			_mmc_detect_change(host, 0, false);
-		}
+		mmc_gpiod_request_cd_irq(host);
+#if defined(CONFIG_BCM43456)
+		if (!strcmp("mmc1", mmc_hostname(host)))
+			printk("%s: bcm43456 skip mmc_detect_change\n", mmc_hostname(host));
+		else
+#endif /* CONFIG_BCM43456 */
+		_mmc_detect_change(host, 0, false);
 	}
 }
 
@@ -2980,6 +2994,19 @@ unregister_bus:
 	mmc_unregister_bus();
 	return ret;
 }
+
+#if defined(CONFIG_BCM43456)
+void mmc_ctrl_power(struct mmc_host *host, bool onoff)
+{
+	if (!onoff) {
+		mmc_claim_host(host);
+		mmc_set_clock(host, host->f_init);
+		mmc_delay(1);
+		mmc_release_host(host);
+	}
+}
+EXPORT_SYMBOL(mmc_ctrl_power);
+#endif /* CONFIG_BCM43456 */
 
 static void __exit mmc_exit(void)
 {

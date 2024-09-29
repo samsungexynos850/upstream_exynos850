@@ -33,11 +33,12 @@
 #include <linux/compiler.h>
 #include <linux/moduleparam.h>
 #include <linux/wakeup_reason.h>
-#ifdef CONFIG_SEC_PM_DEBUG
-#include <linux/rtc.h>
-#include <linux/regulator/machine.h>
-#endif
 #include <linux/memory_hotplug.h>
+#ifdef CONFIG_SEC_PM_DEBUG
+#include <linux/regulator/machine.h>
+#include <linux/rtc.h>
+#endif /* CONFIG_SEC_PM_DEBUG */
+#include <linux/sec_debug.h>
 
 #include "power.h"
 
@@ -81,6 +82,7 @@ void s2idle_set_ops(const struct platform_s2idle_ops *ops)
 	s2idle_ops = ops;
 	unlock_system_sleep();
 }
+EXPORT_SYMBOL_GPL(s2idle_set_ops);
 
 static void s2idle_begin(void)
 {
@@ -164,6 +166,7 @@ static void s2idle_loop(void)
 			break;
 
 		pm_wakeup_clear(false);
+		clear_wakeup_reasons();
 	}
 
 	pm_pr_dbg("resume from suspend-to-idle\n");
@@ -383,25 +386,10 @@ static int suspend_prepare(suspend_state_t state)
 			log_suspend_abort_reason("PM_SUSPEND_PREPARE failed: "
 					"%ps (%d)", callback, nr_calls);
 		}
-#endif
+#endif /* CONFIG_SEC_PM_DEBUG */		
 		nr_calls--;
 		goto Finish;
 	}
-
-#ifndef CONFIG_SUSPEND_SKIP_SYNC
-	trace_suspend_resume(TPS("sync_filesystems"), 0, true);
-	dbg_snapshot_suspend("sync_filesystems", ksys_sync, NULL, state, DSS_FLAG_IN);
-	pr_info("Syncing filesystems ... ");
-	if (intr_sync(NULL)) {
-		printk("canceled.\n");
-		trace_suspend_resume(TPS("sync_filesystems"), 0, false);
-		error = -EBUSY;
-		goto Finish;
-	}
-	pr_cont("done.\n");
-	dbg_snapshot_suspend("sync_filesystems", ksys_sync, NULL, state, DSS_FLAG_OUT);
-	trace_suspend_resume(TPS("sync_filesystems"), 0, false);
-#endif
 
 	trace_suspend_resume(TPS("freeze_processes"), 0, true);
 	dbg_snapshot_suspend("freeze_processes", suspend_freeze_processes,
@@ -413,11 +401,12 @@ static int suspend_prepare(suspend_state_t state)
 	if (!error)
 		return 0;
 
+	log_suspend_abort_reason("One or more tasks refusing to freeze");
 	suspend_stats.failed_freeze++;
 	dpm_save_failed_step(SUSPEND_FREEZE);
 #ifdef CONFIG_SEC_PM_DEBUG
 	log_suspend_abort_reason("Freezing processes failed: %d", error);
-#endif
+#endif /* CONFIG_SEC_PM_DEBUG */
  Finish:
 	mem_stop_offline();
 	__pm_notifier_call_chain(PM_POST_SUSPEND, nr_calls, NULL);
@@ -446,7 +435,6 @@ void __weak arch_suspend_enable_irqs(void)
  */
 static int suspend_enter(suspend_state_t state, bool *wakeup)
 {
-	char suspend_abort[MAX_SUSPEND_ABORT_LEN];
 	int error, last_dev;
 
 	error = platform_suspend_prepare(state);
@@ -458,13 +446,14 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 		last_dev = suspend_stats.last_failed_dev + REC_FAILED_NUM - 1;
 		last_dev %= REC_FAILED_NUM;
 		pr_err("late suspend of devices failed\n");
-		log_suspend_abort_reason("%s device failed to power down",
-			suspend_stats.failed_devs[last_dev]);
+		log_suspend_abort_reason("late suspend of %s device failed",
+					 suspend_stats.failed_devs[last_dev]);
 		goto Platform_finish;
 	}
 #ifdef CONFIG_SEC_PM_DEBUG
 	regulator_show_enabled();
 #endif /* CONFIG_SEC_PM_DEBUG */
+
 	error = platform_suspend_prepare_late(state);
 	if (error)
 		goto Devices_early_resume;
@@ -480,7 +469,7 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 		last_dev %= REC_FAILED_NUM;
 		pr_err("noirq suspend of devices failed\n");
 		log_suspend_abort_reason("noirq suspend of %s device failed",
-			suspend_stats.failed_devs[last_dev]);
+					 suspend_stats.failed_devs[last_dev]);
 		goto Platform_early_resume;
 	}
 	error = platform_suspend_prepare_noirq(state);
@@ -515,9 +504,6 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 			trace_suspend_resume(TPS("machine_suspend"),
 				state, false);
 		} else if (*wakeup) {
-			pm_get_active_wakeup_sources(suspend_abort,
-				MAX_SUSPEND_ABORT_LEN);
-			log_suspend_abort_reason(suspend_abort);
 			error = -EBUSY;
 		}
 		syscore_resume();
@@ -556,7 +542,7 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
  */
 int suspend_devices_and_enter(suspend_state_t state)
 {
-	int error, last_dev;
+	int error;
 	bool wakeup = false;
 
 	if (!sleep_state_supported(state))
@@ -572,11 +558,9 @@ int suspend_devices_and_enter(suspend_state_t state)
 	suspend_test_start();
 	error = dpm_suspend_start(PMSG_SUSPEND);
 	if (error) {
-		last_dev = suspend_stats.last_failed_dev + REC_FAILED_NUM - 1;
-		last_dev %= REC_FAILED_NUM;
 		pr_err("Some devices failed to suspend, or early wake event detected\n");
-		log_suspend_abort_reason("%s device failed to suspend, or early wake event detected",
-			suspend_stats.failed_devs[last_dev]);
+		log_suspend_abort_reason(
+				"Some devices failed to suspend, or early wake event detected");
 		goto Recover_platform;
 	}
 	suspend_test_finish("suspend devices");
@@ -652,6 +636,16 @@ static int enter_state(suspend_state_t state)
 	if (state == PM_SUSPEND_TO_IDLE)
 		s2idle_begin();
 
+#ifndef CONFIG_SUSPEND_SKIP_SYNC
+	trace_suspend_resume(TPS("sync_filesystems"), 0, true);
+	dbg_snapshot_suspend("sync_filesystems", ksys_sync, NULL, state, DSS_FLAG_IN);
+	pr_info("Syncing filesystems ... ");
+	ksys_sync();
+	pr_cont("done.\n");
+	dbg_snapshot_suspend("sync_filesystems", ksys_sync, NULL, state, DSS_FLAG_OUT);
+	trace_suspend_resume(TPS("sync_filesystems"), 0, false);
+#endif
+
 	pm_pr_dbg("Preparing system for sleep (%s)\n", mem_sleep_labels[state]);
 	pm_suspend_clear_flags();
 	error = suspend_prepare(state);
@@ -709,7 +703,10 @@ int pm_suspend(suspend_state_t state)
 #else
 	pr_info("suspend entry (%s)\n", mem_sleep_labels[state]);
 #endif
+
+	secdbg_base_set_task_in_pm_suspend((uint64_t)current);
 	error = enter_state(state);
+	secdbg_base_set_task_in_pm_suspend(0);
 	if (error) {
 		suspend_stats.fail++;
 		dpm_save_failed_errno(error);

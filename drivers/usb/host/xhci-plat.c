@@ -640,8 +640,8 @@ static int xhci_plat_remove(struct platform_device *dev)
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 	struct clk *clk = xhci->clk;
 	struct clk *reg_clk = xhci->reg_clk;
-#ifndef CONFIG_USB_HOST_SAMSUNG_FEATURE
 	struct usb_hcd *shared_hcd = xhci->shared_hcd;
+#if !IS_ENABLED(CONFIG_USB_HOST_SAMSUNG_FEATURE)
 	int timeout = 0;
 #endif
 	
@@ -678,6 +678,7 @@ static int xhci_plat_remove(struct platform_device *dev)
 	xhci_dbg(xhci, "%s: waited %dmsec", __func__, timeout);
 #endif
 
+	pm_runtime_get_sync(&dev->dev);
 	xhci->xhc_state |= XHCI_STATE_REMOVING;
 	xhci->xhci_alloc->offset = 0;
 
@@ -685,12 +686,11 @@ static int xhci_plat_remove(struct platform_device *dev)
 	wake_unlock(xhci->wakelock);
 	wake_lock_destroy(xhci->wakelock);
 
-#if IS_ENABLED(CONFIG_USB_HOST_SAMSUNG_FEATURE)
-	usb_remove_hcd(xhci->shared_hcd);
-#else
+#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+	dev_info(&dev->dev, "remove hcd (shared)\n");
+#endif
 	usb_remove_hcd(shared_hcd);
 	xhci->shared_hcd = NULL;
-#endif
 	usb_phy_shutdown(hcd->usb_phy);
 
 	/*
@@ -702,19 +702,21 @@ static int xhci_plat_remove(struct platform_device *dev)
 	if (parent && hcd->phy)
 		hcd->phy = NULL;
 
-	usb_remove_hcd(hcd);
-#if IS_ENABLED(CONFIG_USB_HOST_SAMSUNG_FEATURE)
-	usb_put_hcd(xhci->shared_hcd);
-#else
-	usb_put_hcd(shared_hcd);
+#ifdef CONFIG_USB_DEBUG_DETAILED_LOG
+	dev_info(&dev->dev, "remove hcd (main)\n");
 #endif
+	usb_remove_hcd(hcd);
+	usb_put_hcd(shared_hcd);
+
 	clk_disable_unprepare(clk);
 	clk_disable_unprepare(reg_clk);
 	usb_put_hcd(hcd);
 
-	pm_runtime_set_suspended(&dev->dev);
 	pm_runtime_disable(&dev->dev);
+	pm_runtime_put_noidle(&dev->dev);
+	pm_runtime_set_suspended(&dev->dev);
 
+	pr_info("%s-n", __func__);
 	return 0;
 }
 
@@ -796,6 +798,7 @@ MODULE_DEVICE_TABLE(acpi, usb_xhci_acpi_match);
 static struct platform_driver usb_xhci_driver = {
 	.probe	= xhci_plat_probe,
 	.remove	= xhci_plat_remove,
+	.shutdown = usb_hcd_platform_shutdown,
 	.driver	= {
 		.name = "xhci-hcd",
 		.pm = &xhci_plat_pm_ops,

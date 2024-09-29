@@ -223,7 +223,7 @@ static inline void purge_txq(struct mem_link_device *mld)
 	/* Purge the skb_txq in every IPC device
 	 * (IPC_MAP_FMT, IPC_MAP_NORM_RAW, etc.)
 	 */
-	for (i = 0; i < MAX_SIPC_MAP; i++) {
+	for (i = 0; i < IPC_MAP_MAX; i++) {
 		struct legacy_ipc_device *dev = mld->legacy_link_dev.dev[i];
 		skb_queue_purge(dev->skb_txq);
 	}
@@ -883,7 +883,7 @@ static enum hrtimer_restart tx_timer_func(struct hrtimer *timer)
 	if (unlikely(!ipc_active(mld)))
 		goto exit;
 
-	for (i = 0; i < MAX_SIPC_MAP; i++) {
+	for (i = 0; i < IPC_MAP_MAX; i++) {
 		struct legacy_ipc_device *dev = mld->legacy_link_dev.dev[i];
 		int ret;
 
@@ -1448,11 +1448,11 @@ static int xmit_to_cp(struct mem_link_device *mld, struct io_device *iod,
 			return xmit_ipc_to_dev(mld, ch, skb, IPC_MAP_FMT);
 		else {
 #ifdef CONFIG_MODEM_IF_LEGACY_QOS
-			return xmit_ipc_to_dev(mld, ch, skb,
-				(skb->queue_mapping == 1) ? IPC_MAP_HPRIO_RAW : IPC_MAP_NORM_RAW);
-#else
-			return xmit_ipc_to_dev(mld, ch, skb, IPC_MAP_NORM_RAW);
+		if (skb->queue_mapping == 1)
+			return xmit_ipc_to_dev(mld, ch, skb, IPC_MAP_HPRIO_RAW);
 #endif
+		return xmit_ipc_to_dev(mld, ch, skb, IPC_MAP_NORM_RAW);
+
 		}
 	}
 }
@@ -2255,7 +2255,7 @@ static int shmem_security_request(struct link_device *ld, struct io_device *iod,
 	struct mem_link_device *mld = ld->mdm_data->mld;
 
 #if defined(CONFIG_SOC_EXYNOS3830)
-	pm_qos_update_request(&ld->pm_qos_mif, 1539000);
+       pm_qos_update_request(&ld->pm_qos_mif, 1539000);
 #endif
 
 	err = copy_from_user(&msr, (const void __user *)arg, sizeof(msr));
@@ -2308,7 +2308,7 @@ static int shmem_security_request(struct link_device *ld, struct io_device *iod,
 
 exit:
 #if defined(CONFIG_SOC_EXYNOS3830)
-	pm_qos_update_request(&ld->pm_qos_mif, 421000);
+       pm_qos_update_request(&ld->pm_qos_mif, 421000);
 #endif
 
 	return err;
@@ -2342,7 +2342,7 @@ static int shmem_security_cp2cp_baaw_request(struct link_device *ld,
 #endif
 
 #ifdef CONFIG_MODEM_IF_NET_GRO
-long gro_flush_time;
+long gro_flush_time = 200000;
 module_param(gro_flush_time, long, 0644);
 
 static void gro_flush_timer(struct link_device *ld)
@@ -2400,7 +2400,7 @@ static int legacy_link_rx_func_napi(struct mem_link_device *mld, int budget, int
 	int i = 0;
 	int ret = 0;
 
-	for (i = 0; i < MAX_SIPC_MAP; i++) {
+	for (i = 0; i < IPC_MAP_MAX; i++) {
 		struct legacy_ipc_device *dev = mld->legacy_link_dev.dev[i];
 		int ps_rcvd = 0;
 		if (unlikely(circ_empty(get_rxq_head(dev), get_rxq_tail(dev))))
@@ -2727,6 +2727,33 @@ struct shmem_srinfo {
 	char buf[0];
 };
 
+#if IS_ENABLED(CONFIG_SBD_BOOTLOG)
+static void shmem_clr_sbdcplog(struct mem_link_device *mld)
+{
+	u8 __iomem *base = mld->base + mld->size - SHMEM_BOOTSBDLOG_SIZE;
+
+	memset(base, 0, SHMEM_BOOTSBDLOG_SIZE);
+}
+
+void shmem_pr_sbdcplog(struct timer_list *t)
+{
+	struct link_device *ld = from_timer(ld, t, cplog_timer);
+	struct mem_link_device *mld = ld_to_mem_link_device(ld);
+	u8 __iomem *base = mld->base + mld->size - SHMEM_BOOTSBDLOG_SIZE;
+	u8 __iomem *offset;
+	int i;
+
+	mif_info("dump cp logs: size: 0x%x, base: %p\n", (unsigned int)mld->size, base);
+
+	for (i = 0; i * 32 < SHMEM_BOOTSBDLOG_SIZE; i++) {
+		offset = base + i * 32;
+		mif_info("%6X: %*ph\n", (unsigned int)(offset - mld->base), 32, offset);
+	}
+
+	shmem_clr_sbdcplog(mld);
+}
+#endif
+
 /* not in use */
 static int shmem_ioctl(struct link_device *ld, struct io_device *iod,
 		       unsigned int cmd, unsigned long arg)
@@ -2773,9 +2800,10 @@ static int shmem_ioctl(struct link_device *ld, struct io_device *iod,
 
 	case IOCTL_GET_CP_BOOTLOG:
 	{
-
+#if !IS_ENABLED(CONFIG_SBD_BOOTLOG)
 		u8 __iomem *base = mld->base + SHMEM_BOOTLOG_BASE;
 		char str[SHMEM_BOOTLOG_BUFF];
+
 		unsigned int size = base[0]        + (base[1] << 8)
 				 + (base[2] << 16) + (base[3] << 24);
 
@@ -2786,16 +2814,20 @@ static int shmem_ioctl(struct link_device *ld, struct io_device *iod,
 
 		strncpy(str, base + SHMEM_BOOTLOG_OFFSET, size);
 		mif_info("CP boot log[%d] : %s\n", size, str);
+#else
+		mif_add_timer(&ld->cplog_timer, 0, shmem_pr_sbdcplog);
+#endif
 		break;
 	}
 
 	case IOCTL_CLR_CP_BOOTLOG:
 	{
+#if !IS_ENABLED(CONFIG_SBD_BOOTLOG)
 		u8 __iomem *base = mld->base + SHMEM_BOOTLOG_BASE;
 
 		mif_info("Clear CP boot log\n");
 		memset(base, 0, SHMEM_BOOTLOG_BUFF);
-
+#endif
 		break;
 	}
 
@@ -3762,10 +3794,6 @@ struct link_device *create_link_device(struct platform_device *pdev, enum modem_
 
 	if (shmem_rx_setup(ld) < 0)
 		goto error;
-
-#if defined(CONFIG_SOC_EXYNOS3830)
-	pm_qos_add_request(&ld->pm_qos_mif, (int)PM_QOS_BUS_THROUGHPUT, 421000);
-#endif
 
 	if (mld->attrs & LINK_ATTR(LINK_ATTR_DPRAM_MAGIC)) {
 		mif_err("%s<->%s: LINK_ATTR_DPRAM_MAGIC\n",

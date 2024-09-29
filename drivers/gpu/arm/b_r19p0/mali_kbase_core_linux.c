@@ -2863,7 +2863,7 @@ static ssize_t show_reset_timeout(struct device *dev,
 static DEVICE_ATTR(reset_timeout, S_IRUGO | S_IWUSR, show_reset_timeout,
 		set_reset_timeout);
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
+#ifdef CONFIG_DEBUG_FS
 static ssize_t show_mem_pool_size(struct device *dev,
 		struct device_attribute *attr, char * const buf)
 {
@@ -3004,7 +3004,6 @@ static ssize_t show_lp_mem_pool_max_size(struct device *dev,
 		kbdev->mem_pools.large, MEMORY_GROUP_MANAGER_NR_GROUPS,
 		kbase_mem_pool_debugfs_max_size);
 }
-
 /**
  * set_lp_mem_pool_max_size - Set maximum size of the large memory pages pool.
  * @dev:   The device this sysfs file is for.
@@ -3034,7 +3033,7 @@ static ssize_t set_lp_mem_pool_max_size(struct device *dev,
 
 static DEVICE_ATTR(lp_mem_pool_max_size, S_IRUGO | S_IWUSR, show_lp_mem_pool_max_size,
 		set_lp_mem_pool_max_size);
-#endif /* CONFIG_DEBUG_FS */
+#endif
 
 /**
  * show_js_ctx_scheduling_mode - Show callback for js_ctx_scheduling_mode sysfs
@@ -3963,7 +3962,7 @@ static struct attribute *kbase_attrs[] = {
 	&dev_attr_js_scheduling_period.attr,
 	&dev_attr_power_policy.attr,
 	&dev_attr_core_mask.attr,
-#if IS_ENABLED(CONFIG_DEBUG_FS)
+#ifdef CONFIG_DEBUG_FS
 	&dev_attr_mem_pool_size.attr,
 	&dev_attr_mem_pool_max_size.attr,
 	&dev_attr_lp_mem_pool_size.attr,

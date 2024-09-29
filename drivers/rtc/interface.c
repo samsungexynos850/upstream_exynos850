@@ -161,7 +161,6 @@ int rtc_read_hrtime(struct rtc_device *rtc, struct rtc_hrtime *tm)
 	err = __rtc_read_hrtime(rtc, tm);
 	mutex_unlock(&rtc->ops_lock);
 
-	trace_rtc_read_hrtime(rtc_hrtm_to_time64(tm), err);
 	return err;
 }
 #endif /* CONFIG_RTC_HIGH_RES*/

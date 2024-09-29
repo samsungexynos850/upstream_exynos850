@@ -614,6 +614,22 @@ config ZSMALLOC_STAT
 	  information to userspace via debugfs.
 	  If unsure, say N.
 
+config MM_EVENT_STAT
+	bool "Track per-process MM event"
+	depends on MMU
+	help
+	  This option enables per-process mm event stat(e.g., fault, reclaim,
+	  compaction and so on ) with some interval(Default is 0.5sec).
+	  Admin can see the stat from trace file via debugfs(e.g.,
+	  /sys/kernel/debug/tracing/trace)
+
+	  It includes max/average memory allocation latency for the interval
+	  as well as event count so that admin can see what happens in VM side
+	  (how many each event happens and how much processes spent time for
+	  the MM event). If it's too large, that would be not good situation.
+
+	  System can dump the trace into bugreport when user allows the dump.
+
 config GENERIC_EARLY_IOREMAP
 	bool
 
@@ -774,7 +790,7 @@ config BALANCE_ANON_FILE_RECLAIM
 
 config FAULT_AROUND_4KB
 	bool "Fault around bytes 4KB"
-	default n
+	default y
 	help
 	  Reduce fault around bytes to 4KB
 
@@ -787,7 +803,7 @@ config KSWAPD_CPU
 
 config MMAP_READAROUND_LIMIT
 	int "Limit mmap readaround upperbound"
-	default 0
+	default 16
 	help
 	  Inappropriate mmap readaround size can hurt device performance
 	  during the sluggish situation. Add the hard upper-limit for
@@ -796,7 +812,7 @@ config MMAP_READAROUND_LIMIT
 config SWAP_ENABLE_READAHEAD
 	bool "Enable readahead on page swap in"
 	depends on SWAP
-	default y
+	default n
 	help
 	  When a page fault occurs, adjacent pages are also paged in
           expecting those pages will be used in near future.
@@ -828,6 +844,23 @@ config GUP_BENCHMARK
 
 config ARCH_HAS_PTE_SPECIAL
 	bool
+
+config LARGE_DIRTY_BUFFER
+	bool "Use large dirty_threshold value by enabling dirty_ratio"
+	default n
+	help
+	  This config enables dirty_ratio/dirty_background_ratio,
+	  and it means large dirty_threshold value in 64bit architectures.
+	  If unsure, say N to use kernel default value
+
+config MAX_DIRTY_THRESH_PAGES
+	int "The upper bound of VM dirty_thresh value in number of pages"
+	depends on LARGE_DIRTY_BUFFER
+	default 25600
+	help
+	  This value is the upper bound of VM dirty-thresh. (0 means no limit.)
+	  It is only effective when dirty_ratio is used.
+	  (Setting dirty_bytes disables this option.)
 
 config HPA
 	bool "High-order Pages Allocator"
@@ -865,24 +898,6 @@ config SPECULATIVE_PAGE_FAULT
 	 detected or because underlying PMD or PTE tables are not yet
 	 allocating, it is failing its processing and a classic page fault
 	 is then tried.
-
-config LARGE_DIRTY_BUFFER
-	bool "Use large dirty_threshold value by enabling dirty_ratio"
-	default n
-	help
-	  This config enables dirty_ratio/dirty_background_ratio,
-	  and it means large dirty_threshold value in 64bit architectures.
-	  If unsure, say N to use kernel default value
-
-config MAX_DIRTY_THRESH_PAGES
-	int "The upper bound of VM dirty_thresh value in number of pages"
-	depends on LARGE_DIRTY_BUFFER
-	default 25600
-	help
-	  This value is the upper bound of VM dirty-thresh. (0 means no limit.)
-	  It is only effective when dirty_ratio is used.
-	  (Setting dirty_bytes disables this option.)
-
 endmenu
 
 config PROCESS_RECLAIM

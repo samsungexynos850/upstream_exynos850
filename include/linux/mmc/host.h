@@ -346,8 +346,8 @@ struct mmc_host {
 #define MMC_CAP_UHS		(MMC_CAP_UHS_SDR12 | MMC_CAP_UHS_SDR25 | \
 				 MMC_CAP_UHS_SDR50 | MMC_CAP_UHS_SDR104 | \
 				 MMC_CAP_UHS_DDR50)
-/* (1 << 21) is free for reuse */
-#define MMC_CAP_RUNTIME_RESUME  (1 << 22)
+#define MMC_CAP_RUNTIME_RESUME  (1 << 21)
+#define MMC_CAP_NEED_RSP_BUSY	(1 << 22)	/* Commands with R1B can't use R1. */
 #define MMC_CAP_DRIVER_TYPE_A	(1 << 23)	/* Host supports Driver Type A */
 #define MMC_CAP_DRIVER_TYPE_C	(1 << 24)	/* Host supports Driver Type C */
 #define MMC_CAP_DRIVER_TYPE_D	(1 << 25)	/* Host supports Driver Type D */
@@ -489,6 +489,7 @@ struct mmc_host {
 #endif /* CONFIG_MMC_CRYPTO */
 
 	int (*sdcard_uevent)(struct mmc_card *card);
+
 	unsigned long		private[0] ____cacheline_aligned;
 };
 

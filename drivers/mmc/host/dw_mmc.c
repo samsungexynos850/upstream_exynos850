@@ -593,7 +593,7 @@ static bool dw_mci_wait_data_busy(struct dw_mci *host, struct mmc_request *mrq)
 {
 	u32 status;
 	struct dw_mci_slot *slot = host->slot;
-	int try = 2;
+	int try = 6;
 	u32 clkena;
 	bool ret = false;
 
@@ -3685,6 +3685,27 @@ static void dw_mci_timeout_timer(struct timer_list *t)
 	}
 }
 
+#if defined(CONFIG_BCM43456)
+static void dw_mci_notify_change(void *dev, int state)
+{
+	struct dw_mci *host = (struct dw_mci *)dev;
+	unsigned long flags;
+
+	if (host) {
+		spin_lock_irqsave(&host->lock, flags);
+		if (state) {
+			printk(KERN_ERR "card inserted\n");
+			host->pdata->quirks |= DW_MCI_QUIRK_BROKEN_CARD_DETECTION;
+		} else {
+			printk(KERN_ERR "card removed\n");
+			host->pdata->quirks &= ~DW_MCI_QUIRK_BROKEN_CARD_DETECTION;
+		}
+		queue_work(host->card_workqueue, &host->card_work);
+		spin_unlock_irqrestore(&host->lock, flags);
+	}
+}
+#endif // defined(CONFIG_BCM43456)
+
 #ifdef CONFIG_OF
 /* given a slot, find out the device node representing that slot */
 static struct device_node *dw_mci_of_find_slot_node(struct dw_mci_slot *slot)
@@ -3728,16 +3749,19 @@ static void dw_mci_slot_of_parse(struct dw_mci_slot *slot)
 static irqreturn_t dw_mci_detect_interrupt(int irq, void *dev_id)
 {
 	struct dw_mci *host = dev_id;
-	struct mmc_host *mmc = host->slot->mmc;
+	struct mmc_host *mmc;
 
 	if (host->card_detect_cnt < 0x7FFFFFF0)
 		host->card_detect_cnt++;
 
-	mmc->trigger_card_event = true;
+	if (host->slot->mmc) {
+		mmc = host->slot->mmc;
+		mmc->trigger_card_event = true;
+	}
+
 	/* sdcard power off */
 	if (host->quirks & DW_MCI_QUIRK_CD_PWR_OFF)
 		queue_work(host->sd_card_det_workqueue, &host->card_det_work);
-
 	queue_work(host->card_workqueue, &host->card_work);
 
 	return IRQ_HANDLED;
@@ -4125,6 +4149,13 @@ static int dw_mci_init_slot(struct dw_mci *host, struct platform_device *pdev)
 
 	dw_mci_get_cd(mmc);
 	host->cqe_on = false;
+	
+#if defined(CONFIG_BCM43456)
+        if (host->pdata->cd_type == DW_MCI_CD_EXTERNAL) {
+            mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
+            mmc->pm_caps |= MMC_PM_KEEP_POWER;
+        }
+#endif /* CONFIG_BCM43456 */
 
 	ret = mmc_add_host(mmc);
 	if (ret)
@@ -4160,6 +4191,12 @@ static int dw_mci_init_slot(struct dw_mci *host, struct platform_device *pdev)
 
 	/* Card initially undetected */
 	slot->last_detect_state = 0;
+
+#if defined(CONFIG_BCM43456)
+        if (host->pdata->cd_type == DW_MCI_CD_EXTERNAL) {
+            host->pdata->ext_cd_init(&dw_mci_notify_change, (void*)host, mmc);
+        }
+#endif /* CONFIG_BCM43456 */
 
 	return 0;
 
@@ -4533,6 +4570,40 @@ static struct dw_mci_of_quirks {
 	.quirk = "enable-ulp-mode",.id = DW_MCI_QUIRK_ENABLE_ULP,}, {
 	.quirk = "card-detect-pwr-off",.id = DW_MCI_QUIRK_CD_PWR_OFF,},};
 
+#if defined(CONFIG_BCM43456)
+void (*notify_func_callback)(void *dev_id, int state);
+void *mmc_host_dev = NULL;
+static DEFINE_MUTEX(notify_mutex_lock);
+EXPORT_SYMBOL(notify_func_callback);
+EXPORT_SYMBOL(mmc_host_dev);
+
+struct mmc_host *wlan_mmc = NULL;
+static int ext_cd_init_callback(
+	void (*notify_func)(void *dev_id, int state), void *dev_id, struct mmc_host *mmc)
+{
+	printk("Enter %s\n",__FUNCTION__);
+	mutex_lock(&notify_mutex_lock);
+	WARN_ON(notify_func_callback);
+	notify_func_callback = notify_func;
+	mmc_host_dev = dev_id;
+	wlan_mmc = mmc;
+	mutex_unlock(&notify_mutex_lock);
+	return 0;
+}
+
+static int ext_cd_cleanup_callback(
+	void (*notify_func)(void *dev_id, int state), void *dev_id)
+{
+	printk("Enter %s\n",__FUNCTION__);
+	mutex_lock(&notify_mutex_lock);
+	WARN_ON(notify_func_callback);
+	notify_func_callback = NULL;
+	mmc_host_dev = NULL;
+	mutex_unlock(&notify_mutex_lock);
+	return 0;
+}
+#endif /* CONFIG_BCM43456 */
+
 static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
 {
 	struct dw_mci_board *pdata;
@@ -4633,6 +4704,14 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
 		if (!of_property_read_bool(np, "disable-cqe-dcmd"))
 			pdata->caps2 |= MMC_CAP2_CQE_DCMD;
 	}
+
+#if defined(CONFIG_BCM43456)
+	if (of_find_property(np, "cd-type-external", NULL)) {
+		pdata->cd_type = DW_MCI_CD_EXTERNAL;
+		pdata->ext_cd_init = ext_cd_init_callback;
+		pdata->ext_cd_cleanup = ext_cd_cleanup_callback;
+	}
+#endif /* CONFIG_BCM43456 */
 
 	return pdata;
 }
@@ -4892,7 +4971,6 @@ int dw_mci_probe(struct dw_mci *host, struct platform_device *pdev)
 		goto err_dmaunmap;
 	}
 	INIT_WORK(&host->card_work, dw_mci_work_routine_card);
-
 	if (host->quirks & DW_MCI_QUIRK_CD_PWR_OFF) {
 		/* For SD card power control */
 		host->sd_card_det_workqueue = alloc_workqueue("sd-card-det-wq", WQ_MEM_RECLAIM | WQ_UNBOUND | WQ_HIGHPRI, 1);
@@ -4902,7 +4980,6 @@ int dw_mci_probe(struct dw_mci *host, struct platform_device *pdev)
 		}
 		INIT_WORK(&host->card_det_work, dw_mci_sd_power_off);
 	}
-
 	/* INT min lock */
 	pm_workqueue = create_freezable_workqueue("dw_mci_clk_ctrl");
 	if (!pm_workqueue)
@@ -4918,7 +4995,9 @@ int dw_mci_probe(struct dw_mci *host, struct platform_device *pdev)
 		goto err_workqueue;
 
 	host->pdata->tuned = false;
-
+#if defined(CONFIG_BCM43456)
+	host->tuned = false;
+#endif /* CONFIG_BCM43456 */
 	if (host->pdata->num_slots)
 		host->num_slots = host->pdata->num_slots;
 	else
@@ -4965,6 +5044,7 @@ int dw_mci_probe(struct dw_mci *host, struct platform_device *pdev)
 #ifdef CONFIG_CPU_IDLE
 	dw_mci_sicd_control(host, true);
 #endif
+
 	host->card_detect_cnt = 0;
 
 	/* Now that slots are all setup, we can enable card detect */

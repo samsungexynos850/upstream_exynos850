@@ -18,6 +18,10 @@
 #include "abox_qos.h"
 #include "abox_soc.h"
 
+#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
+#include <sound/samsung/sec_audio_debug.h>
+#endif
+
 #define DEFAULT_CPU_GEAR_ID		(0xAB0CDEFA)
 #define TEST_CPU_GEAR_ID		(DEFAULT_CPU_GEAR_ID + 1)
 #define DEFAULT_LIT_FREQ_ID		DEFAULT_CPU_GEAR_ID
@@ -47,6 +51,7 @@
 #define IOVA_DDMA_BUFFER_BASE		(0x96000000)
 #define IOVA_DDMA_BUFFER(x)		(IOVA_DDMA_BUFFER_BASE + (SZ_1M * x))
 #define IOVA_VSS_FIRMWARE		(0xA0000000)
+#define IOVA_VSS_FIRMWARE_NOCP		(0xA0600000)
 #define IOVA_VSS_PARAMETER		(0xA1000000)
 #define IOVA_VSS_PCI			(0xA2000000)
 #define IOVA_VSS_PCI_DOORBELL		(0xA3000000)
@@ -54,6 +59,7 @@
 #define IOVA_SILENT_LOG			(0xE0000000)
 #define PHSY_VSS_FIRMWARE		(0xFEE00000)
 #define PHSY_VSS_SIZE			(SZ_8M)
+#define PHSY_NOCP_VSS_SIZE		(SZ_1M)
 
 #define ABOX_LOG_OFFSET			(0xb00000)
 #define ABOX_LOG_SIZE			(SZ_1M)
@@ -379,8 +385,8 @@ struct abox_data {
 	void *shm_addr;
 	size_t shm_size;
 	struct abox2host_hndshk_tag *hndshk_tag;
-	void *drv_args_addr;
-	size_t drv_args_size;
+	unsigned int bootargs_offset;
+	const char *bootargs;
 	int clk_diff_ppb;
 	unsigned int if_count;
 	unsigned int rdma_count;

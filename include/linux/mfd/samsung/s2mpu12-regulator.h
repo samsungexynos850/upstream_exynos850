@@ -430,6 +430,9 @@ struct s2mpu12_dev {
 	/* Work queue */
 	struct workqueue_struct *irq_wqueue;
 	struct delayed_work irq_work;
+#if IS_ENABLED(CONFIG_SEC_PM)
+	struct device *ap_pmic_dev;
+#endif /* CONFIG_SEC_PM */
 };
 
 enum s2mpu12_types {

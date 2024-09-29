@@ -15,14 +15,16 @@
 
 #define MAX_CNT_U64     0xFFFFFFFFFF
 #define MAX_CNT_U32     0x7FFFFFFF
-#define STATUS_MASK     (R1_ERROR | R1_CC_ERROR | R1_CARD_ECC_FAILED | R1_WP_VIOLATION | R1_OUT_OF_RANGE)
+#define STATUS_MASK     (R1_ERROR | R1_CC_ERROR |\
+			R1_CARD_ECC_FAILED | R1_WP_VIOLATION | R1_OUT_OF_RANGE)
 
 /* Only [0:4] bits in response are reserved. The other bits shouldn't be used */
 #define HALT_UNHALT_ERR		0x00000001
 #define CQ_EN_DIS_ERR		0x00000002
 #define RPMB_SWITCH_ERR		0x00000004
 #define HW_RST			0x00000008
-#define STATUS_ERR_MASK		(HALT_UNHALT_ERR | CQ_EN_DIS_ERR | RPMB_SWITCH_ERR | HW_RST)
+#define STATUS_ERR_MASK		(HALT_UNHALT_ERR | CQ_EN_DIS_ERR |\
+				RPMB_SWITCH_ERR | HW_RST)
 
 struct mmc_blk_request;
 
@@ -240,7 +242,7 @@ struct mmc_queue_req;
  * MMC Physical partitions
  */
 struct mmc_part {
-	unsigned int	size;	/* partition size (in bytes) */
+	u64		size;	/* partition size (in bytes) */
 	unsigned int	part_cfg;	/* partition type */
 	char	name[MAX_MMC_PART_NAME_LEN];
 	bool	force_ro;	/* to make boot parts RO by default */
@@ -341,6 +343,7 @@ struct mmc_card {
 
 	unsigned int		bouncesz;	/* Bounce buffer size */
 	struct workqueue_struct *complete_wq;	/* Private workqueue */
+
 	struct device_attribute error_count;
 	struct mmc_card_error_log err_log[10];
 };
@@ -351,7 +354,8 @@ static inline bool mmc_large_sector(struct mmc_card *card)
 }
 
 bool mmc_card_is_blockaddr(struct mmc_card *card);
-void mmc_card_error_logging(struct mmc_card *card, struct mmc_blk_request *brq, u32 status);
+void mmc_card_error_logging(struct mmc_card *card,
+				struct mmc_blk_request *brq, u32 status);
 
 #define mmc_card_mmc(c)		((c)->type == MMC_TYPE_MMC)
 #define mmc_card_sd(c)		((c)->type == MMC_TYPE_SD)

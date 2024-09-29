@@ -363,9 +363,12 @@ static int abox_of_get_addr(struct abox_data *data, struct device_node *np,
 	case 1:
 		*addr = data->dram_base;
 		break;
+#ifdef CONFIG_SND_SOC_ABOX_NOCP
+#else
 	case 2:
 		*addr = shm_get_vss_region();
 		break;
+#endif
 	}
 	*addr += area[1];
 	if (size)
@@ -1042,10 +1045,10 @@ int abox_iommu_map_sg(struct device *dev, unsigned long iova,
 		goto out;
 	}
 
-	ret = iommu_map_sg(data->iommu_domain, iova, sg, nents, prot);
+	ret = default_iommu_map_sg(data->iommu_domain, iova, sg, nents, prot);
 	if (ret < 0) {
 		devm_kfree(dev, mapping);
-		dev_err(dev, "iommu_map_sg(%#lx) fail: %d\n", iova, ret);
+		dev_err(dev, "default_iommu_map_sg(%#lx) fail: %d\n", iova, ret);
 		goto out;
 	}
 
@@ -2182,11 +2185,14 @@ static void abox_ext_bin_download(struct abox_data *data,
 		size = DRAM_FIRMWARE_SIZE;
 		efw->iova = efw->offset + IOVA_DRAM_FIRMWARE;
 		break;
+#ifdef CONFIG_SND_SOC_ABOX_NOCP
+#else
 	case 2:
 		base = shm_get_vss_region();
 		size = shm_get_vss_size();
 		efw->iova = efw->offset + IOVA_VSS_FIRMWARE;
 		break;
+#endif
 	default:
 		dev_err(dev, "%s: invalied area %s, %u, %#x\n", __func__,
 				efw->name, efw->area, efw->offset);
@@ -2591,6 +2597,17 @@ static int abox_download_firmware(struct device *dev)
 	if (ret)
 		return ret;
 
+	if ((data->bootargs_offset != 0) && (data->bootargs != NULL)) {
+		dev_info(dev, "bootargs[%p][0x%x][%s]\n",
+				data->sram_base,
+				data->bootargs_offset, data->bootargs);
+
+		memcpy_toio(data->sram_base + data->bootargs_offset,
+				data->bootargs, SZ_512);
+	} else {
+		dev_info(dev, "bootargs is NULL\n");
+	}
+
 	/* Requesting missing extra firmware is waste of time. */
 	if (!requested) {
 		abox_request_extra_firmware(data);
@@ -2696,11 +2713,6 @@ static int abox_enable(struct device *dev)
 				&val);
 		dev_info(dev, "[1] ABOX Timer1 Preset LSB = %x\n", val);
 		abox_update_suspend_wait_flag(data, false);
-		if (is_slog_memory_free()) {
-			if (data->drv_args_addr && data->drv_args_size) {
-				memcpy_toio(data->drv_args_addr, "slog=false", SZ_256);
-			}
-		}
 		abox_start_timer(data);
 	} else {
 		abox_gic_init_gic(data->dev_gic);
@@ -2715,11 +2727,6 @@ static int abox_enable(struct device *dev)
 			abox_request_cpu_gear(dev, data, DEFAULT_CPU_GEAR_ID,
 					ABOX_CPU_GEAR_MIN, "enable");
 			goto error;
-		}
-		if (is_slog_memory_free()) {
-			if (data->drv_args_addr && data->drv_args_size) {
-				memcpy_toio(data->drv_args_addr, "slog=false", SZ_256);
-			}
 		}
 	}
 
@@ -3084,7 +3091,7 @@ static int samsung_abox_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&data->iommu_maps);
 
 	data->ipc_workqueue = alloc_ordered_workqueue("abox_ipc",
-			WQ_MEM_RECLAIM);
+			WQ_MEM_RECLAIM | WQ_HIGHPRI);
 	if (!data->ipc_workqueue) {
 		dev_err(dev, "Couldn't create workqueue %s\n", "abox_ipc");
 		return -ENOMEM;
@@ -3140,6 +3147,18 @@ static int samsung_abox_probe(struct platform_device *pdev)
 	abox_iommu_map(dev, IOVA_DRAM_FIRMWARE, data->dram_base_phys,
 			DRAM_FIRMWARE_SIZE, data->dram_base);
 
+#ifdef CONFIG_SND_SOC_ABOX_NOCP
+	addr = dmam_alloc_coherent(dev, PHSY_NOCP_VSS_SIZE, &paddr, GFP_KERNEL);
+	memset(addr, 0x0, PHSY_NOCP_VSS_SIZE);
+	if (paddr) {
+		dev_info(dev, "%s(%#x) alloc\n", "nocp vss firmware",
+				PHSY_NOCP_VSS_SIZE);
+		abox_iommu_map(dev, IOVA_VSS_FIRMWARE_NOCP,
+				paddr, PHSY_NOCP_VSS_SIZE, addr);
+	} else {
+		dev_info(dev, "not vss firmware virtual\n");
+	}
+#else
 	paddr = shm_get_vss_base();
 	if (paddr) {
 		dev_info(dev, "%s(%#x) alloc\n", "vss firmware",
@@ -3147,25 +3166,21 @@ static int samsung_abox_probe(struct platform_device *pdev)
 		abox_iommu_map(dev, IOVA_VSS_FIRMWARE, paddr,
 				shm_get_vss_size(), shm_get_vss_region());
 	} else {
-		dev_info(dev, "%s(%#x) fake\n", "vss firmware", PHSY_VSS_SIZE);
+		dev_info(dev, "%s(%#x) alloc\n", "vss firmware virtual",
+				PHSY_VSS_SIZE);
 		addr = dmam_alloc_coherent(dev, PHSY_VSS_SIZE, &paddr,
 				GFP_KERNEL);
-		abox_iommu_map(dev, IOVA_VSS_FIRMWARE, paddr, PHSY_VSS_SIZE, addr);
+		memset(addr, 0x0, PHSY_VSS_SIZE);
+		abox_iommu_map(dev, IOVA_VSS_FIRMWARE, paddr, PHSY_VSS_SIZE,
+				addr);
 	}
-#if 0
-	paddr = shm_get_vparam_base();
-	if (paddr) {
-		dev_info(dev, "%s(%#x) alloc\n", "vss parameter",
-				shm_get_vparam_size());
-		abox_iommu_map(dev, IOVA_VSS_PARAMETER, paddr,
-				shm_get_vparam_size(), shm_get_vparam_region());
-	} else {
-		dev_info(dev, "%s(%#x) fake\n", "vss parameter", PAGE_SIZE);
-		addr = dmam_alloc_coherent(dev, PAGE_SIZE, &paddr, GFP_KERNEL);
-		abox_iommu_map(dev, IOVA_VSS_PARAMETER, paddr, PAGE_SIZE, addr);
-	}
-#endif
 
+	paddr = shm_get_vparam_base();
+	dev_info(dev, "%s(%#x) alloc\n", "vss parameter",
+			shm_get_vparam_size());
+	abox_iommu_map(dev, IOVA_VSS_PARAMETER, paddr,
+			shm_get_vparam_size(), shm_get_vparam_region());
+#endif
 	abox_iommu_map(dev, 0x10000000, 0x10000000, PAGE_SIZE, 0);
 	iovmm_set_fault_handler(dev, abox_iommu_fault_handler, data);
 
@@ -3242,8 +3257,27 @@ static int samsung_abox_probe(struct platform_device *pdev)
 			&data->shm_size);
 	abox_of_get_addr(data, np, "samsung,handshake-area",
 			(void **)&data->hndshk_tag, NULL);
-	abox_of_get_addr(data, np, "samsung,drv-bootargs-area",
-			&data->drv_args_addr, &data->drv_args_size);
+
+	data->bootargs_offset = 0;
+	ret = of_property_read_u32(np, "samsung,abox-bootargs-offset",
+			&data->bootargs_offset);
+	if (ret < 0) {
+		dev_err(dev, "Failed to read %s: %d\n",
+				"samsung,abox-bootargs-offset", ret);
+		data->bootargs_offset = 0;
+		return ret;
+	}
+
+	ret = of_property_read_string(np, "samsung,abox-bootargs",
+			&data->bootargs);
+	if (ret < 0) {
+		dev_err(dev, "Failed to read %s: %d\n",
+				"samsung,abox-bootargs", ret);
+		return ret;
+	}
+	dev_info(dev, "bootargs[0x%x][%s]\n",
+			data->bootargs_offset, data->bootargs);
+
 	ret = abox_ipc_init(dev, data->ipc_tx_addr, data->ipc_tx_size,
 			data->ipc_rx_addr, data->ipc_rx_size);
 	for (i = 0; i < IPC_ID_COUNT; i++)

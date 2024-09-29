@@ -70,6 +70,7 @@ int exynos_fmp_fips_init(struct exynos_fmp *fmp)
 	int ret = 0;
 
 	set_fmp_fips_state(FMP_FIPS_PROGRESS_STATE);
+	fmp->result.overall = 0;
 	dev_info(fmp->dev, "%s: Started!!\n", __func__);
 
 	if (!fmp || !fmp->dev) {

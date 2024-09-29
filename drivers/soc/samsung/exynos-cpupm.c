@@ -21,13 +21,13 @@
 #include <soc/samsung/cal-if.h>
 #include <soc/samsung/exynos-pmu.h>
 
-#if defined(CONFIG_SEC_PM)
-#if defined(CONFIG_MUIC_NOTIFIER) && defined(CONFIG_PDIC_NOTIFIER)
+#if defined(CONFIG_SEC_PM) && defined(CONFIG_MUIC_NOTIFIER)
 #include <linux/muic/common/muic.h>
 #include <linux/muic/common/muic_notifier.h>
+#if defined(CONFIG_PDIC_NOTIFIER)
 #include <linux/usb/typec/common/pdic_notifier.h>
-#endif /* CONFIG_MUIC_NOTIFIER && CONFIG_PDIC_NOTIFIER */
-#endif /* CONFIG_SEC_PM */
+#endif /* CONFIG_PDIC_NOTIFIER */
+#endif /* CONFIG_SEC_PM && CONFIG_MUIC_NOTIFIER */
 
 static int cpupm_initialized;
 
@@ -971,16 +971,18 @@ static int __init exynos_cpupm_early_init(void)
 }
 early_initcall(exynos_cpupm_early_init);
 
-#if defined(CONFIG_SEC_PM)
-#if defined(CONFIG_MUIC_NOTIFIER) && defined(CONFIG_PDIC_NOTIFIER)
+#if defined(CONFIG_SEC_PM) && defined(CONFIG_MUIC_NOTIFIER)
 struct notifier_block cpuidle_muic_nb;
 
 static int exynos_cpupm_muic_notifier(struct notifier_block *nb,
 				unsigned long action, void *data)
 {
-	PD_NOTI_ATTACH_TYPEDEF *pnoti = (PD_NOTI_ATTACH_TYPEDEF *)data;
-	muic_attached_dev_t attached_dev = pnoti->cable_type;
-	bool jig_is_attached = false;
+#if defined(CONFIG_PDIC_NOTIFIER)
+	PD_NOTI_ATTACH_TYPEDEF *p_noti = (PD_NOTI_ATTACH_TYPEDEF *)data;
+	muic_attached_dev_t attached_dev = p_noti->cable_type;
+#else
+	muic_attached_dev_t attached_dev = *(muic_attached_dev_t *)data;
+#endif
 
 	switch (attached_dev) {
 	case ATTACHED_DEV_JIG_UART_OFF_MUIC:
@@ -990,17 +992,14 @@ static int exynos_cpupm_muic_notifier(struct notifier_block *nb,
 	case ATTACHED_DEV_JIG_UART_ON_MUIC:
 	case ATTACHED_DEV_JIG_UART_ON_VB_MUIC:
 		if (action == MUIC_NOTIFY_CMD_DETACH) {
-			jig_is_attached = false;
+			pr_info("%s: JIG(%d) is detached\n", __func__, attached_dev);
 			enable_power_mode(0, POWERMODE_TYPE_SYSTEM);
 		} else if (action == MUIC_NOTIFY_CMD_ATTACH) {
-			jig_is_attached = true;
+			pr_info("%s: JIG(%d) is attached\n", __func__, attached_dev);
 			disable_power_mode(0, POWERMODE_TYPE_SYSTEM);
 		} else {
 			pr_err("%s: ACTION Error!(%lu)\n", __func__, action);
 		}
-
-		pr_info("%s: JIG(%d) is %s\n", __func__, attached_dev,
-				jig_is_attached ? "attached" : "detached");
 		break;
 	default:
 		break;
@@ -1015,5 +1014,4 @@ static int __init exynos_cpupm_muic_notifier_init(void)
 			exynos_cpupm_muic_notifier, MUIC_NOTIFY_DEV_CPUIDLE);
 }
 late_initcall(exynos_cpupm_muic_notifier_init);
-#endif /* CONFIG_MUIC_NOTIFIER && CONFIG_PDIC_NOTIFIER */
-#endif /* CONFIG_SEC_PM */
+#endif /* CONFIG_SEC_PM && CONFIG_MUIC_NOTIFIER  */

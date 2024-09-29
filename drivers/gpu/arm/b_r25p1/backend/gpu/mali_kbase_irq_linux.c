@@ -78,7 +78,7 @@ static irqreturn_t kbase_job_irq_handler(int irq, void *data)
 	kbase_job_done(kbdev, val);
 
 	/* MALI_SEC_INTEGRAION */
-	KBASE_KTRACE_ADD(kbdev, LSI_JM_IRQ_E, NULL, 0);
+	KBASE_KTRACE_ADD(kbdev, LSI_JM_IRQ_E, NULL, val);
 
 	spin_unlock_irqrestore(&kbdev->hwaccess_lock, flags);
 
@@ -125,7 +125,7 @@ static irqreturn_t kbase_mmu_irq_handler(int irq, void *data)
 	atomic_dec(&kbdev->faults_pending);
 
 	/* MALI_SEC_INTEGRAION */
-	KBASE_KTRACE_ADD(kbdev, LSI_MMU_IRQ_E, NULL, 0);
+	KBASE_KTRACE_ADD(kbdev, LSI_MMU_IRQ_E, NULL, val);
 
 	return IRQ_HANDLED;
 }
@@ -164,7 +164,7 @@ static irqreturn_t kbase_gpu_irq_handler(int irq, void *data)
 	kbase_gpu_interrupt(kbdev, val);
 
 	/* MALI_SEC_INTEGRAION */
-	KBASE_KTRACE_ADD(kbdev, LSI_GPU_IRQ_E, NULL, 0);
+	KBASE_KTRACE_ADD(kbdev, LSI_GPU_IRQ_E, NULL, val);
 
 	return IRQ_HANDLED;
 }

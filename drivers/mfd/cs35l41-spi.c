@@ -33,7 +33,6 @@ static struct regmap_config cs35l41_regmap_spi = {
 	.num_reg_defaults = ARRAY_SIZE(cs35l41_reg),
 	.volatile_reg = cs35l41_volatile_reg,
 	.readable_reg = cs35l41_readable_reg,
-	.precious_reg = cs35l41_precious_reg,
 	.cache_type = REGCACHE_RBTREE,
 };
 
@@ -78,7 +77,6 @@ static int cs35l41_spi_probe(struct spi_device *spi)
 	cs35l41->dev = &spi->dev;
 	cs35l41->irq = spi->irq;
 	cs35l41->pdata = pdata;
-	cs35l41->bus_spi = true;
 
 	dev_info(&spi->dev, "CS35L41 SPI MFD probe\n");
 

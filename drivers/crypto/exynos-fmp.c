@@ -155,6 +155,7 @@ int exynos_fmp_fips_register(struct exynos_fmp *fmp)
 		goto err;
 	}
 
+#ifdef CONFIG_EXYNOS_FMP_ACVP_TEST
 	fmp->miscdev.minor = MISC_DYNAMIC_MINOR;
 	fmp->miscdev.name = "fmp";
 	fmp->miscdev.fops = &fmp_fips_fops;
@@ -164,6 +165,7 @@ int exynos_fmp_fips_register(struct exynos_fmp *fmp)
 				__func__, ret);
 		goto err;
 	}
+#endif
 
 	ret = sysfs_create_group(&fmp->dev->kobj, &fmp_fips_attr_group);
 	if (ret) {
@@ -177,7 +179,9 @@ int exynos_fmp_fips_register(struct exynos_fmp *fmp)
 	return 0;
 
 err_misc:
+#ifdef CONFIG_EXYNOS_FMP_ACVP_TEST
 	misc_deregister(&fmp->miscdev);
+#endif
 err:
 	return -EINVAL;
 }
@@ -185,7 +189,9 @@ err:
 void exynos_fmp_fips_deregister(struct exynos_fmp *fmp)
 {
 	sysfs_remove_group(&fmp->dev->kobj, &fmp_fips_attr_group);
+#ifdef CONFIG_EXYNOS_FMP_ACVP_TEST
 	misc_deregister(&fmp->miscdev);
+#endif
 }
 #endif
 

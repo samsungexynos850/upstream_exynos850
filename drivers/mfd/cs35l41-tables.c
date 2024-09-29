@@ -275,6 +275,7 @@ bool cs35l41_readable_reg(struct device *dev, unsigned int reg)
 	case CS35L41_MIXER_NGATE_CFG:
 	case CS35L41_MIXER_NGATE_CH1_CFG:
 	case CS35L41_MIXER_NGATE_CH2_CFG:
+	case CS35L41_DSP_MBOX_1 ... CS35L41_DSP_VIRT2_MBOX_8:
 	case CS35L41_CLOCK_DETECT_1:
 	case CS35L41_TIMER1_CONTROL:
 	case CS35L41_TIMER1_COUNT_PRESET:
@@ -603,23 +604,12 @@ bool cs35l41_readable_reg(struct device *dev, unsigned int reg)
 	}
 }
 
-bool cs35l41_precious_reg(struct device *dev, unsigned int reg)
-{
-	switch (reg) {
-	case CS35L41_OTP_MEM0 ... CS35L41_OTP_MEM31:
-		return true;
-	default:
-		return false;
-	}
-}
-
 bool cs35l41_volatile_reg(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
 	case CS35L41_SFT_RESET:
 	case CS35L41_FABID:
 	case CS35L41_REVID:
-	case CS35L41_DTEMP_EN:
 	case CS35L41_IRQ1_STATUS:
 	case CS35L41_IRQ1_STATUS1:
 	case CS35L41_IRQ1_STATUS2:
@@ -629,10 +619,6 @@ bool cs35l41_volatile_reg(struct device *dev, unsigned int reg)
 	case CS35L41_IRQ1_RAW_STATUS2:
 	case CS35L41_IRQ1_RAW_STATUS3:
 	case CS35L41_IRQ1_RAW_STATUS4:
-	case CS35L41_IRQ1_MASK1:
-	case CS35L41_IRQ1_MASK2:
-	case CS35L41_IRQ1_MASK3:
-	case CS35L41_IRQ1_MASK4:
 	case CS35L41_IRQ1_FRC1:
 	case CS35L41_IRQ1_FRC2:
 	case CS35L41_IRQ1_FRC3:
@@ -653,10 +639,6 @@ bool cs35l41_volatile_reg(struct device *dev, unsigned int reg)
 	case CS35L41_IRQ2_RAW_STATUS2:
 	case CS35L41_IRQ2_RAW_STATUS3:
 	case CS35L41_IRQ2_RAW_STATUS4:
-	case CS35L41_IRQ2_MASK1:
-	case CS35L41_IRQ2_MASK2:
-	case CS35L41_IRQ2_MASK3:
-	case CS35L41_IRQ2_MASK4:
 	case CS35L41_IRQ2_FRC1:
 	case CS35L41_IRQ2_FRC2:
 	case CS35L41_IRQ2_FRC3:
@@ -668,6 +650,7 @@ bool cs35l41_volatile_reg(struct device *dev, unsigned int reg)
 	case CS35L41_IRQ2_POL3:
 	case CS35L41_IRQ2_POL4:
 	case CS35L41_IRQ2_DB3:
+	case CS35L41_DSP_MBOX_1 ... CS35L41_DSP_VIRT2_MBOX_8:
 	case CS35L41_DSP1_XMEM_PACK_0 ... CS35L41_DSP1_XMEM_PACK_3068:
 	case CS35L41_DSP1_XMEM_UNPACK32_0 ... CS35L41_DSP1_XMEM_UNPACK32_2046:
 	case CS35L41_DSP1_XMEM_UNPACK24_0 ... CS35L41_DSP1_XMEM_UNPACK24_4093:
@@ -682,7 +665,7 @@ bool cs35l41_volatile_reg(struct device *dev, unsigned int reg)
 	}
 }
 
-static const struct cs35l41_otp_packed_element_t otp_map_1[CS35L41_NUM_OTP_ELEM] = {
+static const struct otp_packed_element_t otp_map_1[CS35L41_NUM_OTP_ELEM] = {
 	/* addr         shift   size */
 	{0x00002030,	0,	4}, /*TRIM_OSC_FREQ_TRIM*/
 	{0x00002030,	7,	1}, /*TRIM_OSC_TRIM_DONE*/
@@ -785,7 +768,7 @@ static const struct cs35l41_otp_packed_element_t otp_map_1[CS35L41_NUM_OTP_ELEM]
 	{0x00017044,	0,	24}, /*LOT_NUMBER*/
 };
 
-static const struct cs35l41_otp_packed_element_t otp_map_2[CS35L41_NUM_OTP_ELEM] = {
+static const struct otp_packed_element_t otp_map_2[CS35L41_NUM_OTP_ELEM] = {
 	/* addr         shift   size */
 	{0x00002030,	0,	4}, /*TRIM_OSC_FREQ_TRIM*/
 	{0x00002030,	7,	1}, /*TRIM_OSC_TRIM_DONE*/
@@ -888,7 +871,7 @@ static const struct cs35l41_otp_packed_element_t otp_map_2[CS35L41_NUM_OTP_ELEM]
 	{0x00017044,	0,	24}, /*LOT_NUMBER*/
 };
 
-const struct cs35l41_otp_map_element_t otp_map_map[3] = {
+const struct otp_map_element_t otp_map_map[3] = {
 	{
 		.id = 0x01,
 		.map = otp_map_1,
@@ -905,4 +888,3 @@ const struct cs35l41_otp_map_element_t otp_map_map[3] = {
 		.num_elements = CS35L41_NUM_OTP_ELEM,
 	},
 };
-EXPORT_SYMBOL(otp_map_map);

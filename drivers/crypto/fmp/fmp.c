@@ -611,19 +611,19 @@ static bool fmp_check_fips(struct bio *bio, struct exynos_fmp *fmp)
 	if (bio->bi_io_vec)  {
 		page = bio->bi_io_vec[0].bv_page;
 		if (page && !PageAnon(page) && page_has_buffers(page)) {
-			bh = (void *)page->private;
-			if (bh && ((void *)bh->b_private == (void *)fmp)) {
-				find = true;
-				if ((void *)page->private != (void *)fmp->bh) {
-					dev_err(fmp->dev, "%s: invalid fips bh\n", __func__);
-					return false;
-				}
+			bh = page_buffers(page);
+			if (bh != fmp->bh) {
+				dev_err(fmp->dev, "%s: invalid fips bh\n", __func__);
+				return false;
 			}
+
+			if (bh && ((void *)bh->b_private == (void *)fmp))
+				find = true;
+
 		}
 	}
 
 	if (find) {
-		fmp->fips_run--;
 		fmp->fips_fin++;
 		ci = &fmp->test_data->ci;
 		dev_dbg(fmp->dev, "%s: find fips run(%d) fin(%d)with algo:%d, enc:%d, key_size:%d\n",
@@ -650,14 +650,14 @@ int exynos_fmp_fips(struct bio *bio)
 		if (bio->bi_io_vec)  {
 			page = bio->bi_io_vec[0].bv_page;
 			if (page && !PageAnon(page) && page_has_buffers(page)) {
-				bh = (void *)page->private;
-				if (bh && ((void *)bh->b_private == (void *)fmp)) {
-					find = true;
-					if ((void *)page->private != (void *)fmp->bh) {
-						dev_err(fmp->dev, "%s: invalid fips bh\n", __func__);
-						return false;
-					}
+				bh = page_buffers(page);
+				if (bh != fmp->bh) {
+					dev_err(fmp->dev, "%s: invalid fips bh\n", __func__);
+					return false;
 				}
+
+				if (bh && ((void *)bh->b_private == (void *)fmp))
+					find = true;
 			}
 		}
 
@@ -684,11 +684,16 @@ int exynos_fmp_bypass(struct fmp_request *req, struct bio *bio)
 #ifdef CONFIG_EXYNOS_FMP_FIPS
 	struct exynos_fmp *fmp = get_fmp();
 
-	if (fmp->fips_run) {
-		if (fmp_check_fips(bio, fmp)) {
-			dev_dbg(fmp->dev, "%s: find fips\n", __func__);
-			return -EINVAL;
-		}
+	if (!fmp->fips_run)
+		return 0;
+
+#ifdef CONFIG_EXYNOS_FMP_ACVP_TEST
+	if (fmp_check_fips(bio, fmp)) {
+#else
+	if (!fmp->result.overall && fmp_check_fips(bio, fmp)) {
+#endif
+		dev_dbg(fmp->dev, "%s: find fips\n", __func__);
+		return -EINVAL;
 	}
 #endif
 	prd = req->table;
@@ -776,7 +781,7 @@ void *exynos_fmp_init(struct platform_device *pdev)
 #endif
 
 	fmp_dev = &pdev->dev;
-
+	fmp->fips_run = 0;
 	dev_info(fmp->dev, "Exynos FMP driver is initialized\n");
 	return fmp;
 

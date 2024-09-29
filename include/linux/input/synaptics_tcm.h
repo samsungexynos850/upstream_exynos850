@@ -46,7 +46,6 @@ struct syna_tcm_board_data {
 	bool swap_axes;
 	int irq_gpio;
 	int irq_on_state;
-	int cs_gpio;
 	int power_gpio;
 	int power_on_state;
 	int reset_gpio;
@@ -65,16 +64,7 @@ struct syna_tcm_board_data {
 	const char *pwr_reg_name;
 	const char *bus_reg_name;
 	const char *fw_name;
-	const char *regulator_lcd_vdd;
-	const char *regulator_lcd_reset;
-	const char *regulator_lcd_bl;
 	struct pinctrl *pinctrl;
-	u32	area_indicator;
-	u32	area_navigation;
-	u32	area_edge;
-	bool enable_settings_aot;
-	bool support_ear_detect;
-	bool prox_lp_scan_enabled;
 };
 
 #endif

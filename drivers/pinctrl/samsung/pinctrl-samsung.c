@@ -30,9 +30,9 @@
 
 #include "../core.h"
 #include "pinctrl-samsung.h"
-#if defined(CONFIG_SEC_GPIO_DVS)
+#ifdef CONFIG_PINCTRL_SEC_GPIO_DVS
 #include "secgpio_dvs.h"
-#endif
+#endif /* CONFIG_PINCTRL_SEC_GPIO_DVS */
 
 /* maximum number of the memory resources */
 #define	SAMSUNG_PINCTRL_NUM_RESOURCES	2
@@ -1547,8 +1547,7 @@ static int __init samsung_pinctrl_drv_register(void)
 }
 postcore_initcall(samsung_pinctrl_drv_register);
 
-
-#if defined(CONFIG_SEC_GPIO_DVS)
+#ifdef CONFIG_PINCTRL_SEC_GPIO_DVS
 
 #define GET_RESULT_GPIO(a, b, c)	\
 	((a<<4 & 0xF0) | (b<<1 & 0xE) | (c & 0x1))
@@ -1782,7 +1781,7 @@ static void gpiodvs_check_init_gpio(struct samsung_pinctrl_drv_data *drvdata,
 	unsigned long flags;
 	enum pincfg_type pt;
 	u32 data[PINCFG_TYPE_NUM];
-	static int pin_num = 0;
+	static int pin_num;
 
 	pin_to_reg_bank(drvdata, pin - drvdata->pin_base, &reg_base,
 					&pin_offset, &bank);
@@ -1824,7 +1823,7 @@ static void gpiodvs_check_sleep_gpio(struct samsung_pinctrl_drv_data *drvdata,
 	unsigned long flags;
 	enum pincfg_type pt;
 	u32 data[PINCFG_TYPE_NUM];
-	static int pin_num = 0;
+	static int pin_num;
 	const u8 *widths;
 	const unsigned int sleep_type_mask = BIT(PINCFG_TYPE_DAT) |
 		BIT(PINCFG_TYPE_CON_PDN) | BIT(PINCFG_TYPE_PUD_PDN);
@@ -1923,11 +1922,11 @@ static int __init exynos850_secgpio_get_nr_gpio(void)
 static struct gpio_dvs_t exynos850_secgpio_dvs = {
 	.result = &gpiomap_result,
 	.check_gpio_status = check_gpio_status,
-    .skip_grps = "gpb gpf2", /* AUD, HSI */
+	.skip_grps = "gpb gpf2", /* AUD, HSI */
 };
 
 const struct secgpio_dvs_data exynos850_secgpio_dvs_data __initconst = {
 	.gpio_dvs = &exynos850_secgpio_dvs,
 	.get_nr_gpio = exynos850_secgpio_get_nr_gpio,
 };
-#endif /* CONFIG_SEC_GPIO_DVS */
+#endif /* CONFIG_PINCTRL_SEC_GPIO_DVS */

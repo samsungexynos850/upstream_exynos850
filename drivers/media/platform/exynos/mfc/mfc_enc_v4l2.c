@@ -922,7 +922,7 @@ static int mfc_enc_streamoff(struct file *file, void *priv,
 			    enum v4l2_buf_type type)
 {
 	struct mfc_ctx *ctx = fh_to_mfc_ctx(file->private_data);
-	int ret = -EINVAL;
+	int ret = -EINVAL;;
 
 	mfc_debug_enter();
 

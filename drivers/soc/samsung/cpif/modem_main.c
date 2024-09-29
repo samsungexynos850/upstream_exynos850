@@ -1038,11 +1038,16 @@ static int cpif_probe(struct platform_device *pdev)
 			pdata->iodevs[i].attrs & IODEV_ATTR(ATTR_DUALSIM))
 			continue;
 
+		if (pdata->iodevs[i].attrs & IODEV_ATTR(ATTR_OPTION_REGION) &&
+		    strncmp(pdata->iodevs[i].option_region, CONFIG_OPTION_REGION,
+				strlen(pdata->iodevs[i].option_region)))
+			continue;
+/*
 		if (pdata->iodevs[i].attrs & IODEV_ATTR(ATTR_OPTION_REGION)
 				&& strcmp(pdata->iodevs[i].option_region,
 					CONFIG_OPTION_REGION))
 			continue;
-
+*/
 		iod[i] = create_io_device(pdev, &pdata->iodevs[i], msd,
 					  modemctl, pdata);
 		if (!iod[i]) {

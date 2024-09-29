@@ -20,7 +20,7 @@
 
 #ifndef S2MU106_PMETER_H
 #define S2MU106_PMETER_H
-#include <linux/mfd/slsi/s2mu106/s2mu106.h>
+#include <linux/mfd/samsung/s2mu106.h>
 #include <linux/platform_device.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>

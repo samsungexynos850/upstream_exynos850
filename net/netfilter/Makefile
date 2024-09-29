@@ -210,7 +210,3 @@ obj-$(CONFIG_IP_SET) += ipset/
 
 # IPVS
 obj-$(CONFIG_IP_VS) += ipvs/
-
-# netfilter priomark for SEC QOS solution
-obj-$(CONFIG_MODEM_IF_LEGACY_QOS) += xt_PRIO.o
-obj-$(CONFIG_MODEM_IF_QOS) += xt_PRIO.o

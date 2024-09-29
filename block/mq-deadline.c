@@ -31,7 +31,7 @@ static const int write_expire = 5 * HZ; /* ditto for writes, these limits are SO
 static const int writes_starved = 2;    /* max times reads can starve a write */
 /* IOPP-mq_dd_max_async_dispatch-v2.0.k5.4 */
 static const int fifo_batch;		/* # of sequential requests treated as one
-				     by the above parameters. For throughput. */
+ 				     by the above parameters. For throughput. */
 static const int async_write_percent = 25;     /* max tags percentige for async write */
 static const unsigned int max_async_write_tags = 8;    /* max tags for async write. */
 
@@ -635,7 +635,7 @@ static void dd_finish_request(struct request *rq)
 {
 	struct request_queue *q = rq->q;
 	struct deadline_data *dd = q->elevator->elevator_data;
-
+	
 	if (blk_queue_is_zoned(q)) {
 		unsigned long flags;
 
@@ -725,9 +725,10 @@ STORE_FUNCTION(deadline_fifo_batch_store, &dd->fifo_batch, 0, INT_MAX, 0);
 
 #define DD_ATTR(name) \
 	__ATTR(name, 0644, deadline_##name##_show, deadline_##name##_store)
-
+	
 #define DD_ATTR_RO(name) \
 	__ATTR(name, 0444, deadline_##name##_show, NULL)
+
 
 static struct elv_fs_entry deadline_attrs[] = {
 	DD_ATTR(read_expire),

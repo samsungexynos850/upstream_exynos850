@@ -375,15 +375,14 @@ static int set_runtime_affinity(enum mcu_ipc_region id, int irq, u32 mask)
 
 static int cp_mbox_set_affinity(enum mcu_ipc_region id, struct device *dev, int irq)
 {
-	struct device_node *np = dev->of_node;
 	u32 irq_affinity_mask = 0;
 
-	if (!np) {
+	if (!dev->of_node) {
 		mif_err("of_node is null\n");
 		return -ENODEV;
 	}
 
-	mif_dt_read_u32(np, "mcu,irq_affinity_mask", irq_affinity_mask);
+	mif_dt_read_u32(dev->of_node, "mcu,irq_affinity_mask", irq_affinity_mask);
 	mif_info("irq_affinity_mask = 0x%x\n", irq_affinity_mask);
 
 #ifdef USE_FIXED_AFFINITY

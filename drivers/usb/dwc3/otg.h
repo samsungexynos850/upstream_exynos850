@@ -70,7 +70,7 @@ struct dwc3_otg {
 	int			pm_qos_int_val;
 
 	struct dwc3_ext_otg_ops *ext_otg_ops;
-#if defined(CONFIG_TYPEC_DEFAULT)
+#if defined(CONFIG_TYPEC)
 	struct intf_typec	*typec;
 #endif
 	struct notifier_block	pm_nb;

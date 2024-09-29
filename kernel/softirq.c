@@ -28,7 +28,6 @@
 #include <linux/irq.h>
 #include <linux/debug-snapshot.h>
 #include <linux/sched/clock.h>
-#include <linux/nmi.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/irq.h>
@@ -295,13 +294,7 @@ restart:
 		trace_softirq_entry(vec_nr);
 		dbg_snapshot_irq_var(start_time);
 		dbg_snapshot_irq(DSS_FLAG_SOFTIRQ, h->action, NULL, 0, DSS_FLAG_IN);
-#ifdef CONFIG_SEC_DEBUG_LOCKUP_INFO
-		sl_softirq_entry(softirq_to_name[vec_nr], h->action);
 		h->action(h);
-		sl_softirq_exit();
-#else
-		h->action(h);
-#endif
 		dbg_snapshot_irq(DSS_FLAG_SOFTIRQ, h->action, NULL, start_time, DSS_FLAG_OUT);
 		trace_softirq_exit(vec_nr);
 		if (unlikely(prev_count != preempt_count())) {
@@ -536,19 +529,7 @@ static void tasklet_action_common(struct softirq_action *a,
 				dbg_snapshot_irq_var(start_time);
 				dbg_snapshot_irq(DSS_FLAG_SOFTIRQ_TASKLET,
 						t->func, NULL, 0, DSS_FLAG_IN);
-#ifdef CONFIG_SEC_DEBUG_LOCKUP_INFO
-				if (softirq_nr == TASKLET_SOFTIRQ) {
-					sl_softirq_entry(softirq_to_name[TASKLET_SOFTIRQ], t->func);
-					t->func(t->data);
-					sl_softirq_exit();
-				} else {
-					sl_softirq_entry(softirq_to_name[HI_SOFTIRQ], t->func);
-					t->func(t->data);
-					sl_softirq_exit();
-				}
-#else
 				t->func(t->data);
-#endif
 				dbg_snapshot_irq(DSS_FLAG_SOFTIRQ_TASKLET,
 						t->func, NULL, start_time, DSS_FLAG_OUT);
 				tasklet_unlock(t);

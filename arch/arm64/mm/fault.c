@@ -133,6 +133,17 @@ static void mem_abort_decode(unsigned int esr)
 		data_abort_decode(esr);
 }
 
+static inline phys_addr_t show_virt_to_phys(unsigned long addr)
+{
+	if (!is_vmalloc_addr((void *)addr) ||
+		(addr >= (unsigned long) KERNEL_START &&
+		 addr <= (unsigned long) KERNEL_END))
+		return __pa(addr);
+	else
+		return page_to_phys(vmalloc_to_page((void *)addr)) +
+		       offset_in_page(addr);
+}
+
 static inline bool is_ttbr0_addr(unsigned long addr)
 {
 	/* entry assembly clears tags for TTBR0 addrs */
@@ -143,17 +154,6 @@ static inline bool is_ttbr1_addr(unsigned long addr)
 {
 	/* TTBR1 addresses may have a tag if KASAN_SW_TAGS is in use */
 	return arch_kasan_reset_tag(addr) >= VA_START;
-}
-
-static inline phys_addr_t show_virt_to_phys(unsigned long addr)
-{
-	if (!is_vmalloc_addr((void *)addr) ||
-		(addr >= (unsigned long) KERNEL_START &&
-		 addr <= (unsigned long) KERNEL_END))
-		return __pa(addr);
-	else
-		return page_to_phys(vmalloc_to_page((void *)addr)) +
-		       offset_in_page(addr);
 }
 
 /*
@@ -673,12 +673,34 @@ no_context:
 	return 0;
 }
 
+int __weak do_tlb_conf_fault(unsigned long addr,
+			     unsigned int esr,
+			     struct pt_regs *regs)
+{
+	return 1; /* do_bad default */
+}
+
+int (*do_tlb_conf_fault_cb)(unsigned long addr,
+			    unsigned int esr,
+			    struct pt_regs *regs)
+	= do_tlb_conf_fault; /* initialization saves us a branch */
+EXPORT_SYMBOL_GPL(do_tlb_conf_fault_cb);
+
+static int _do_tlb_conf_fault(unsigned long addr,
+			      unsigned int esr,
+			      struct pt_regs *regs)
+{
+	return (*do_tlb_conf_fault_cb)(addr, esr, regs);
+}
+
+#define thread_virt_addr_valid(xaddr)   pfn_valid(__pa(xaddr) >> PAGE_SHIFT)
+
 static int __kprobes do_translation_fault(unsigned long addr,
 					  unsigned int esr,
 					  struct pt_regs *regs)
 {
 	/* We may have invalid '*current' due to a stack overflow. */
-	if (!virt_addr_valid(current_thread_info()))
+	if (!thread_virt_addr_valid(current_thread_info()))
 		__do_kernel_fault_safe(NULL, addr, esr, regs);
 
 	if (is_ttbr0_addr(addr))
@@ -798,7 +820,7 @@ static const struct fault_info fault_info[] = {
 	{ do_bad,		SIGKILL, SI_KERNEL,	"unknown 45"			},
 	{ do_bad,		SIGKILL, SI_KERNEL,	"unknown 46"			},
 	{ do_bad,		SIGKILL, SI_KERNEL,	"unknown 47"			},
-	{ do_bad,		SIGKILL, SI_KERNEL,	"TLB conflict abort"		},
+	{ _do_tlb_conf_fault,	SIGKILL, SI_KERNEL,	"TLB conflict abort"		},
 	{ do_bad,		SIGKILL, SI_KERNEL,	"Unsupported atomic hardware update fault"	},
 	{ do_bad,		SIGKILL, SI_KERNEL,	"unknown 50"			},
 	{ do_bad,		SIGKILL, SI_KERNEL,	"unknown 51"			},

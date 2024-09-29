@@ -33,7 +33,6 @@ static struct regmap_config cs35l41_regmap_i2c = {
 	.num_reg_defaults = ARRAY_SIZE(cs35l41_reg),
 	.volatile_reg = cs35l41_volatile_reg,
 	.readable_reg = cs35l41_readable_reg,
-	.precious_reg = cs35l41_precious_reg,
 	.cache_type = REGCACHE_RBTREE,
 };
 
@@ -69,7 +68,6 @@ static int cs35l41_i2c_probe(struct i2c_client *client,
 	cs35l41->dev = dev;
 	cs35l41->irq = client->irq;
 	cs35l41->pdata = pdata;
-	cs35l41->bus_spi = false;
 
 	i2c_set_clientdata(client, cs35l41);
 	cs35l41->regmap = devm_regmap_init_i2c(client, regmap_config);

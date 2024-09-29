@@ -100,34 +100,37 @@ config MALI_SUSTAINABLE_OPT
 	help
 		Choose this option to enable sustainable optimization in the Mali tTRx DDK.
 
-menu "ARM GPU Configuration"
-menuconfig MALI_EXYNOS_SECURE_RENDERING
-	bool "Enable EXYNOS Secure Rendering Support"
-	default y
+config MALI_CAMERA_EXT_BTS
+	bool "Enable sysfs node for camera ext bts scenario"
+	depends on MALI_MIDGARD && EXYNOS_BTS && EXYNOS9630_BTS
+	default n
 	help
-	Support Secure Rendering on Exynos SoC
+		Choose this option to enable sysfs node for camera ext bts scenario
 
-choice
-	prompt "Mali Secure Rendering method"
-	depends on MALI_EXYNOS_SECURE_RENDERING
-	default MALI_EXYNOS_SECURE_RENDERING_UNSUPPORTED
+config MALI_FTRACE_FREQ
+	bool "Enable ftrace for gpu frequency"
+	depends on MALI_MIDGARD && MALI_DVFS
+	default n
 	help
-		Select Mali secure rendering method
-
-config MALI_EXYNOS_SECURE_RENDERING_UNSUPPORTED
-    bool "Disabled"
+		Choose this option to enable ftrace for gpu frequency
 
 config MALI_EXYNOS_SECURE_RENDERING_LEGACY
     bool "Legacy"
     depends on MALI_MIDGARD && ION_EXYNOS && EXYNOS_CONTENT_PATH_PROTECTION
+	default n
     help
       Support Secure Rendering on Exynos SoC (Legacy)
 
 config MALI_EXYNOS_SECURE_RENDERING_ARM
     bool "Modified ARM"
     depends on MALI_MIDGARD && ION_EXYNOS && EXYNOS_CONTENT_PATH_PROTECTION
+	default n
     help
       Support Secure Rendering on Exynos SoC (Newer ARM method)
 
-endchoice
-endmenu
+config MALI_EXYNOS_SECURE_RENDERING_UNSUPPORTED
+    bool "Disabled"
+	default !(MALI_EXYNOS_SECURE_RENDERING_LEGACY) && !(MALI_EXYNOS_SECURE_RENDERING_ARM)
+	help
+	  Does not support Secure Rendering on Exynos SoC.
+	  Should be enabled when MALI_EXYNOS_SECURE_RENDERING_LEGACY and MALI_EXYNOS_SECURE_RENDERING_ARM are disabled.

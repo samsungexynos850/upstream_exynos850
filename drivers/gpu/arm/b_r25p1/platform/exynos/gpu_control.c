@@ -39,6 +39,10 @@
 #include <linux/of.h>
 #endif
 
+#ifdef CONFIG_MALI_FTRACE_FREQ
+#include <trace/events/power.h>
+#endif
+
 extern struct regulator *g3d_m_regulator;
 unsigned int gpu_pmu_status_reg_offset;
 unsigned int gpu_pmu_status_local_pwr_mask;
@@ -164,6 +168,10 @@ static int gpu_set_dvfs_using_calapi(struct exynos_context *platform, int clk)
 #endif
 
 	platform->cur_clock = cal_dfs_get_rate(platform->g3d_cmu_cal_id);
+
+#ifdef CONFIG_MALI_FTRACE_FREQ
+	trace_gpu_frequency_change(platform->cur_clock);
+#endif
 
 	GPU_LOG(DVFS_DEBUG, LSI_CLOCK_VALUE, clk, platform->cur_clock,
 		"[id: %x] clock set: %d, clock get: %d\n",

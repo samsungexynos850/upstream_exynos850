@@ -35,10 +35,12 @@
 
 /* To Support Samsung SoC */
 #include <soc/samsung/cal-if.h>
+
+/* 1. last kmsg hooking */
+#include <linux/sec_debug.h>
 #ifdef CONFIG_SEC_PM_DEBUG
 #include <linux/uaccess.h>
 #include <linux/proc_fs.h>
-
 static bool sec_log_full;
 #endif
 /* 1. last kmsg hooking */
@@ -101,56 +103,48 @@ void secdbg_base_get_kevent_info(struct ess_info_offset *p, int type)
 		p->size = sizeof(struct __task_log);
 		p->per_core = 1;
 		break;
-
 	case DSS_KEVENT_WORK:
 		p->base = kevent_base_pa + (unsigned long)(dss_log->work) - kevent_base_va;
 		p->nr = DSS_LOG_MAX_NUM;
 		p->size = sizeof(struct __work_log);
 		p->per_core = 1;
 		break;
-
 	case DSS_KEVENT_IRQ:
 		p->base = kevent_base_pa + (unsigned long)(dss_log->irq) - kevent_base_va;
 		p->nr = DSS_LOG_MAX_NUM * 2;
 		p->size = sizeof(struct __irq_log);
 		p->per_core = 1;
 		break;
-
 	case DSS_KEVENT_FREQ:
 		p->base = kevent_base_pa + (unsigned long)(dss_log->freq) - kevent_base_va;
 		p->nr = DSS_LOG_MAX_NUM;
 		p->size = sizeof(struct __freq_log);
 		p->per_core = 0;
 		break;
-
 	case DSS_KEVENT_IDLE:
 		p->base = kevent_base_pa + (unsigned long)(dss_log->cpuidle) - kevent_base_va;
 		p->nr = DSS_LOG_MAX_NUM;
 		p->size = sizeof(struct __cpuidle_log);
 		p->per_core = 1;
 		break;
-
 	case DSS_KEVENT_THRM:
 		p->base = kevent_base_pa + (unsigned long)(dss_log->thermal) - kevent_base_va;
 		p->nr = DSS_LOG_MAX_NUM;
 		p->size = sizeof(struct __thermal_log);
 		p->per_core = 0;
 		break;
-
 	case DSS_KEVENT_ACPM:
 		p->base = kevent_base_pa + (unsigned long)(dss_log->acpm) - kevent_base_va;
 		p->nr = DSS_LOG_MAX_NUM;
 		p->size = sizeof(struct __acpm_log);
 		p->per_core = 0;
 		break;
-
 	case DSS_KEVENT_MFRQ:
 		p->base = kevent_base_pa + (unsigned long)(dss_log->freq_misc) - kevent_base_va;
 		p->nr = DSS_LOG_MAX_NUM;
 		p->size = sizeof(struct __freq_misc_log);
 		p->per_core = 0;
 		break;
-
 	default:
 		p->base = 0;
 		p->nr = 0;
@@ -158,7 +152,6 @@ void secdbg_base_get_kevent_info(struct ess_info_offset *p, int type)
 		p->per_core = 0;
 		break;
 	}
-
 	p->last = secdbg_base_get_kevent_index_addr(type);
 }
 
@@ -867,6 +860,7 @@ static void __init dbg_snapshot_fixmap(void)
 
 	/* output the information of debug-snapshot */
 	dbg_snapshot_output();
+
 #ifdef CONFIG_SEC_DEBUG_LAST_KMSG
 	secdbg_lkmg_store(dss_items[DSS_ITEM_KERNEL_ID].head_ptr,
 			dss_items[DSS_ITEM_KERNEL_ID].curr_ptr,
@@ -1028,27 +1022,20 @@ static ssize_t sec_log_read_all(struct file *file, char __user *buf,
 		size = item->entry.size;
 	else
 		size = (size_t)(item->curr_ptr - item->head_ptr);
-
 	if (pos >= size)
 		return 0;
-
 	count = min(len, size);
-
 	if ((pos + count) > size)
 		count = size - pos;
-
 	if (copy_to_user(buf, item->head_ptr + pos, count))
 		return -EFAULT;
-
 	*offset += count;
 	return count;
 }
-
 static const struct file_operations sec_log_file_ops = {
 	.owner = THIS_MODULE,
 	.read = sec_log_read_all,
 };
-
 static int __init sec_log_late_init(void)
 {
 	struct proc_dir_entry *entry;
@@ -1056,17 +1043,13 @@ static int __init sec_log_late_init(void)
 
 	if (!item->head_ptr)
 		return 0;
-
 	entry = proc_create("sec_log", 0440, NULL, &sec_log_file_ops);
 	if (!entry) {
 		pr_err("%s: failed to create proc entry\n", __func__);
 		return 0;
 	}
-
 	proc_set_size(entry, item->entry.size);
-
 	return 0;
 }
-
 late_initcall(sec_log_late_init);
 #endif /* CONFIG_SEC_PM_DEBUG */

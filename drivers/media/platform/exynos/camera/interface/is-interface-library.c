@@ -1761,9 +1761,6 @@ int is_init_ddk_thread(void)
 	struct sched_param param = { .sched_priority = IS_MAX_PRIO - 1 };
 	char name[30];
 	int i, j, ret = 0;
-#ifdef SET_CPU_AFFINITY
-	u32 cpu = 0;
-#endif
 
 	struct is_lib_support *lib = &gPtr_lib_support;
 
@@ -1798,16 +1795,43 @@ int is_init_ddk_thread(void)
 					lib_task_work);
 		}
 
-		if (i != TASK_RTA) {
-#ifdef SET_CPU_AFFINITY
-			cpu = lib_get_task_affinity(i);
-			ret = set_cpus_allowed_ptr(lib->task_taaisp[i].task, cpumask_of(cpu));
-			dbg_lib(3, "%s: task(%d) affinity cpu(%d) (%d)\n", __func__, i, cpu, ret);
-#endif
-		}
 	}
 
 	return ret;
+}
+
+void is_set_ddk_thread_affinity(void)
+{
+	struct is_lib_support *lib = &gPtr_lib_support;
+	struct is_core *core;
+	struct task_struct *task;
+	int i;
+	const char *cpus;
+
+	core = (struct is_core *)platform_get_drvdata(lib->pdev);
+	cpus = core->resourcemgr.dvfs_ctrl.cur_cpus;
+
+	for (i = 0 ; i < TASK_INDEX_MAX; i++) {
+		if (i == TASK_RTA)
+			continue;
+
+		task = lib->task_taaisp[i].task;
+
+		if (!cpus) {
+			/* Legacy mode */
+			u32 cpu = lib_get_task_affinity(i);
+
+			set_cpus_allowed_ptr(task, cpumask_of(cpu));
+			dbg_lib(3, "lib_%d_worker: affinity %d\n", i, cpu);
+		} else {
+			/* DT mode */
+			struct cpumask cpumask;
+
+			cpulist_parse(cpus, &cpumask);
+			set_cpus_allowed_ptr(task, &cpumask);
+			dbg_lib(3, "lib_%d_worker: affinity %s\n", i, cpus);
+		}
+	}
 }
 
 void is_flush_ddk_thread(void)

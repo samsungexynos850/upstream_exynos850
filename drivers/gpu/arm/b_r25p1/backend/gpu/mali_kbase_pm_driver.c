@@ -324,7 +324,6 @@ static void kbase_pm_invoke(struct kbase_device *kbdev,
 	    core_type == KBASE_PM_CORE_SHADER &&
 	    !(kbdev->dummy_job_wa.flags &
 		    KBASE_DUMMY_JOB_WA_FLAG_LOGICAL_SHADER_POWER)) {
-		GPU_LOG(DVFS_DEBUG, LSI_WA_EXECUTE, kbdev->dummy_job_wa.flags, core_type, "before kbase_wa_execute in %s\n", __func__);
 		kbase_dummy_job_wa_execute(kbdev, cores);
 	} else {
 		if (lo != 0)

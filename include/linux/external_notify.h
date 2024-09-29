@@ -5,7 +5,7 @@
  * header file supporting usb notify layer
  * external notify call chain information
  *
- * Copyright (C) 2016-2020 Samsung Electronics
+ * Copyright (C) 2016-2021 Samsung Electronics
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
  *
  */
 
-  /* usb notify layer v3.5 */
+  /* usb notify layer v3.6 */
 
 #ifndef __EXTERNAL_NOTIFY_H__
 #define __EXTERNAL_NOTIFY_H__

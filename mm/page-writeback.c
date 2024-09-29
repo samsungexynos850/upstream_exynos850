@@ -508,7 +508,7 @@ static unsigned long node_dirty_limit(struct pglist_data *pgdat)
 			node_memory / global_dirtyable_memory();
 	else
 		dirty = vm_dirty_ratio * node_memory / 100;
-
+	
 #if defined(CONFIG_MAX_DIRTY_THRESH_PAGES) && (CONFIG_MAX_DIRTY_THRESH_PAGES > 0)
 	if (!vm_dirty_bytes && dirty > CONFIG_MAX_DIRTY_THRESH_PAGES)
 		dirty = CONFIG_MAX_DIRTY_THRESH_PAGES;
@@ -1589,7 +1589,6 @@ static inline void bdi_fill_sec_debug_bdp(struct backing_dev_info *bdi,
 	unsigned long elapsed_ms = (jiffies - start_time) * 1000 / HZ;
 	unsigned int idx;
 	struct bdi_sec_bdp_entry *entry;
-	unsigned long nr_dirty_pages_in_timelist = 0;  /* # of dirty pages in b_dirty_time list */
 	unsigned long nr_dirty_inodes_in_timelist = 0; /* # of dirty inodes in b_dirty_time list */
 
 	// fuse bdi balance_dirty_pages debug timeout : 1 sec
@@ -1619,7 +1618,6 @@ static inline void bdi_fill_sec_debug_bdp(struct backing_dev_info *bdi,
 	entry->wb_thresh = dtc->wb_thresh;
 	entry->wb_dirty = dtc->wb_dirty;
 	entry->wb_avg_write_bandwidth = dtc->wb->avg_write_bandwidth;
-	entry->wb_timelist_dirty = nr_dirty_pages_in_timelist;
 	entry->wb_timelist_inodes = nr_dirty_inodes_in_timelist;
 
 	if (bdp_debug->max_entry.elapsed_ms <= elapsed_ms)
@@ -1854,10 +1852,18 @@ pause:
 					  period,
 					  pause,
 					  start_time);
+		
+		/* Collecting approximate value. No lock required. */
+		bdi->last_thresh = thresh;
+		bdi->last_nr_dirty = dirty;
+		bdi->paused_total += pause;
+					  
+		/* IOPP-prevent_infinite_writeback-v1.1.4.4 */
+		/* Do not sleep if the backing device is removed */
+		if (unlikely(!bdi->dev))
+			return;
 
-		/* @fs.sec -- b73d2f65ec1a7a5621f2f682a666bae75da7f61e -- */
 		if (bdi->capabilities & BDI_CAP_SEC_DEBUG && pause == max_pause) {
-			unsigned long nr_dirty_pages_in_timelist = 0;  /* # of dirty pages in b_dirty_time list */
 			unsigned long nr_dirty_inodes_in_timelist = 0; /* # of dirty inodes in b_dirty_time list */
 			struct inode *inode;
 
@@ -1874,27 +1880,16 @@ pause:
 			}
 			spin_unlock(&wb->list_lock);
 			printk_ratelimited(KERN_WARNING "dev: %s, paused %lu, g-thresh %lu, g-dirty %lu, bdi-thresh %lu, bdi-dirty %lu,"
-				" bdi-bw %lu timelist_dirty %lu, timelist_inodes %lu\n",
+				" bdi-bw %lu, timelist_inodes %lu\n",
 				bdi->dev ? dev_name(bdi->dev) : "(unknown)",
 				(unsigned long) (jiffies - start_time) * 1000 / HZ,
-				(unsigned long) gdtc->thresh,
-				(unsigned long) gdtc->dirty,
-				(unsigned long) gdtc->wb_thresh,
-				(unsigned long) gdtc->wb_dirty,
-				(unsigned long) gdtc->wb->avg_write_bandwidth,
-				(unsigned long) nr_dirty_pages_in_timelist,
+				(unsigned long) sdtc->thresh,
+				(unsigned long) sdtc->dirty,
+				(unsigned long) sdtc->wb_thresh,
+				(unsigned long) sdtc->wb_dirty,
+				(unsigned long) sdtc->wb->avg_write_bandwidth,
 				(unsigned long) nr_dirty_inodes_in_timelist);
 		}
-
-		/* IOPP-prevent_infinite_writeback-v1.1.4.4 */
-		/* Do not sleep if the backing device is removed */
-		if (unlikely(!bdi->dev))
-			return;
-
-		/* Collecting approximate value. No lock required. */
-		bdi->last_thresh = thresh;
-		bdi->last_nr_dirty = dirty;
-		bdi->paused_total += pause;
 
 		__set_current_state(TASK_KILLABLE);
 		wb->dirty_sleep = now;

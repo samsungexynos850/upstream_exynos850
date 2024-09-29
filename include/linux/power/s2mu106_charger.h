@@ -20,11 +20,11 @@
 
 #ifndef S2MU106_CHARGER_H
 #define S2MU106_CHARGER_H
-#include <linux/mfd/slsi/s2mu106/s2mu106.h>
+#include <linux/mfd/samsung/s2mu106.h>
 
 #if defined(CONFIG_MUIC_NOTIFIER)
-#include <linux/muic/common/muic.h>
-#include <linux/muic/common/muic_notifier.h>
+#include <linux/muic/muic.h>
+#include <linux/muic/muic_notifier.h>
 #endif /* CONFIG_MUIC_NOTIFIER */
 
 #include <linux/power/s2mu00x_battery.h>

@@ -487,9 +487,6 @@ static ssize_t exynos_flexpmu_dbg_read(struct file *file, char __user *user_buf,
 
 	ret = flexpmu_debugfs_read_fptr[d2f->fid](d2f->fid, buf);
 
-	if (ret > sizeof(buf))
-		return ret;
-
 	return simple_read_from_buffer(user_buf, count, ppos, buf, ret);
 }
 

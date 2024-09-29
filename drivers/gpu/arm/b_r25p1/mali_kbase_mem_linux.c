@@ -44,12 +44,6 @@
 #include <linux/cache.h>
 #include <linux/memory_group_manager.h>
 
-#if KERNEL_VERSION(4, 14, 0) > LINUX_VERSION_CODE
-#include <linux/ion.h>
-#else
-#include <linux/ion_exynos.h>
-#endif
-
 #include <mali_kbase.h>
 #include <mali_kbase_mem_linux.h>
 #include <tl/mali_kbase_tracepoints.h>
@@ -990,11 +984,6 @@ int kbase_mem_do_sync_imported(struct kbase_context *kctx,
 			"Syncing imported buffer at GPU VA %llx to GPU\n",
 			reg->start_pfn);
 
-#if KERNEL_VERSION(4, 14, 0) > LINUX_VERSION_CODE
-		if (ion_cached_needsync_dmabuf(dma_buf)) {
-#else
-		if (ion_cached_dmabuf(dma_buf)) {
-#endif
 #ifdef KBASE_MEM_ION_SYNC_WORKAROUND
 		if (!WARN_ON(!reg->gpu_alloc->imported.umm.dma_attachment)) {
 			struct dma_buf_attachment *attachment = reg->gpu_alloc->imported.umm.dma_attachment;
@@ -1019,18 +1008,12 @@ int kbase_mem_do_sync_imported(struct kbase_context *kctx,
 				dir);
 #endif
 #endif /* KBASE_MEM_ION_SYNC_WORKAROUND */
-        }
 		break;
 	case KBASE_SYNC_TO_CPU:
 		dev_dbg(kctx->kbdev->dev,
 			"Syncing imported buffer at GPU VA %llx to CPU\n",
 			reg->start_pfn);
 
-#if KERNEL_VERSION(4, 14, 0) > LINUX_VERSION_CODE
-		if (ion_cached_needsync_dmabuf(dma_buf)) {
-#else
-		if (ion_cached_dmabuf(dma_buf)) {
-#endif
 #ifdef KBASE_MEM_ION_SYNC_WORKAROUND
 		if (!WARN_ON(!reg->gpu_alloc->imported.umm.dma_attachment)) {
 			struct dma_buf_attachment *attachment = reg->gpu_alloc->imported.umm.dma_attachment;
@@ -1047,7 +1030,6 @@ int kbase_mem_do_sync_imported(struct kbase_context *kctx,
 #endif
 				dir);
 #endif /* KBASE_MEM_ION_SYNC_WORKAROUND */
-        }
 		break;
 	};
 
