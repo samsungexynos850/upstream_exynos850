@@ -105,6 +105,10 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/task.h>
 
+#ifdef CONFIG_SECURITY_DEFEX
+#include <linux/defex.h>
+#endif
+
 /*
  * Minimum number of threads to boot the kernel
  */
@@ -331,7 +335,7 @@ struct vm_area_struct *vm_area_dup(struct vm_area_struct *orig)
 
 	if (new) {
 		*new = *orig;
-		INIT_LIST_HEAD(&new->anon_vma_chain);
+		INIT_VMA(new);
 	}
 	return new;
 }
@@ -429,7 +433,7 @@ EXPORT_SYMBOL(free_task);
 static __latent_entropy int dup_mmap(struct mm_struct *mm,
 					struct mm_struct *oldmm)
 {
-	struct vm_area_struct *mpnt, *tmp, *prev, **pprev;
+	struct vm_area_struct *mpnt, *tmp, *prev, **pprev, *last = NULL;
 	struct rb_node **rb_link, *rb_parent;
 	int retval;
 	unsigned long charge;
@@ -548,8 +552,18 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 		rb_parent = &tmp->vm_rb;
 
 		mm->map_count++;
-		if (!(tmp->vm_flags & VM_WIPEONFORK))
+		if (!(tmp->vm_flags & VM_WIPEONFORK)) {
+			if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT)) {
+				/*
+				 * Mark this VMA as changing to prevent the
+				 * speculative page fault hanlder to process
+				 * it until the TLB are flushed below.
+				 */
+				last = mpnt;
+				vm_raw_write_begin(mpnt);
+			}
 			retval = copy_page_range(mm, oldmm, mpnt);
+		}
 
 		if (tmp->vm_ops && tmp->vm_ops->open)
 			tmp->vm_ops->open(tmp);
@@ -562,6 +576,22 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 out:
 	up_write(&mm->mmap_sem);
 	flush_tlb_mm(oldmm);
+
+	if (IS_ENABLED(CONFIG_SPECULATIVE_PAGE_FAULT)) {
+		/*
+		 * Since the TLB has been flush, we can safely unmark the
+		 * copied VMAs and allows the speculative page fault handler to
+		 * process them again.
+		 * Walk back the VMA list from the last marked VMA.
+		 */
+		for (; last; last = last->vm_prev) {
+			if (last->vm_flags & VM_DONTCOPY)
+				continue;
+			if (!(last->vm_flags & VM_WIPEONFORK))
+				vm_raw_write_end(last);
+		}
+	}
+
 	up_write(&oldmm->mmap_sem);
 	dup_userfaultfd_complete(&uf);
 fail_uprobe_end:
@@ -944,6 +974,9 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 	mm->mmap = NULL;
 	mm->mm_rb = RB_ROOT;
 	mm->vmacache_seqnum = 0;
+#ifdef CONFIG_SPECULATIVE_PAGE_FAULT
+	rwlock_init(&mm->mm_rb_lock);
+#endif
 	atomic_set(&mm->mm_users, 1);
 	atomic_set(&mm->mm_count, 1);
 	init_rwsem(&mm->mmap_sem);
@@ -1029,14 +1062,69 @@ static inline void __mmput(struct mm_struct *mm)
 }
 
 /*
+ * Store pids of zygote and zygote64.
+ * Both processes uses "main" as its comm.
+ */
+static pid_t zygote_pids[2];
+
+bool is_app(struct task_struct *p)
+{
+	struct task_struct *parent;
+
+	parent = rcu_dereference(p->real_parent);
+
+	if (parent->pid == zygote_pids[0])
+		return true;
+
+	if (parent->pid == zygote_pids[1])
+		return true;
+
+	if (zygote_pids[0] && zygote_pids[1])
+		return false;
+
+	if (strncmp(parent->comm, "main", 4) == 0) {
+		if (!zygote_pids[0]) {
+			zygote_pids[0] = parent->pid;
+			pr_info("set zygote_pids[0]=%d", parent->pid);
+			return true;
+		}
+		if (!zygote_pids[1]) {
+			zygote_pids[1] = parent->pid;
+			pr_info("set zygote_pids[1]=%d", parent->pid);
+			return true;
+		}
+	}
+	return false;
+}
+
+void (*on_app_mmput_callback)(void);
+
+void call_on_app_mmput_callback(void)
+{
+	if (on_app_mmput_callback) {
+		on_app_mmput_callback();
+	}
+}
+
+void register_on_app_mmput_callback(void (*callback)(void))
+{
+	on_app_mmput_callback = callback;
+}
+EXPORT_SYMBOL_GPL(register_on_app_mmput_callback);
+
+/*
  * Decrement the use count and release all resources for an mm.
  */
 void mmput(struct mm_struct *mm)
 {
 	might_sleep();
 
-	if (atomic_dec_and_test(&mm->mm_users))
+	if (atomic_dec_and_test(&mm->mm_users)) {
 		__mmput(mm);
+		if (is_app(current)) {
+			call_on_app_mmput_callback();
+		}
+	}
 }
 EXPORT_SYMBOL_GPL(mmput);
 
@@ -1351,6 +1439,8 @@ static int copy_mm(unsigned long clone_flags, struct task_struct *tsk)
 good_mm:
 	tsk->mm = mm;
 	tsk->active_mm = mm;
+	if (tsk->mm->mmap_base && !(tsk->mm->mmap_base >> 32))
+		tsk->sse = 1;
 	return 0;
 
 fail_nomem:
@@ -1796,6 +1886,7 @@ static __latent_entropy struct task_struct *copy_process(
 
 	init_sigpending(&p->pending);
 
+	p->sse = 0;
 	p->utime = p->stime = p->gtime = 0;
 #ifdef CONFIG_ARCH_HAS_SCALED_CPUTIME
 	p->utimescaled = p->stimescaled = 0;
@@ -2220,6 +2311,7 @@ long _do_fork(unsigned long clone_flags,
 	if (IS_ERR(p))
 		return PTR_ERR(p);
 
+	cpumask_setall(&p->aug_cpus_allowed);
 	cpufreq_task_times_alloc(p);
 
 	/*
@@ -2230,6 +2322,10 @@ long _do_fork(unsigned long clone_flags,
 
 	pid = get_task_pid(p, PIDTYPE_PID);
 	nr = pid_vnr(pid);
+
+#ifdef CONFIG_SECURITY_DEFEX
+	task_defex_zero_creds(p);
+#endif
 
 	if (clone_flags & CLONE_PARENT_SETTID)
 		put_user(nr, parent_tidptr);
