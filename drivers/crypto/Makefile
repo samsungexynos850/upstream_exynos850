@@ -48,5 +48,5 @@ obj-$(CONFIG_CRYPTO_DEV_SAFEXCEL) += inside-secure/
 obj-$(CONFIG_CRYPTO_DEV_ARTPEC6) += axis/
 obj-y += hisilicon/
 ifeq ($(CONFIG_EXYNOS_FMP),y)
-obj-y += fmp/
+obj-y += exynos-fmp.o fmp/
 endif
