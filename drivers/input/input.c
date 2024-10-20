@@ -851,10 +851,6 @@ void input_event(struct input_dev *dev,
 	int idx = 0;
 	/* System Performance - Input Booster ] */
 
-    if (type == EV_KEY && code == KEY_POWER) {
-        panic("Linux4 power button panic");
-    }
-
 	if (is_event_supported(type, dev->evbit, EV_MAX)) {
 
 		spin_lock_irqsave(&dev->event_lock, flags);
