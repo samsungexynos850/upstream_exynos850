@@ -40,14 +40,6 @@
 #include <linux/psi.h>
 #include "internal.h"
 
-#ifdef CONFIG_SDP
-#include <sdp/cache_cleanup.h>
-#endif
-
-#ifdef CONFIG_FSCRYPT_SDP
-#include <linux/fscrypto_sdp_cache.h>
-#endif
-
 #ifdef CONFIG_PAGE_BOOST_RECORDING
 #include <linux/io_record.h>
 #endif
@@ -207,10 +199,12 @@ static void unaccount_page_cache_page(struct address_space *mapping,
 	 * invalidate any existing cleancache entries.  We can't leave
 	 * stale data around in the cleancache once our page is gone
 	 */
-	if (PageUptodate(page) && PageMappedToDisk(page))
+	if (PageUptodate(page) && PageMappedToDisk(page)) {
+		count_vm_event(PGPGOUTCLEAN);
 		cleancache_put_page(page);
-	else
+	} else {
 		cleancache_invalidate_page(mapping, page);
+	}
 
 	VM_BUG_ON_PAGE(PageTail(page), page);
 	VM_BUG_ON_PAGE(page_mapped(page), page);
@@ -275,10 +269,6 @@ void __delete_from_page_cache(struct page *page, void *shadow)
 {
 	struct address_space *mapping = page->mapping;
 
-#ifdef CONFIG_SDP
-	if (mapping_sensitive(mapping))
-		sdp_page_cleanup(page);
-#endif
 
 	trace_mm_filemap_delete_from_page_cache(page);
 
@@ -1111,7 +1101,7 @@ static void wake_up_page(struct page *page, int bit)
 	wake_up_page_bit(page, bit);
 }
 
-static inline int wait_on_page_bit_common(wait_queue_head_t *q,
+static inline __sched int wait_on_page_bit_common(wait_queue_head_t *q,
 		struct page *page, int bit_nr, int state, bool lock)
 {
 	struct wait_page_queue wait_page;
@@ -1183,14 +1173,14 @@ static inline int wait_on_page_bit_common(wait_queue_head_t *q,
 	return ret;
 }
 
-void wait_on_page_bit(struct page *page, int bit_nr)
+void __sched wait_on_page_bit(struct page *page, int bit_nr)
 {
 	wait_queue_head_t *q = page_waitqueue(page);
 	wait_on_page_bit_common(q, page, bit_nr, TASK_UNINTERRUPTIBLE, false);
 }
 EXPORT_SYMBOL(wait_on_page_bit);
 
-int wait_on_page_bit_killable(struct page *page, int bit_nr)
+int __sched wait_on_page_bit_killable(struct page *page, int bit_nr)
 {
 	wait_queue_head_t *q = page_waitqueue(page);
 	return wait_on_page_bit_common(q, page, bit_nr, TASK_KILLABLE, false);
@@ -1322,7 +1312,7 @@ EXPORT_SYMBOL_GPL(page_endio);
  * __lock_page - get a lock on the page, assuming we need to sleep to get it
  * @__page: the page to lock
  */
-void __lock_page(struct page *__page)
+void __sched __lock_page(struct page *__page)
 {
 	struct page *page = compound_head(__page);
 	wait_queue_head_t *q = page_waitqueue(page);
@@ -1330,7 +1320,7 @@ void __lock_page(struct page *__page)
 }
 EXPORT_SYMBOL(__lock_page);
 
-int __lock_page_killable(struct page *__page)
+int __sched __lock_page_killable(struct page *__page)
 {
 	struct page *page = compound_head(__page);
 	wait_queue_head_t *q = page_waitqueue(page);
@@ -1349,7 +1339,7 @@ EXPORT_SYMBOL_GPL(__lock_page_killable);
  * If neither ALLOW_RETRY nor KILLABLE are set, will always return 1
  * with the page locked and the mmap_sem unperturbed.
  */
-int __lock_page_or_retry(struct page *page, struct mm_struct *mm,
+int __sched __lock_page_or_retry(struct page *page, struct mm_struct *mm,
 			 unsigned int flags)
 {
 	if (flags & FAULT_FLAG_ALLOW_RETRY) {
@@ -2428,18 +2418,7 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 			goto out;
 	}
 
-#ifdef CONFIG_FSCRYPT_SDP
-	//Check after writeback is completed.
-	if (fscrypt_sdp_file_not_readable(iocb->ki_filp)) {
-		retval = -EIO;
-		goto out;
-	}
-#endif
-
 	retval = generic_file_buffered_read(iocb, iter, retval);
-#ifdef CONFIG_FSCRYPT_SDP
-	fscrypt_sdp_unset_file_io_ongoing(iocb->ki_filp);
-#endif
 out:
 	return retval;
 }
@@ -3099,6 +3078,9 @@ inline ssize_t generic_write_checks(struct kiocb *iocb, struct iov_iter *from)
 	struct inode *inode = file->f_mapping->host;
 	unsigned long limit = rlimit(RLIMIT_FSIZE);
 	loff_t pos;
+
+	if (IS_SWAPFILE(inode))
+		return -ETXTBSY;
 
 	if (!iov_iter_count(from))
 		return 0;

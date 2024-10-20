@@ -347,8 +347,144 @@ int notify_change2(struct vfsmount *mnt, struct dentry * dentry, struct iattr * 
 }
 EXPORT_SYMBOL(notify_change2);
 
+/**
+ * notify_change - modify attributes of a filesytem object
+ * @dentry:	object affected
+ * @attr:	new attributes
+ * @delegated_inode: returns inode, if the inode is delegated
+ *
+ * The caller must hold the i_mutex on the affected object.
+ *
+ * If notify_change discovers a delegation in need of breaking,
+ * it will return -EWOULDBLOCK and return a reference to the inode in
+ * delegated_inode.  The caller should then break the delegation and
+ * retry.  Because breaking a delegation may take a long time, the
+ * caller should drop the i_mutex before doing so.
+ *
+ * Alternatively, a caller may pass NULL for delegated_inode.  This may
+ * be appropriate for callers that expect the underlying filesystem not
+ * to be NFS exported.  Also, passing NULL is fine for callers holding
+ * the file open for write, as there can be no conflicting delegation in
+ * that case.
+ */
 int notify_change(struct dentry * dentry, struct iattr * attr, struct inode **delegated_inode)
 {
-	return notify_change2(NULL, dentry, attr, delegated_inode);
+	struct inode *inode = dentry->d_inode;
+	umode_t mode = inode->i_mode;
+	int error;
+	struct timespec64 now;
+	unsigned int ia_valid = attr->ia_valid;
+
+	WARN_ON_ONCE(!inode_is_locked(inode));
+
+	if (ia_valid & (ATTR_MODE | ATTR_UID | ATTR_GID | ATTR_TIMES_SET)) {
+		if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
+			return -EPERM;
+	}
+
+	/*
+	 * If utimes(2) and friends are called with times == NULL (or both
+	 * times are UTIME_NOW), then we need to check for write permission
+	 */
+	if (ia_valid & ATTR_TOUCH) {
+		if (IS_IMMUTABLE(inode))
+			return -EPERM;
+
+		if (!inode_owner_or_capable(inode)) {
+			error = inode_permission(inode, MAY_WRITE);
+			if (error)
+				return error;
+		}
+	}
+
+	if ((ia_valid & ATTR_MODE)) {
+		umode_t amode = attr->ia_mode;
+		/* Flag setting protected by i_mutex */
+		if (is_sxid(amode))
+			inode->i_flags &= ~S_NOSEC;
+	}
+
+	now = current_time(inode);
+
+	attr->ia_ctime = now;
+	if (!(ia_valid & ATTR_ATIME_SET))
+		attr->ia_atime = now;
+	if (!(ia_valid & ATTR_MTIME_SET))
+		attr->ia_mtime = now;
+	if (ia_valid & ATTR_KILL_PRIV) {
+		error = security_inode_need_killpriv(dentry);
+		if (error < 0)
+			return error;
+		if (error == 0)
+			ia_valid = attr->ia_valid &= ~ATTR_KILL_PRIV;
+	}
+
+	/*
+	 * We now pass ATTR_KILL_S*ID to the lower level setattr function so
+	 * that the function has the ability to reinterpret a mode change
+	 * that's due to these bits. This adds an implicit restriction that
+	 * no function will ever call notify_change with both ATTR_MODE and
+	 * ATTR_KILL_S*ID set.
+	 */
+	if ((ia_valid & (ATTR_KILL_SUID|ATTR_KILL_SGID)) &&
+	    (ia_valid & ATTR_MODE))
+		BUG();
+
+	if (ia_valid & ATTR_KILL_SUID) {
+		if (mode & S_ISUID) {
+			ia_valid = attr->ia_valid |= ATTR_MODE;
+			attr->ia_mode = (inode->i_mode & ~S_ISUID);
+		}
+	}
+	if (ia_valid & ATTR_KILL_SGID) {
+		if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) {
+			if (!(ia_valid & ATTR_MODE)) {
+				ia_valid = attr->ia_valid |= ATTR_MODE;
+				attr->ia_mode = inode->i_mode;
+			}
+			attr->ia_mode &= ~S_ISGID;
+		}
+	}
+	if (!(attr->ia_valid & ~(ATTR_KILL_SUID | ATTR_KILL_SGID)))
+		return 0;
+
+	/*
+	 * Verify that uid/gid changes are valid in the target
+	 * namespace of the superblock.
+	 */
+	if (ia_valid & ATTR_UID &&
+	    !kuid_has_mapping(inode->i_sb->s_user_ns, attr->ia_uid))
+		return -EOVERFLOW;
+	if (ia_valid & ATTR_GID &&
+	    !kgid_has_mapping(inode->i_sb->s_user_ns, attr->ia_gid))
+		return -EOVERFLOW;
+
+	/* Don't allow modifications of files with invalid uids or
+	 * gids unless those uids & gids are being made valid.
+	 */
+	if (!(ia_valid & ATTR_UID) && !uid_valid(inode->i_uid))
+		return -EOVERFLOW;
+	if (!(ia_valid & ATTR_GID) && !gid_valid(inode->i_gid))
+		return -EOVERFLOW;
+
+	error = security_inode_setattr(dentry, attr);
+	if (error)
+		return error;
+	error = try_break_deleg(inode, delegated_inode);
+	if (error)
+		return error;
+
+	if (inode->i_op->setattr)
+		error = inode->i_op->setattr(dentry, attr);
+	else
+		error = simple_setattr(dentry, attr);
+
+	if (!error) {
+		fsnotify_change(dentry, ia_valid);
+		ima_inode_post_setattr(dentry);
+		evm_inode_post_setattr(dentry, ia_valid);
+	}
+
+	return error;
 }
 EXPORT_SYMBOL(notify_change);

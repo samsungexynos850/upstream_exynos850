@@ -5995,9 +5995,12 @@ bool napi_complete_done(struct napi_struct *n, int work_done)
 				      HRTIMER_MODE_REL_PINNED);
 	}
 	if (unlikely(!list_empty(&n->poll_list))) {
+		struct softnet_data *sd = this_cpu_ptr(&softnet_data);
+
 		/* If n->poll_list is not empty, we need to mask irqs */
 		local_irq_save(flags);
 		list_del_init(&n->poll_list);
+		sd->current_napi = NULL;
 		local_irq_restore(flags);
 	}
 
@@ -6274,6 +6277,14 @@ void netif_napi_del(struct napi_struct *napi)
 	napi->gro_bitmask = 0;
 }
 EXPORT_SYMBOL(netif_napi_del);
+
+struct napi_struct *get_current_napi_context(void)
+{
+	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
+
+	return sd->current_napi;
+}
+EXPORT_SYMBOL(get_current_napi_context);
 
 static int napi_poll(struct napi_struct *n, struct list_head *repoll)
 {

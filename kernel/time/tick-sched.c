@@ -1069,6 +1069,7 @@ ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next)
 
 	return ktime_sub(next_event, now);
 }
+EXPORT_SYMBOL_GPL(tick_nohz_get_sleep_length);
 
 /**
  * tick_nohz_get_idle_calls_cpu - return the current idle calls counter value
@@ -1081,11 +1082,6 @@ unsigned long tick_nohz_get_idle_calls_cpu(int cpu)
 	struct tick_sched *ts = tick_get_tick_sched(cpu);
 
 	return ts->idle_calls;
-}
-
-ktime_t *get_next_event_cpu(unsigned int cpu)
-{
-	return &(per_cpu(tick_cpu_device, cpu).evtdev->next_event);
 }
 
 /**
@@ -1401,3 +1397,9 @@ int tick_check_oneshot_change(int allow_nohz)
 	tick_nohz_switch_to_nohz();
 	return 0;
 }
+
+ktime_t *get_next_event_cpu(unsigned int cpu)
+{
+	return &(per_cpu(tick_cpu_device, cpu).evtdev->next_event);
+}
+EXPORT_SYMBOL_GPL(get_next_event_cpu);

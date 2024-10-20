@@ -397,11 +397,9 @@ int psci_cpu_init_idle(unsigned int cpu)
 	return ret;
 }
 
-static int psci_suspend_finisher(unsigned long index)
+static int psci_suspend_finisher(unsigned long state_id)
 {
-	u32 *state = __this_cpu_read(psci_power_state);
-
-	return psci_ops.cpu_suspend(state[index - 1],
+	return psci_ops.cpu_suspend(state_id,
 				    __pa_symbol(cpu_resume));
 }
 
@@ -453,7 +451,7 @@ static int psci_suspend_customized_finisher(unsigned long index)
 int psci_cpu_suspend_enter(unsigned long index)
 {
 	int ret;
-	u32 *state = __this_cpu_read(psci_power_state);
+    u32 *state = __this_cpu_read(psci_power_state);
 	/*
 	 * idle state index 0 corresponds to wfi, should never be called
 	 * from the cpu_suspend operations

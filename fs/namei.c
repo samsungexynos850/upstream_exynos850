@@ -41,12 +41,11 @@
 #include <linux/uaccess.h>
 #include <linux/build_bug.h>
 
-#ifdef CONFIG_FSCRYPT_SDP
-#include <linux/fscrypto_sdp_name.h>
-#endif
-
 #include "internal.h"
 #include "mount.h"
+
+#define CREATE_TRACE_POINTS
+#include <trace/events/namei.h>
 
 /* [Feb-1997 T. Schoebel-Theuer]
  * Fundamental changes in the pathname lookup mechanisms (namei)
@@ -386,8 +385,6 @@ EXPORT_SYMBOL(generic_permission);
 static inline int do_inode_permission(struct vfsmount *mnt, struct inode *inode, int mask)
 {
 	if (unlikely(!(inode->i_opflags & IOP_FASTPERM))) {
-		if (likely(mnt && inode->i_op->permission2))
-			return inode->i_op->permission2(mnt, inode, mask);
 		if (likely(inode->i_op->permission))
 			return inode->i_op->permission(inode, mask);
 
@@ -783,6 +780,81 @@ static inline int d_revalidate(struct dentry *dentry, unsigned int flags)
 		return 1;
 }
 
+#define INIT_PATH_SIZE 64
+
+static void success_walk_trace(struct nameidata *nd)
+{
+	struct path *pt = &nd->path;
+	struct inode *i = nd->inode;
+	char buf[INIT_PATH_SIZE], *try_buf;
+	int cur_path_size;
+	char *p;
+
+	/* When eBPF/ tracepoint is disabled, keep overhead low. */
+	if (!trace_inodepath_enabled())
+		return;
+
+	/* First try stack allocated buffer. */
+	try_buf = buf;
+	cur_path_size = INIT_PATH_SIZE;
+
+	while (cur_path_size <= PATH_MAX) {
+		/* Free previous heap allocation if we are now trying
+		 * a second or later heap allocation.
+		 */
+		if (try_buf != buf)
+			kfree(try_buf);
+
+		/* All but the first alloc are on the heap. */
+		if (cur_path_size != INIT_PATH_SIZE) {
+			try_buf = kmalloc(cur_path_size, GFP_KERNEL);
+			if (!try_buf) {
+				try_buf = buf;
+				sprintf(try_buf, "error:buf_alloc_failed");
+				break;
+			}
+		}
+
+		p = d_path(pt, try_buf, cur_path_size);
+
+		if (!IS_ERR(p)) {
+			char *end = mangle_path(try_buf, p, "\n");
+
+			if (end) {
+				try_buf[end - try_buf] = 0;
+				break;
+			} else {
+				/* On mangle errors, double path size
+				 * till PATH_MAX.
+				 */
+				cur_path_size = cur_path_size << 1;
+				continue;
+			}
+		}
+
+		if (PTR_ERR(p) == -ENAMETOOLONG) {
+			/* If d_path complains that name is too long,
+			 * then double path size till PATH_MAX.
+			 */
+			cur_path_size = cur_path_size << 1;
+			continue;
+		}
+
+		sprintf(try_buf, "error:d_path_failed_%lu",
+			-1 * PTR_ERR(p));
+		break;
+	}
+
+	if (cur_path_size > PATH_MAX)
+		sprintf(try_buf, "error:d_path_name_too_long");
+
+	trace_inodepath(i, try_buf);
+
+	if (try_buf != buf)
+		kfree(try_buf);
+	return;
+}
+
 /**
  * complete_walk - successful completion of path walk
  * @nd:  pointer nameidata
@@ -805,15 +877,21 @@ static int complete_walk(struct nameidata *nd)
 			return -ECHILD;
 	}
 
-	if (likely(!(nd->flags & LOOKUP_JUMPED)))
+	if (likely(!(nd->flags & LOOKUP_JUMPED))) {
+		success_walk_trace(nd);
 		return 0;
+	}
 
-	if (likely(!(dentry->d_flags & DCACHE_OP_WEAK_REVALIDATE)))
+	if (likely(!(dentry->d_flags & DCACHE_OP_WEAK_REVALIDATE))) {
+		success_walk_trace(nd);
 		return 0;
+	}
 
 	status = dentry->d_op->d_weak_revalidate(dentry, nd->flags);
-	if (status > 0)
+	if (status > 0) {
+		success_walk_trace(nd);
 		return 0;
+	}
 
 	if (!status)
 		status = -ESTALE;
@@ -1083,7 +1161,7 @@ const char *get_link(struct nameidata *nd)
 		return ERR_PTR(error);
 
 	nd->last_type = LAST_BIND;
-	res = inode->i_link;
+	res = READ_ONCE(inode->i_link);
 	if (!res) {
 		const char * (*get)(struct dentry *, struct inode *,
 				struct delayed_call *);
@@ -1708,13 +1786,13 @@ static struct dentry *lookup_slow(const struct qstr *name,
 static inline int may_lookup(struct nameidata *nd)
 {
 	if (nd->flags & LOOKUP_RCU) {
-		int err = inode_permission2(nd->path.mnt, nd->inode, MAY_EXEC|MAY_NOT_BLOCK);
+		int err = inode_permission(nd->inode, MAY_EXEC|MAY_NOT_BLOCK);
 		if (err != -ECHILD)
 			return err;
 		if (unlazy_walk(nd))
 			return -ECHILD;
 	}
-	return inode_permission2(nd->path.mnt, nd->inode, MAY_EXEC);
+	return inode_permission(nd->inode, MAY_EXEC);
 }
 
 static inline int handle_dots(struct nameidata *nd, int type)
@@ -2470,8 +2548,8 @@ int vfs_path_lookup(struct dentry *dentry, struct vfsmount *mnt,
 }
 EXPORT_SYMBOL(vfs_path_lookup);
 
-static int lookup_one_len_common(const char *name, struct vfsmount *mnt,
-				 struct dentry *base, int len, struct qstr *this)
+static int lookup_one_len_common(const char *name, struct dentry *base,
+				 int len, struct qstr *this)
 {
 	this->name = name;
 	this->len = len;
@@ -2499,7 +2577,7 @@ static int lookup_one_len_common(const char *name, struct vfsmount *mnt,
 			return err;
 	}
 
-	return inode_permission2(mnt, base->d_inode, MAY_EXEC);
+	return inode_permission(base->d_inode, MAY_EXEC);
 }
 
 /**
@@ -2523,7 +2601,7 @@ struct dentry *try_lookup_one_len(const char *name, struct dentry *base, int len
 
 	WARN_ON_ONCE(!inode_is_locked(base->d_inode));
 
-	err = lookup_one_len_common(name, NULL, base, len, &this);
+	err = lookup_one_len_common(name, base, len, &this);
 	if (err)
 		return ERR_PTR(err);
 
@@ -2542,7 +2620,7 @@ EXPORT_SYMBOL(try_lookup_one_len);
  *
  * The caller must hold base->i_mutex.
  */
-struct dentry *lookup_one_len2(const char *name, struct vfsmount *mnt, struct dentry *base, int len)
+struct dentry *lookup_one_len(const char *name, struct dentry *base, int len)
 {
 	struct dentry *dentry;
 	struct qstr this;
@@ -2550,18 +2628,12 @@ struct dentry *lookup_one_len2(const char *name, struct vfsmount *mnt, struct de
 
 	WARN_ON_ONCE(!inode_is_locked(base->d_inode));
 
-	err = lookup_one_len_common(name, mnt, base, len, &this);
+	err = lookup_one_len_common(name, base, len, &this);
 	if (err)
 		return ERR_PTR(err);
 
 	dentry = lookup_dcache(&this, base, 0);
 	return dentry ? dentry : __lookup_slow(&this, base, 0);
-}
-EXPORT_SYMBOL(lookup_one_len2);
-
-struct dentry *lookup_one_len(const char *name, struct dentry *base, int len)
-{
-	return lookup_one_len2(name, NULL, base, len);
 }
 EXPORT_SYMBOL(lookup_one_len);
 
@@ -2584,7 +2656,7 @@ struct dentry *lookup_one_len_unlocked(const char *name,
 	int err;
 	struct dentry *ret;
 
-	err = lookup_one_len_common(name, NULL, base, len, &this);
+	err = lookup_one_len_common(name, base, len, &this);
 	if (err)
 		return ERR_PTR(err);
 
@@ -2869,7 +2941,7 @@ static inline int may_create(struct vfsmount *mnt, struct inode *dir, struct den
 	if (!kuid_has_mapping(s_user_ns, current_fsuid()) ||
 	    !kgid_has_mapping(s_user_ns, current_fsgid()))
 		return -EOVERFLOW;
-	return inode_permission2(mnt, dir, MAY_WRITE | MAY_EXEC);
+	return inode_permission(dir, MAY_WRITE | MAY_EXEC);
 }
 
 /*
@@ -2983,7 +3055,6 @@ bool may_open_dev(const struct path *path)
 static int may_open(const struct path *path, int acc_mode, int flag)
 {
 	struct dentry *dentry = path->dentry;
-	struct vfsmount *mnt = path->mnt;
 	struct inode *inode = dentry->d_inode;
 	int error;
 
@@ -3008,7 +3079,7 @@ static int may_open(const struct path *path, int acc_mode, int flag)
 		break;
 	}
 
-	error = inode_permission2(mnt, inode, MAY_OPEN | acc_mode);
+	error = inode_permission(inode, MAY_OPEN | acc_mode);
 	if (error)
 		return error;
 
@@ -3043,7 +3114,7 @@ static int handle_truncate(struct file *filp)
 	if (!error)
 		error = security_path_truncate(path);
 	if (!error) {
-		error = do_truncate2(path->mnt, path->dentry, 0,
+		error = do_truncate(path->dentry, 0,
 				    ATTR_MTIME|ATTR_CTIME|ATTR_OPEN,
 				    filp);
 	}
@@ -3070,7 +3141,7 @@ static int may_o_create(const struct path *dir, struct dentry *dentry, umode_t m
 	    !kgid_has_mapping(s_user_ns, current_fsgid()))
 		return -EOVERFLOW;
 
-	error = inode_permission2(dir->mnt, dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
+	error = inode_permission(dir->dentry->d_inode, MAY_WRITE | MAY_EXEC);
 	if (error)
 		return error;
 
@@ -3480,8 +3551,7 @@ struct dentry *vfs_tmpfile(struct dentry *dentry, umode_t mode, int open_flag)
 	int error;
 
 	/* we want directory to be writable */
-	error = inode_permission2(ERR_PTR(-EOPNOTSUPP), dir,
-					MAY_WRITE | MAY_EXEC);
+	error = inode_permission(dir, MAY_WRITE | MAY_EXEC);
 	if (error)
 		goto out_err;
 	error = -EOPNOTSUPP;
@@ -3809,12 +3879,12 @@ retry:
 		goto out;
 	switch (mode & S_IFMT) {
 		case 0: case S_IFREG:
-			error = vfs_create2(path.mnt, path.dentry->d_inode,dentry,mode,true);
+			error = vfs_create(path.dentry->d_inode,dentry,mode,true);
 			if (!error)
 				ima_post_path_mknod(dentry);
 			break;
 		case S_IFCHR: case S_IFBLK:
-			error = vfs_mknod2(path.mnt, path.dentry->d_inode,dentry,mode,
+			error = vfs_mknod(path.dentry->d_inode,dentry,mode,
 					new_decode_dev(dev));
 			break;
 		case S_IFIFO: case S_IFSOCK:
@@ -3889,7 +3959,7 @@ retry:
 		mode &= ~current_umask();
 	error = security_path_mkdir(&path, dentry, mode);
 	if (!error)
-		error = vfs_mkdir2(path.mnt, path.dentry->d_inode, dentry, mode);
+		error = vfs_mkdir(path.dentry->d_inode, dentry, mode);
 	done_path_create(&path, dentry);
 	if (retry_estale(error, lookup_flags)) {
 		lookup_flags |= LOOKUP_REVAL;
@@ -4002,7 +4072,7 @@ retry:
 	error = security_path_rmdir(&path, dentry);
 	if (error)
 		goto exit3;
-	error = vfs_rmdir2(path.mnt, path.dentry->d_inode, dentry);
+	error = vfs_rmdir(path.dentry->d_inode, dentry);
 #ifdef CONFIG_PROC_DLOG
 	if (!error)
 		dlog_hook_rmdir(dentry, &path);
@@ -4091,6 +4161,7 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry, struct inode **delegate
 }
 EXPORT_SYMBOL(vfs_unlink);
 
+
 /*
  * Make sure that the actual truncation of the file will occur outside its
  * directory's i_mutex.  Truncate can take a long time if there is a lot of
@@ -4134,7 +4205,7 @@ retry_deleg:
 		error = security_path_unlink(&path, dentry);
 		if (error)
 			goto exit2;
-		error = vfs_unlink2(path.mnt, path.dentry->d_inode, dentry, &delegated_inode);
+		error = vfs_unlink(path.dentry->d_inode, dentry, &delegated_inode);
 #ifdef CONFIG_PROC_DLOG
 		if (!error)
 			dlog_hook(dentry, inode, &path);
@@ -4235,7 +4306,7 @@ retry:
 
 	error = security_path_symlink(&path, dentry, from->name);
 	if (!error)
-		error = vfs_symlink2(path.mnt, path.dentry->d_inode, dentry, from->name);
+		error = vfs_symlink(path.dentry->d_inode, dentry, from->name);
 	done_path_create(&path, dentry);
 	if (retry_estale(error, lookup_flags)) {
 		lookup_flags |= LOOKUP_REVAL;
@@ -4396,7 +4467,7 @@ retry:
 	error = security_path_link(old_path.dentry, &new_path, new_dentry);
 	if (error)
 		goto out_dput;
-	error = vfs_link2(old_path.mnt, old_path.dentry, new_path.dentry->d_inode, new_dentry, &delegated_inode);
+	error = vfs_link(old_path.dentry, new_path.dentry->d_inode, new_dentry, &delegated_inode);
 out_dput:
 	done_path_create(&new_path, new_dentry);
 	if (delegated_inode) {
@@ -4732,7 +4803,7 @@ retry_deleg:
 				     &new_path, new_dentry, flags);
 	if (error)
 		goto exit5;
-	error = vfs_rename2(old_path.mnt, old_path.dentry->d_inode, old_dentry,
+	error = vfs_rename(old_path.dentry->d_inode, old_dentry,
 			   new_path.dentry->d_inode, new_dentry,
 			   &delegated_inode, flags);
 exit5:
@@ -4839,7 +4910,7 @@ int vfs_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 		spin_unlock(&inode->i_lock);
 	}
 
-	link = inode->i_link;
+	link = READ_ONCE(inode->i_link);
 	if (!link) {
 		link = inode->i_op->get_link(dentry, inode, &done);
 		if (IS_ERR(link))

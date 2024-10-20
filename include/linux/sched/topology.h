@@ -3,14 +3,9 @@
 #define _LINUX_SCHED_TOPOLOGY_H
 
 #include <linux/topology.h>
+#include <linux/android_kabi.h>
 
 #include <linux/sched/idle.h>
-
-/*
- * Increase resolution of cpu_capacity calculations
- */
-#define SCHED_CAPACITY_SHIFT	SCHED_FIXEDPOINT_SHIFT
-#define SCHED_CAPACITY_SCALE	(1L << SCHED_CAPACITY_SHIFT)
 
 /*
  * sched-domains (multiprocessor balancing) declarations:
@@ -72,6 +67,8 @@ struct sched_domain_shared {
 	atomic_t	ref;
 	atomic_t	nr_busy_cpus;
 	int		has_idle_cores;
+
+	bool            overutilized;
 };
 
 struct sched_domain {
@@ -147,6 +144,10 @@ struct sched_domain {
 	struct sched_domain_shared *shared;
 
 	unsigned int span_weight;
+
+	ANDROID_KABI_RESERVE(1);
+	ANDROID_KABI_RESERVE(2);
+
 	/*
 	 * Span of all CPUs in this domain.
 	 *

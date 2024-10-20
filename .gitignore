@@ -12,7 +12,6 @@
 .*
 *.a
 *.asn1.[ch]
-*.bin
 *.bz2
 *.c.[012]*.*
 *.dtb
@@ -132,3 +131,6 @@ all.config
 
 # Kdevelop4
 *.kdev4
+
+# Out directory
+out/

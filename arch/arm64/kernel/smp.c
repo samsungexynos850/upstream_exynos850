@@ -58,6 +58,7 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/processor.h>
+#include <asm/scs.h>
 #include <asm/smp_plat.h>
 #include <asm/sections.h>
 #include <asm/tlbflush.h>
@@ -354,6 +355,9 @@ void cpu_die(void)
 {
 	unsigned int cpu = smp_processor_id();
 
+	/* Save the shadow stack pointer before exiting the idle task */
+	scs_save(current);
+
 	idle_task_exit();
 
 	local_daif_mask();
@@ -419,11 +423,6 @@ void __init smp_cpus_done(unsigned int max_cpus)
 void __init smp_prepare_boot_cpu(void)
 {
 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
-	/*
-	 * Initialise the static keys early as they may be enabled by the
-	 * cpufeature code.
-	 */
-	jump_label_init();
 	cpuinfo_store_boot_cpu();
 }
 
@@ -623,7 +622,11 @@ static void __init acpi_parse_and_init_cpus(void)
 #else
 #define acpi_parse_and_init_cpus(...)	do { } while (0)
 #endif
+/* Dummy vendor field */
+DEFINE_PER_CPU(bool, pending_ipi);
+EXPORT_SYMBOL_GPL(pending_ipi);
 
+static void (*__smp_update_ipi_history_cb)(int cpu);
 /*
  * Enumerate the possible CPU set from the device tree and build the
  * cpu logical map array containing MPIDR values related to logical
@@ -781,6 +784,12 @@ void __init set_smp_cross_call(void (*fn)(const struct cpumask *, unsigned int))
 {
 	__smp_cross_call = fn;
 }
+
+void set_update_ipi_history_callback(void (*fn)(int))
+{
+	__smp_update_ipi_history_cb = fn;
+}
+EXPORT_SYMBOL_GPL(set_update_ipi_history_callback);
 
 static const char *ipi_types[NR_IPI] __tracepoint_string = {
 #define S(x,s)	[x] = s
@@ -1003,7 +1012,9 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 
 void smp_send_reschedule(int cpu)
 {
-	smp_cross_call_common(cpumask_of(cpu), IPI_RESCHEDULE);
+	if (__smp_update_ipi_history_cb)
+		__smp_update_ipi_history_cb(cpu);
+	smp_cross_call(cpumask_of(cpu), IPI_RESCHEDULE);
 }
 
 #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST

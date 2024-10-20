@@ -662,7 +662,7 @@ int ssp_probe(struct platform_device *pdev)
 #if (KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE) || defined(CONFIG_SSP_PM_WAKEUP_LINUX_VER_5_4)
 	wakeup_source_register(&pdev->dev, "ssp_wake_lock");
 #else
-	wakeup_source_register("ssp_wake_lock");
+	wakeup_source_register(NULL, "ssp_wake_lock");
 #endif
 	init_waitqueue_head(&data->reset_lock.waitqueue);
 	atomic_set(&data->reset_lock.state, 1);

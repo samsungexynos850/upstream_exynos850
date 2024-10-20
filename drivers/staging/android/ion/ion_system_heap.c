@@ -390,7 +390,7 @@ free_heap:
 	return ERR_PTR(-ENOMEM);
 }
 
-static int ion_system_heap_create(void)
+int ion_system_heap_create(void)
 {
 	struct ion_heap *heap;
 
@@ -490,7 +490,7 @@ static struct ion_heap *__ion_system_contig_heap_create(void)
 	return heap;
 }
 
-static int __maybe_unused ion_system_contig_heap_create(void)
+int ion_system_contig_heap_create(void)
 {
 	struct ion_heap *heap;
 
@@ -502,3 +502,7 @@ static int __maybe_unused ion_system_contig_heap_create(void)
 	return 0;
 }
 
+#ifndef CONFIG_ION_MODULE
+device_initcall(ion_system_contig_heap_create);
+device_initcall(ion_system_heap_create);
+#endif
