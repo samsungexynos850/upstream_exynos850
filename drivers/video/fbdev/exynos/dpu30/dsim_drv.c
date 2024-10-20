@@ -2307,15 +2307,19 @@ module_exit(dsim_exit);
  */
 static int rmem_device_init(struct reserved_mem *rmem, struct device *dev)
 {
-	struct dsim_device *dsim = dev_get_drvdata(dev);
+    struct dsim_device *dsim = dev_get_drvdata(dev);
 
-	dsim_info("%s +\n", __func__);
-	dsim->fb_handover.phys_addr = rmem->base;
-	dsim->fb_handover.phys_size = rmem->size;
-	dsim_info("%s -\n", __func__);
+    dsim_info("%s +\n", __func__);
+    dsim->fb_handover.phys_addr = rmem->base;
+    dsim->fb_handover.phys_size = rmem->size;
 
-	return 0;
+    dsim_info("%s addr:%x size:%x\n", __func__, dsim->fb_handover.phys_addr, dsim->fb_handover.phys_size);
+
+    dsim_info("%s -\n", __func__);
+
+    return 0;
 }
+
 
 /*
  * rmem_device_release is called in of_reserved_mem_device_release function
