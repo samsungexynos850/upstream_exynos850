@@ -20,9 +20,6 @@
 
 #include "thermal_core.h"
 
-/***   Private data structures to represent thermal device tree data ***/
-
-
 /**
  * struct __sensor_param - Holds individual sensor data
  * @sensor_data: sensor driver private data passed as input argument
@@ -40,47 +37,7 @@ struct __sensor_param {
 	struct list_head first_tz;
 };
 
-/**
- * struct __thermal_zone - internal representation of a thermal zone
- * @mode: current thermal zone device mode (enabled/disabled)
- * @passive_delay: polling interval while passive cooling is activated
- * @polling_delay: zone polling interval
- * @slope: slope of the temperature adjustment curve
- * @offset: offset of the temperature adjustment curve
- * @default_disable: Keep the thermal zone disabled by default
- * @is_wakeable: Ignore post suspend thermal zone re-evaluation
- * @tzd: thermal zone device pointer for this sensor
- * @ntrips: number of trip points
- * @trips: an array of trip points (0..ntrips - 1)
- * @num_tbps: number of thermal bind params
- * @tbps: an array of thermal bind params (0..num_tbps - 1)
- * @senps: sensor related parameters
- * @list: sibling thermal zone
- */
-
 /*
-struct __thermal_zone {
-	enum thermal_device_mode mode;
-	int passive_delay;
-	int polling_delay;
-	int slope;
-	int offset;
-	struct thermal_zone_device *tzd;
-	bool default_disable;
-	bool is_wakeable;
-
-	int ntrips;
-	struct thermal_trip *trips;
-
-	int num_tbps;
-	struct __thermal_bind_params *tbps;
-
-	struct list_head list;
-	struct __sensor_param *senps;
-};
-*/
-
-/**
  * struct virtual_sensor - internal representation of a virtual thermal zone
  * @num_sensors - number of sensors this virtual sensor will reference to
  *		  estimate temperature
@@ -196,11 +153,10 @@ static int of_thermal_throttle_hotplug(struct thermal_zone_device *tz)
 {
 	struct __thermal_zone *data = tz->devdata;
 	int ret = 0;
-
-	if (!data->ops->throttle_cpu_hotplug)
+	if (!data->senps->ops->throttle_cpu_hotplug)
 		return -EINVAL;
 
-	ret = data->ops->throttle_cpu_hotplug(data->sensor_data, tz->temperature);
+	ret = data->senps->ops->throttle_cpu_hotplug(data->senps->sensor_data, tz->temperature);
 
 	return ret;
 }
@@ -763,6 +719,7 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id, void *data,
 		if (sensor_specs.np == sensor_np && id == sensor_id) {
 			first_tzd = thermal_zone_of_add_sensor(child, sensor_np,
 							 sens_param);
+
 			of_node_put(sensor_specs.np);
 			of_node_put(child);
 			goto exit;

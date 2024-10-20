@@ -808,10 +808,9 @@ static unsigned int find_next_max(struct cpufreq_frequency_table *table,
  * @np: a valid struct device_node to the cooling device device tree node
  * @policy: cpufreq policy
  * Normally this should be same as cpufreq policy->related_cpus.
- * @try_model: true if a power model should be used
- * @plat_mitig_func: function that does the mitigation by changing the
- *                   frequencies (Optional). By default, cpufreq framweork will
- *                   be notified of the new limits.
+ * @capacitance: dynamic power coefficient for these cpus
+ * @plat_static_func: function to calculate the static power consumed by these
+ *                    cpus (optional)
  *
  * This interface function registers the cpufreq cooling device with the name
  * "thermal-cpufreq-%x". This api can support multiple instances of cpufreq
@@ -1035,7 +1034,7 @@ cpufreq_platform_cooling_register(struct cpufreq_policy *policy,
 		return ERR_PTR(-EINVAL);
 	}
 	cdev = __cpufreq_cooling_register(cpu_node, policy, false,
-					  (get_static_t) plat_ops);
+					 (get_static_t) plat_ops);
 
 	of_node_put(cpu_node);
 	return cdev;
