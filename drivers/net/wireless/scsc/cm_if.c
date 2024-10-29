@@ -30,10 +30,6 @@ MODULE_PARM_DESC(EnableTestMode, "Enable WlanLite test mode driver.");
 
 static BLOCKING_NOTIFIER_HEAD(slsi_wlan_notifier);
 
-static bool EnableRfTestMode;
-module_param(EnableRfTestMode, bool, S_IRUGO | S_IWUSR);
-MODULE_PARM_DESC(EnableRfTestMode, "Enable RF test mode driver.");
-
 static struct mutex slsi_start_mutex;
 static int recovery_in_progress;
 static u16 latest_scsc_panic_code;
@@ -275,55 +271,6 @@ static  bool wlan_stop_on_failure_v2(struct scsc_service_client *client, struct 
 	mutex_unlock(&slsi_start_mutex);
 	SLSI_INFO_NODEV("Done!\n");
 	return true;
-}
-
-int slsi_check_rf_test_mode(void)
-{
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 0)
-	struct file *fp = NULL;
-	int         ret = 0;
-#if defined(SCSC_SEP_VERSION) && SCSC_SEP_VERSION >= 9
-	char *filepath = "/data/vendor/conn/.psm.info";
-#else
-	char *filepath = "/data/misc/conn/.psm.info";
-#endif
-	char power_val = 0;
-
-	/* reading power value from /data/vendor/conn/.psm.info */
-	fp = filp_open(filepath, O_RDONLY, 0);
-	if (IS_ERR(fp) || (!fp)) {
-		pr_err("%s is not exist.\n", filepath);
-		return -ENOENT; /* -2 */
-	}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 14, 0)
-	ret = kernel_read(fp, &power_val, 1, &fp->f_pos);
-#else
-	ret = kernel_read(fp, fp->f_pos, &power_val, 1);
-#endif
-	if (ret < 0) {
-		SLSI_INFO_NODEV("Kernel read error found\n");
-		goto exit;
-	}
-	/* if power_val is 0, it means rf_test mode by rf. */
-	if (power_val == '0') {
-		pr_err("*#rf# is enabled.\n");
-		EnableRfTestMode = 1;
-	} else {
-		pr_err("*#rf# is disabled.\n");
-		EnableRfTestMode = 0;
-	}
-
-	if (fp)
-		filp_close(fp, NULL);
-
-	return 0;
-	exit:
-		filp_close(fp, NULL);
-		return -EINVAL;
-#else
-		return -ENOENT;
-#endif
 }
 
 /* WLAN service driver registration
@@ -585,7 +532,6 @@ void slsi_sm_service_failed(struct slsi_dev *sdev, const char *reason, bool is_w
 	int state;
 
 	mutex_lock(&slsi_start_mutex);
-	
 
 	if (is_work)
 		complete_all(&sdev->service_fail_started_indication);
@@ -622,12 +568,6 @@ bool slsi_is_test_mode_enabled(void)
 	return EnableTestMode;
 }
 
-/* Is production rf test mode enabled? */
-bool slsi_is_rf_test_mode_enabled(void)
-{
-	return EnableRfTestMode;
-}
-
 #define SLSI_SM_WLAN_SERVICE_RECOVERY_COMPLETED_TIMEOUT 20000
 #define SLSI_SM_WLAN_SERVICE_RECOVERY_DISABLED_TIMEOUT 2000
 
@@ -643,7 +583,7 @@ int slsi_sm_recovery_service_stop(struct slsi_dev *sdev)
 
 	sdev->wlan_service_on = 0;
 	atomic_set(&sdev->cm_if.cm_if_state, SCSC_WIFI_CM_IF_STATE_STOPPING);
-
+	
 	if (!sdev->service) {
 		atomic_set(&sdev->cm_if.cm_if_state, SCSC_WIFI_CM_IF_STATE_STOPPED);
 		SLSI_WARN(sdev, "Service is NULL\n");
@@ -653,12 +593,14 @@ int slsi_sm_recovery_service_stop(struct slsi_dev *sdev)
 		mutex_unlock(&slsi_start_mutex);
 		return err;
 	}
-
+	
 	err = scsc_mx_service_stop(sdev->service);
 	if (err == -EILSEQ || err == -EIO)
 		SLSI_INFO(sdev, "scsc_mx_service_stop failed err: %d\n", err);
 	else
 		err = 0;
+	if (!err)
+		sdev->service = NULL;
 	atomic_set(&sdev->cm_if.cm_if_state, SCSC_WIFI_CM_IF_STATE_STOPPED);
 	mutex_unlock(&slsi_start_mutex);
 	return err;
@@ -729,6 +671,7 @@ int slsi_sm_recovery_service_start(struct slsi_dev *sdev)
 		mutex_unlock(&slsi_start_mutex);
 		return -EINVAL;
 	}
+	
 
 	if (!sdev->service) {
 		atomic_set(&sdev->cm_if.cm_if_state, SCSC_WIFI_CM_IF_STATE_STOPPED);
@@ -902,6 +845,7 @@ int slsi_sm_wlan_service_start(struct slsi_dev *sdev)
 		mutex_unlock(&slsi_start_mutex);
 		return -EINVAL;
 	}
+	
 
 	if (!sdev->service) {
 		atomic_set(&sdev->cm_if.cm_if_state, SCSC_WIFI_CM_IF_STATE_STOPPED);
