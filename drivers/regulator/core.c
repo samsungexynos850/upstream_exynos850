@@ -4505,9 +4505,9 @@ static int regulator_show_enabled_children(struct device *dev, void *data)
 	struct rdev_check_data *check_data = data;
 
 	if (rdev->supply && rdev->supply->rdev == check_data->parent)
-		regulator_show_enabled_subtree(rdev, check_data->level + 1);
-	
-		return 0;
+	    regulator_show_enabled_subtree(rdev, check_data->level + 1);
+
+    return 0;
 }
 
 

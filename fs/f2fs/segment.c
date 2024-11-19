@@ -212,7 +212,7 @@ void f2fs_register_inmem_page(struct inode *inode, struct page *page)
 	inc_page_count(F2FS_I_SB(inode), F2FS_INMEM_PAGES);
     if (F2FS_I_SB(inode)->sec_stat.max_inmem_pages < get_pages(F2FS_I_SB(inode), F2FS_INMEM_PAGES))
         F2FS_I_SB(inode)->sec_stat.max_inmem_pages = get_pages(F2FS_I_SB(inode), F2FS_INMEM_PAGES);
-	mutex_unlock(&F2FS_I(inode)->inmem_lock);
+	    mutex_unlock(&F2FS_I(inode)->inmem_lock);
 
 	trace_f2fs_register_inmem_page(page, INMEM);
 }
