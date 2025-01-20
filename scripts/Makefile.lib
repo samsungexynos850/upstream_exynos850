@@ -248,6 +248,9 @@ cmd_gzip = (cat $(filter-out FORCE,$^) | gzip -n -f -9 > $@) || \
 # ---------------------------------------------------------------------------
 DTC ?= $(objtree)/scripts/dtc/dtc
 
+# Silence dts compilation warnings
+DTC_FLAGS += -q
+
 # Overlay support
 DTC_FLAGS += -@
 
