@@ -5027,10 +5027,6 @@ CONFIG_SEC_VIBRATOR=y
 # CONFIG_SEC_VIB_NOTIFIER is not set
 
 #
-# Samsung LABO Options
-#
-
-#
 # Samsung ABC Options
 #
 CONFIG_SEC_ABC=y
@@ -5086,7 +5082,6 @@ CONFIG_SEC_ABC_HUB_BOOTC=y
 # Samsung STI Options
 #
 CONFIG_SEC_STI=y
-CONFIG_SEC_AUTO_INPUT=y
 
 #
 # KUnit support
