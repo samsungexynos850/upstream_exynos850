@@ -208,6 +208,11 @@ struct tmc_drvdata {
 	struct idr		idr;
 	struct mutex		idr_mutex;
 	struct etr_buf		*sysfs_buf;
+
+	/* samsung coresight sfr */
+	bool			hwacg;
+	void __iomem		*sfr_base;
+	u32			q_offset;
 	struct etr_buf		*perf_buf;
 };
 

@@ -187,6 +187,8 @@ static int tcpci_get_cc(struct tcpc_dev *tcpc,
 	ret = regmap_read(tcpci->regmap, TCPC_CC_STATUS, &reg);
 	if (ret < 0)
 		return ret;
+	pr_info("%s: CC_STATUS=0x%x ROLE_CTRL=0x%x\n", __func__, reg,
+			role_control);
 
 	*cc1 = tcpci_to_typec_cc((reg >> TCPC_CC_STATUS_CC1_SHIFT) &
 				 TCPC_CC_STATUS_CC1_MASK,

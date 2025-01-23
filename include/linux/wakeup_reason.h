@@ -33,5 +33,6 @@ static inline void log_suspend_abort_reason(const char *fmt, ...) { }
 static inline void log_abnormal_wakeup_reason(const char *fmt, ...) { }
 static inline void clear_wakeup_reasons(void) { }
 #endif
-
+void log_wakeup_reason_name(const char *name);
+void log_wakeup_reason(int irq);
 #endif /* _LINUX_WAKEUP_REASON_H */

@@ -134,6 +134,19 @@ config U_SERIAL_CONSOLE
 	help
 	   It supports the serial gadget can be used as a console.
 
+config USB_OLD_CONFIGFS
+	bool "Old style configfs"
+	depends on USB_CONFIGFS
+	default n
+	help
+	   It supports old style configfs
+
+config USB_ANDROID_SAMSUNG_COMPOSITE
+	bool "Samsung Composite function"
+	depends on USB_CONFIGFS
+	help
+	   Provides SAMSUNG composite driver.
+
 source "drivers/usb/gadget/udc/Kconfig"
 
 #
@@ -215,10 +228,25 @@ config USB_F_PRINTER
 config USB_F_TCM
 	tristate
 
-config USB_F_ACC
+config USB_F_MTP
+	tristate
+
+config USB_F_PTP
 	tristate
 
 config USB_F_AUDIO_SRC
+	tristate
+
+config USB_F_ACC
+	tristate
+
+config USB_F_SIMMIAN
+	tristate
+
+config USB_F_CONN_GADGET
+	tristate
+
+config USB_F_SS_MON_GADGET
 	tristate
 
 # this first set of drivers all depend on bulk-capable hardware.
@@ -384,6 +412,56 @@ config USB_CONFIGFS_F_FS
 	  implemented in kernel space (for instance Ethernet, serial or
 	  mass storage) and other are implemented in user space.
 
+config USB_CONFIGFS_F_DM
+	bool "DM gadget"
+	depends on USB_CONFIGFS
+	select USB_F_DM
+	help
+	  USB gadget DM(Diagnosis Monitor) support
+
+config USB_CONFIGFS_F_ADB
+	bool "ADB gadget"
+	depends on USB_CONFIGFS
+	select USB_F_ADB
+	help
+	  USB gadget ADB support
+
+config USB_CONFIGFS_F_SIMMIAN
+       bool "Android gadget SIMMIAN function"
+       depends on USB_CONFIGFS
+       select USB_F_SIMMIAN
+       help
+         Provides SIMMIAN function for android gadget driver.
+
+config USB_CONFIGFS_F_MTP
+	bool "MTP gadget"
+	depends on USB_CONFIGFS
+	select USB_F_MTP
+	help
+	  USB gadget MTP support
+
+config USB_CONFIGFS_F_PTP
+	bool "PTP gadget"
+	depends on USB_CONFIGFS && USB_CONFIGFS_F_MTP
+	select USB_F_PTP
+	help
+	  USB gadget PTP support
+
+config USB_CONFIGFS_F_CONN_GADGET
+        bool "Conn gadget function"
+        depends on USB_CONFIGFS
+        select USB_F_CONN_GADGET
+        help
+          SydeSync
+
+config USB_CONFIGFS_F_SS_MON_GADGET
+	bool "F_SAMSUNG gadget"
+	depends on USB_CONFIGFS
+	select USB_F_SS_MON_GADGET
+	help
+	 Driver for control to Samsung Usb device layer
+	 For Samung working scenario and saving debug log, etc
+
 config USB_CONFIGFS_F_ACC
 	bool "Accessory gadget"
 	depends on USB_CONFIGFS
@@ -400,6 +478,19 @@ config USB_CONFIGFS_F_AUDIO_SRC
 	select USB_F_AUDIO_SRC
 	help
 	  USB gadget Audio Source support
+
+config USB_RNDIS_MULTIPACKET
+	bool "Samsung Rndis Multi Packet support"
+	depends on USB_CONFIGFS_UEVENT
+	help
+	  Rndis Multipacket Support.
+
+config USB_NCM_SUPPORT_MTU_CHANGE
+	bool "Samsung NCM MTU size change support"
+	depends on USB_CONFIGFS_NCM
+	default y
+	help
+	  NCM MTU size change support.
 
 config USB_CONFIGFS_F_UAC1
 	bool "Audio Class 1.0"

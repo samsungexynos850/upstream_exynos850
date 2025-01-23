@@ -12,6 +12,30 @@ menuconfig RADIO_ADAPTERS
 
 if RADIO_ADAPTERS && VIDEO_V4L2
 
+config RADIO_S5E3830
+	tristate "SAMSUNG S5E3830 FM Radio"
+	depends on VIDEO_V4L2
+
+source "drivers/media/radio/s610/Kconfig"
+
+config RADIO_S5E7885
+	tristate "SAMSUNG S5E7885 FM Radio"
+	depends on VIDEO_V4L2
+
+source "drivers/media/radio/s610/Kconfig"
+
+config RADIO_S5E9610
+	tristate "SAMSUNG S5E9610 FM Radio"
+	depends on VIDEO_V4L2
+
+source "drivers/media/radio/s610/Kconfig"
+
+config RADIO_S5E9630
+	tristate "SAMSUNG S5E9630 FM Radio"
+	depends on VIDEO_V4L2
+
+source "drivers/media/radio/s610/Kconfig"
+
 config RADIO_TEA575X
 	tristate
 

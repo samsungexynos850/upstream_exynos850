@@ -66,6 +66,11 @@ do {									\
 
 #endif /* DUMP_MSGS */
 
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+/* SCSI commands that we recognize */
+#define READ_CD					0xbe
+#endif
+
 /* Length of a SCSI Command Data Block */
 #define MAX_COMMAND_SIZE	16
 

@@ -116,6 +116,9 @@ struct usb_request {
 
 	int			status;
 	unsigned		actual;
+
+	/* Device Specific Flag */
+	u32			func_flag;
 	unsigned int		udc_priv;
 };
 

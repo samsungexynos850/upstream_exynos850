@@ -118,6 +118,13 @@ config LEDS_CR0014114
 	  To compile this driver as a module, choose M here: the module
 	  will be called leds-cr0014114.
 
+config LEDS_ET6034A
+	tristate "LED driver for ET6034A"
+	depends on I2C
+	help
+	  This option enables support for the LEDs connected to the ET6034A
+	  ET6034A uses the I2C BUS structure,
+
 config LEDS_LM3530
 	tristate "LCD Backlight driver for LM3530"
 	depends on LEDS_CLASS
@@ -755,6 +762,34 @@ config LEDS_NIC78BX
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called leds-nic78bx.
+
+config LEDS_S2MU106_FLASH
+	bool "FLASH LED support for the S2MU106"
+    depends on (MFD_S2MU106) && I2C
+	help
+	  If you say yes here you will get support for
+	  for the LEDS_S2MU106_FLASH led chip.
+
+config LEDS_S2MU107_FLASH
+	bool "FLASH LED support for the S2MU107"
+    depends on (MFD_S2MU107) && I2C
+	help
+	  If you say yes here you will get support for
+	  for the LEDS_S2MU107_FLASH led chip.
+
+config LEDS_SM5714
+	bool "LED support for the LEDS_SM5714"
+	depends on LEDS_CLASS
+	help
+	  This option enables support for the LEDs on the SM5714.
+
+config LEDS_AW36518
+	bool "LED support for the LEDS_AW36518"
+	help
+	  This option enables support for AW36518 LED flash connected
+	  through ExpressWire interface.
+
+	  Say Y to enable this driver.
 
 comment "LED Triggers"
 source "drivers/leds/trigger/Kconfig"

@@ -1,28 +1,21 @@
 # SPDX-License-Identifier: GPL-2.0
-subdir-y += actions
-subdir-y += al
-subdir-y += allwinner
-subdir-y += altera
-subdir-y += amd
-subdir-y += amlogic
-subdir-y += apm
-subdir-y += arm
-subdir-y += broadcom
-subdir-y += cavium
-subdir-y += exynos
-subdir-y += freescale
-subdir-y += hisilicon
-subdir-y += lg
-subdir-y += marvell
-subdir-y += mediatek
-subdir-y += nvidia
-subdir-y += qcom
-subdir-y += realtek
-subdir-y += renesas
-subdir-y += rockchip
-subdir-y += socionext
-subdir-y += sprd
-subdir-y += synaptics
-subdir-y += ti
-subdir-y += xilinx
-subdir-y += zte
+dtbo-y += exynos/exynos3830-universal3830_r15.dtbo
+dtbo-y += exynos/exynos3830-universal3830_r01.dtbo
+dtb-y += exynos/exynos7-espresso.dtb
+dtbo-y += exynos/exynos3830-universal3830_r04.dtbo
+dtbo-y += exynos/exynos3830-universal3830_r00.dtbo
+dtbo-y += exynos/exynos3830-universal3830_r02.dtbo
+dtb-y += exynos/exynos5433-tm2.dtb
+dtb-y += exynos/exynos5433-tm2e.dtb
+dtbo-y += exynos/exynos3830-universal3830_r03.dtbo
+dtb-y += exynos/exynos3830.dtb
+dtbo-y += samsung/a13/a13_eur_open_w00_r00.dtbo
+dtbo-y += samsung/a13/a13_eur_open_w00_r06.dtbo
+
+targets += dtbs
+DTB_LIST  := $(dtb-y) $(dtbo-y)
+always    := $(DTB_LIST)
+
+dtbs: $(addprefix $(obj)/, $(DTB_LIST))
+
+clean-files := *.dtb*

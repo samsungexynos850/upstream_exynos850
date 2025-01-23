@@ -141,6 +141,9 @@ extern int cfg80211_rdev_list_generation;
 struct cfg80211_internal_bss {
 	struct list_head list;
 	struct list_head hidden_list;
+#ifdef CONFIG_CFG80211_SLSI_HE
+	struct list_head nontrans_list;
+#endif
 	struct rb_node rbn;
 	u64 ts_boottime;
 	unsigned long ts;

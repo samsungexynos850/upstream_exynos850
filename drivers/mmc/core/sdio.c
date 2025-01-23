@@ -171,6 +171,7 @@ static int sdio_read_cccr(struct mmc_card *card, u32 ocr)
 				if (data & SDIO_UHS_SDR104)
 					card->sw_caps.sd3_bus_mode
 						|= SD_MODE_UHS_SDR104;
+
 			}
 
 			ret = mmc_io_rw_direct(card, 0, 0,
@@ -766,7 +767,15 @@ try_again:
 	/* Initialization sequence for UHS-I cards */
 	/* Only if card supports 1.8v and UHS signaling */
 	if ((ocr & R4_18V_PRESENT) && card->sw_caps.sd3_bus_mode) {
+#if defined(CONFIG_BCM43456)
+		if (!oldcard)
+			host->card = card;
 		err = mmc_sdio_init_uhs_card(card);
+		if (!oldcard)
+			host->card = NULL;
+#else 
+		err = mmc_sdio_init_uhs_card(card);
+#endif /* CONFIG_BCM43456 */
 		if (err)
 			goto remove;
 	} else {
@@ -1193,6 +1202,13 @@ int mmc_attach_sdio(struct mmc_host *host)
 			goto remove_added;
 	}
 
+#if defined(CONFIG_BCM43456)
+        if(!strcmp("mmc1", mmc_hostname(host))) {
+            printk("%s: Set Nonremovable flag\n",mmc_hostname(host));
+            host->caps |= MMC_CAP_NONREMOVABLE;
+        }
+#endif /* CONFIG_BCM43456 */
+
 	if (host->caps & MMC_CAP_POWER_OFF_CARD)
 		pm_runtime_put(&card->dev);
 
@@ -1220,3 +1236,44 @@ err:
 	return err;
 }
 
+#if defined(CONFIG_BCM43456)
+int sdio_reset_comm(struct mmc_card *card)
+{
+	struct mmc_host *host = card->host;
+	u32 ocr;
+	u32 rocr;
+	int err;
+
+	printk("%s():\n", __func__);
+	mmc_claim_host(host);
+
+	mmc_retune_disable(host);
+
+	mmc_go_idle(host);
+
+	mmc_set_clock(host, host->f_min);
+
+	err = mmc_send_io_op_cond(host, 0, &ocr);
+	if (err)
+		goto err;
+
+	rocr = mmc_select_voltage(host, ocr);
+	if (!rocr) {
+		err = -EINVAL;
+		goto err;
+	}
+
+	err = mmc_sdio_init_card(host, rocr, card, 0);
+	if (err)
+		goto err;
+
+	mmc_release_host(host);
+	return 0;
+err:
+	printk("%s: Error resetting SDIO communications (%d)\n",
+	       mmc_hostname(host), err);
+	mmc_release_host(host);
+	return err;
+}
+EXPORT_SYMBOL(sdio_reset_comm);
+#endif  /* CONFIG_BCM43456 */

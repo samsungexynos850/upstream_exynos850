@@ -762,4 +762,5 @@ config CRYPTO_DEV_CCREE
 
 source "drivers/crypto/hisilicon/Kconfig"
 
+source "drivers/crypto/fmp/Kconfig"
 endif # CRYPTO_HW

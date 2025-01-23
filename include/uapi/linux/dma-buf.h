@@ -49,4 +49,23 @@ struct dma_buf_sync {
 #define DMA_BUF_SET_NAME_A	_IOW(DMA_BUF_BASE, 1, u32)
 #define DMA_BUF_SET_NAME_B	_IOW(DMA_BUF_BASE, 1, u64)
 
+/*
+ * create a dma-buf that is a container of the given dma-bufs.
+ * The result dma-buf, dmabuf-container has dma_buf_merge.count+1 buffers
+ * that includes the dma-buf that is the first argument to ioctl and the
+ * dma-bufs given by dma_buf_merge.dma_bufs.
+ */
+struct dma_buf_merge {
+	int   *dma_bufs;
+	__s32 count;
+	__s32 dmabuf_container;	/* output: result dmabuf of dmabuf_container */
+	__u32 reserved[2];
+};
+#define DMA_BUF_IOCTL_MERGE	_IOWR(DMA_BUF_BASE, 13, struct dma_buf_merge)
+#define DMA_BUF_IOCTL_CONTAINER_SET_MASK	_IOW(DMA_BUF_BASE, 14, __u32)
+#define DMA_BUF_IOCTL_CONTAINER_GET_MASK	_IOR(DMA_BUF_BASE, 14, __u32)
+
+#define DMA_BUF_IOCTL_TRACK			_IO(DMA_BUF_BASE, 8)
+#define DMA_BUF_IOCTL_UNTRACK			_IO(DMA_BUF_BASE, 9)
+
 #endif

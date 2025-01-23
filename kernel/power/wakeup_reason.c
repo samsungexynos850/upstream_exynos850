@@ -50,12 +50,19 @@ static struct kmem_cache *wakeup_irq_nodes_cache;
 
 static const char *default_irq_name = "(unnamed)";
 
+#define MAX_WAKEUP_REASON_IRQS 32
+static int irq_list[MAX_WAKEUP_REASON_IRQS];
 static struct kobject *kobj;
-
+static int irqcount;
 static bool capture_reasons;
 static bool suspend_abort;
 static bool abnormal_wake;
 static char non_irq_wake_reason[MAX_SUSPEND_ABORT_LEN];
+
+#define MAX_WAKEUP_SRCS 32
+static const char* wakeup_src_list[MAX_WAKEUP_SRCS];
+static int wakeup_src_cnt;
+static bool wakeup_src_by_name;
 
 static ktime_t last_monotime; /* monotonic time before last suspend */
 static ktime_t curr_monotime; /* monotonic time after last suspend */
@@ -292,6 +299,15 @@ static ssize_t last_resume_reason_show(struct kobject *kobj,
 		return buf_offset;
 	}
 
+	if (!suspend_abort && wakeup_src_by_name) {
+		int i;
+		for (i = 0; i < wakeup_src_cnt; i++) {
+			/* XXX: 999 is dummy irq number for batterystats*/
+			buf_offset += sprintf(buf + buf_offset, "999 %s\n",
+					wakeup_src_list[i]);
+		}
+	}
+
 	if (!list_empty(&leaf_irqs))
 		list_for_each_entry(n, &leaf_irqs, siblings)
 			buf_offset += scnprintf(buf + buf_offset,
@@ -349,12 +365,63 @@ static struct attribute_group attr_group = {
 	.attrs = attrs,
 };
 
+/*
+ * logs all the wake up reasons to the kernel
+ * stores the irqs to expose them to the userspace via sysfs
+ */
+void log_wakeup_reason(int irq)
+{
+	struct irq_desc *desc;
+	unsigned long flags;
+	desc = irq_to_desc(irq);
+	if (desc && desc->action && desc->action->name)
+		printk(KERN_INFO "Resume caused by IRQ %d, %s\n", irq,
+				desc->action->name);
+	else
+		printk(KERN_INFO "Resume caused by IRQ %d\n", irq);
+
+	spin_lock_irqsave(&wakeup_reason_lock, flags);
+	if (irqcount == MAX_WAKEUP_REASON_IRQS) {
+		spin_unlock_irqrestore(&wakeup_reason_lock, flags);
+		printk(KERN_WARNING "Resume caused by more than %d IRQs\n",
+				MAX_WAKEUP_REASON_IRQS);
+		return;
+	}
+
+	irq_list[irqcount++] = irq;
+	spin_unlock_irqrestore(&wakeup_reason_lock, flags);
+}
+
+void log_wakeup_reason_name(const char *name)
+{
+	printk(KERN_INFO "Resume caused by wakeup source: %s\n", name);
+
+	spin_lock(&wakeup_reason_lock);
+	if (wakeup_src_cnt == MAX_WAKEUP_SRCS) {
+		spin_unlock(&wakeup_reason_lock);
+		printk(KERN_WARNING
+			"Resume caused by more than %d wakeup sources\n",
+			MAX_WAKEUP_REASON_IRQS);
+		return;
+	}
+
+	wakeup_src_list[wakeup_src_cnt++] = name;
+	wakeup_src_by_name = true;
+	spin_unlock(&wakeup_reason_lock);
+}
+
 /* Detects a suspend and clears all the previous wake up reasons*/
 static int wakeup_reason_pm_event(struct notifier_block *notifier,
 		unsigned long pm_event, void *unused)
 {
+	unsigned long flags;
 	switch (pm_event) {
 	case PM_SUSPEND_PREPARE:
+		spin_lock_irqsave(&wakeup_reason_lock, flags);
+		irqcount = 0;
+		wakeup_src_cnt = 0;
+		wakeup_src_by_name = false;
+		spin_unlock_irqrestore(&wakeup_reason_lock, flags);
 		/* monotonic time since boot */
 		last_monotime = ktime_get();
 		/* monotonic time since boot including the time spent in suspend */

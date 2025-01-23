@@ -98,6 +98,26 @@ ENTRY(flush_cache_all)
 	ret	x12
 ENDPROC(flush_cache_all)
 
+ENTRY(__flush_dcache_louis)
+        dmb     ish
+        mrs     x0, clidr_el1
+        ands    x3, x0, #(7 << 21)
+        lsr     x3, x3, #20                     // w3 = LoUIS * 2
+        b.eq    level_is_zero
+        mov     x10, #0
+        b       loop1                           // start flushing cache
+level_is_zero:
+        ret
+ENDPROC(__flush_dcache_louis)
+
+ENTRY(flush_cache_louis)
+        mov     x12, lr
+        bl      __flush_dcache_louis
+        mov     x0, #0
+        ic      ialluis
+        ret     x12
+ENDPROC(flush_cache_louis)
+
 /*
  *	flush_icache_range(start,end)
  *
@@ -152,6 +172,48 @@ alternative_else_nop_endif
 	b	1b
 ENDPROC(__flush_icache_range)
 ENDPROC(__flush_cache_user_range)
+
+/*
+ *	flush_icache_range_poc(start,end)
+ *
+ *	Ensure that the I and D caches for the specified region [start, end]
+ *	are cleaned and invalidated to the PoC.
+ *
+ *	- start   - virtual start address of region
+ *	- end     - virtual end address of region
+ */
+ENTRY(flush_icache_range_poc)
+	uaccess_ttbr0_enable x2, x3, x4
+	dcache_line_size x2, x3
+	sub	x3, x2, #1
+	bic	x4, x0, x3
+1:
+USER(9f, dc	civac, x4	)	// clean D line to PoC
+	add	x4, x4, x2
+	cmp	x4, x1
+	b.lo	1b
+	dsb	ish
+
+	icache_line_size x2, x3
+	sub	x3, x2, #1
+	bic	x4, x0, x3
+1:
+USER(9f, ic	ivau, x4	)	// invalidate I line PoU
+	dsb	ish
+	isb
+	add	x4, x4, x2
+	cmp	x4, x1
+	b.lo	1b
+	dsb	ish
+	isb
+	mov	x0, #0
+1:
+	uaccess_ttbr0_disable x1, x2
+	ret
+9:
+	mov	x0, #-EFAULT
+	b	1b
+ENDPROC(flush_icache_range_poc)
 
 /*
  *	invalidate_icache_range(start,end)

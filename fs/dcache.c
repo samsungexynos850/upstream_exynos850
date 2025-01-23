@@ -33,6 +33,9 @@
 #include <linux/list_lru.h>
 #include "internal.h"
 #include "mount.h"
+#ifdef CONFIG_KDP_NS
+#include <linux/kdp.h>
+#endif
 
 /*
  * Usage:
@@ -1464,6 +1467,7 @@ void shrink_dcache_parent(struct dentry *parent)
 {
 	for (;;) {
 		struct select_data data;
+		bool need_sched = true;
 
 		INIT_LIST_HEAD(&data.dispose);
 		data.start = parent;
@@ -1476,9 +1480,18 @@ void shrink_dcache_parent(struct dentry *parent)
 			continue;
 		}
 
-		cond_resched();
+		if (cond_resched())
+			need_sched = false;
+
 		if (!data.found)
 			break;
+
+		if (unlikely(need_sched)) {
+			long prev_state = current->state;
+
+			if (!schedule_timeout_uninterruptible(1))
+				set_current_state(prev_state);
+		}
 	}
 }
 EXPORT_SYMBOL(shrink_dcache_parent);
@@ -3099,11 +3112,13 @@ void __init vfs_caches_init_early(void)
 {
 	int i;
 
+	set_memsize_kernel_type(MEMSIZE_KERNEL_VFSHASH);
 	for (i = 0; i < ARRAY_SIZE(in_lookup_hashtable); i++)
 		INIT_HLIST_BL_HEAD(&in_lookup_hashtable[i]);
 
 	dcache_init_early();
 	inode_init_early();
+	set_memsize_kernel_type(MEMSIZE_KERNEL_OTHERS);
 }
 
 void __init vfs_caches_init(void)
@@ -3118,4 +3133,7 @@ void __init vfs_caches_init(void)
 	mnt_init();
 	bdev_cache_init();
 	chrdev_init();
+#ifdef CONFIG_KDP_NS
+	ns_protect = 1;
+#endif
 }

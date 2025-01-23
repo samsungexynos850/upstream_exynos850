@@ -28,6 +28,32 @@
 #include <linux/usb/tcpm.h>
 #include <linux/usb/typec_altmode.h>
 #include <linux/workqueue.h>
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+#include <linux/usb/typec/common/pdic_policy.h>
+#endif /* CONFIG_PDIC_POLICY */
+
+#if IS_ENABLED(CONFIG_VBUS_NOTIFIER)
+#include <linux/vbus_notifier.h>
+#endif /* CONFIG_VBUS_NOTIFIER */
+#if IS_ENABLED(CONFIG_SEC_PD)
+#include <linux/battery/sec_pd.h>
+
+#elif IS_ENABLED(CONFIG_BATTERY_NOTIFIER)
+#include <linux/battery/battery_notifier.h>
+
+extern struct pdic_notifier_struct pd_noti;
+#endif /* CONFIG_BATTERY_NOTIFIER */
+
+#if defined(CONFIG_PDIC_NOTIFIER)
+#include <linux/usb/typec/common/pdic_core.h>
+#include <linux/usb/typec/common/pdic_sysfs.h>
+#include <linux/usb/typec/common/pdic_notifier.h>
+
+static enum pdic_sysfs_property tcpm_sysfs_properties[] = {
+	PDIC_SYSFS_PROP_CHIP_NAME,
+	PDIC_SYSFS_PROP_CC_PIN_STATUS,
+};
+#endif /* CONFIG_PDIC_NOTIFIER */
 
 #define FOREACH_STATE(S)			\
 	S(INVALID_STATE),			\
@@ -195,6 +221,10 @@ struct tcpm_port {
 
 	struct mutex lock;		/* tcpm state machine lock */
 	struct workqueue_struct *wq;
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+	struct pp_ic_data ic_data;
+	struct pdic_policy *pp_data;
+#endif /* CONFIG_PDIC_POLICY */
 
 	struct typec_capability typec_caps;
 	struct typec_port *typec_port;
@@ -409,8 +439,16 @@ static bool tcpm_port_is_disconnected(struct tcpm_port *port)
  * Logging
  */
 
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+#define tcpm_log(port, fmt, args...) \
+	pr_info("%s: " fmt "\n", __func__,  ## args)
+#define tcpm_log_force(port, fmt, args...) \
+	pr_info("%s: " fmt "\n", __func__,  ## args)
+static void tcpm_log_source_caps(struct tcpm_port *port) { }
+static void tcpm_debugfs_init(const struct tcpm_port *port) { }
+static void tcpm_debugfs_exit(const struct tcpm_port *port) { }
+#else
 #ifdef CONFIG_DEBUG_FS
-
 static bool tcpm_log_full(struct tcpm_port *port)
 {
 	return port->logbuffer_tail ==
@@ -613,7 +651,8 @@ static void tcpm_log_source_caps(struct tcpm_port *port) { }
 static void tcpm_debugfs_init(const struct tcpm_port *port) { }
 static void tcpm_debugfs_exit(const struct tcpm_port *port) { }
 
-#endif
+#endif /* CONFIG_DEBUG_FS */
+#endif /* CONFIG_PDIC_POLICY */
 
 static int tcpm_pd_transmit(struct tcpm_port *port,
 			    enum tcpm_transmit_type type,
@@ -2540,6 +2579,14 @@ static int tcpm_set_vbus(struct tcpm_port *port, bool enable)
 		return ret;
 
 	port->vbus_source = enable;
+
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+	if (enable)
+		pdic_policy_send_msg(port->pp_data, MSG_VBUSON, 0, 0);
+	else
+		pdic_policy_send_msg(port->pp_data, MSG_VBUSOFF, 0, 0);
+#endif /* CONFIG_PDIC_POLICY */
+
 	return 0;
 }
 
@@ -2587,6 +2634,9 @@ static int tcpm_init_vbus(struct tcpm_port *port)
 	ret = port->tcpc->set_vbus(port->tcpc, false, false);
 	port->vbus_source = false;
 	port->vbus_charge = false;
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+	pdic_policy_send_msg(port->pp_data, MSG_VBUSOFF, 0, 0);
+#endif /* CONFIG_PDIC_POLICY */
 	return ret;
 }
 
@@ -2662,6 +2712,11 @@ static int tcpm_src_attach(struct tcpm_port *port)
 	port->attached = true;
 	port->send_discover = true;
 
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+	pdic_policy_send_msg(port->pp_data, MSG_SRC, 0, 0);
+	pdic_policy_send_msg(port->pp_data, MSG_DFP, 0, 0);
+#endif /* CONFIG_PDIC_POLICY */
+
 	return 0;
 
 out_disable_vconn:
@@ -2722,7 +2777,9 @@ static void tcpm_reset_port(struct tcpm_port *port)
 	port->try_snk_count = 0;
 	port->usb_type = POWER_SUPPLY_USB_TYPE_C;
 
+#if !IS_ENABLED(CONFIG_BATTERY_SAMSUNG)
 	power_supply_changed(port->psy);
+#endif
 }
 
 static void tcpm_detach(struct tcpm_port *port)
@@ -2732,6 +2789,10 @@ static void tcpm_detach(struct tcpm_port *port)
 
 	if (!port->attached)
 		return;
+
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+	pdic_policy_send_msg(port->pp_data, MSG_CCOFF, 0, 0);
+#endif /* CONFIG_PDIC_POLICY */
 
 	tcpm_reset_port(port);
 }
@@ -2764,6 +2825,15 @@ static int tcpm_snk_attach(struct tcpm_port *port)
 	port->attached = true;
 	port->send_discover = true;
 
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+	pdic_policy_send_msg(port->pp_data, MSG_SNK, 0, 0);
+	pdic_policy_send_msg(port->pp_data, MSG_UFP, 0, 0);
+	if (port->polarity == TYPEC_POLARITY_CC1)
+		pdic_policy_send_msg(port->pp_data, MSG_CC1, 0, 0);
+	else
+		pdic_policy_send_msg(port->pp_data, MSG_CC2, 0, 0);
+#endif /* CONFIG_PDIC_POLICY */
+
 	return 0;
 }
 
@@ -2788,6 +2858,19 @@ static int tcpm_acc_attach(struct tcpm_port *port)
 	tcpm_typec_connect(port);
 
 	port->attached = true;
+
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+	switch (port->state) {
+	case DEBUG_ACC_ATTACHED:
+		pdic_policy_send_msg(port->pp_data, MSG_DEBUG, 0, 0);
+		break;
+	case AUDIO_ACC_ATTACHED:
+		pdic_policy_send_msg(port->pp_data, MSG_AUDIO, 0, 0);
+		break;
+	default:
+		break;
+	}
+#endif /* CONFIG_PDIC_POLICY */
 
 	return 0;
 }
@@ -3035,6 +3118,9 @@ static void run_state_machine(struct tcpm_port *port)
 		typec_set_pwr_opmode(port->typec_port, TYPEC_PWR_MODE_PD);
 		port->pwr_opmode = TYPEC_PWR_MODE_PD;
 		tcpm_set_state_cond(port, SRC_READY, 0);
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+		pdic_policy_send_msg(port->pp_data, MSG_EX_CNT, 0, 0);
+#endif /* CONFIG_PDIC_POLICY */
 		break;
 	case SRC_READY:
 #if 1
@@ -3163,6 +3249,20 @@ static void run_state_machine(struct tcpm_port *port)
 		port->rx_msgid = -1;
 		port->explicit_contract = false;
 		tcpm_set_state(port, SNK_DISCOVERY, 0);
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+		switch (opmode) {
+		case TYPEC_PWR_MODE_1_5A: 
+			pdic_policy_send_msg(port->pp_data, MSG_RP22K, 0, 0);
+			break;
+		case TYPEC_PWR_MODE_3_0A: 
+			pdic_policy_send_msg(port->pp_data, MSG_RP10K, 0, 0);
+			break;
+		case TYPEC_PWR_MODE_USB:
+		default:
+			pdic_policy_send_msg(port->pp_data, MSG_RP56K, 0, 0);
+			break;
+		}
+#endif /* CONFIG_PDIC_POLICY */
 		break;
 	case SNK_DISCOVERY:
 		if (port->vbus_present) {
@@ -3260,6 +3360,9 @@ static void run_state_machine(struct tcpm_port *port)
 			typec_set_pwr_opmode(port->typec_port,
 					     TYPEC_PWR_MODE_PD);
 			port->pwr_opmode = TYPEC_PWR_MODE_PD;
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+			pdic_policy_send_msg(port->pp_data, MSG_EX_CNT, 0, 0);
+#endif /* CONFIG_PDIC_POLICY */
 		}
 
 		tcpm_swap_complete(port, 0);
@@ -3267,7 +3370,9 @@ static void run_state_machine(struct tcpm_port *port)
 		tcpm_check_send_discover(port);
 		tcpm_pps_complete(port, port->pps_status);
 
+#if !IS_ENABLED(CONFIG_BATTERY_SAMSUNG)
 		power_supply_changed(port->psy);
+#endif
 
 		break;
 
@@ -3400,10 +3505,16 @@ static void run_state_machine(struct tcpm_port *port)
 			tcpm_unregister_altmodes(port);
 			tcpm_set_roles(port, true, port->pwr_role,
 				       TYPEC_DEVICE);
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+			pdic_policy_send_msg(port->pp_data, MSG_UFP, 0, 0);
+#endif /* CONFIG_PDIC_POLICY */
 		} else {
 			tcpm_set_roles(port, true, port->pwr_role,
 				       TYPEC_HOST);
 			port->send_discover = true;
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+			pdic_policy_send_msg(port->pp_data, MSG_DFP, 0, 0);
+#endif /* CONFIG_PDIC_POLICY */
 		}
 		tcpm_set_state(port, ready_state(port), 0);
 		break;
@@ -3934,6 +4045,10 @@ static void tcpm_pd_event_handler(struct work_struct *work)
 				_tcpm_pd_vbus_on(port);
 			else
 				_tcpm_pd_vbus_off(port);
+#if IS_ENABLED(CONFIG_VBUS_NOTIFIER)
+			vbus_notifier_handle(vbus ? STATUS_VBUS_HIGH :
+							STATUS_VBUS_LOW);
+#endif /* CONFIG_VBUS_NOTIFIER */
 		}
 		if (events & TCPM_CC_EVENT) {
 			enum typec_cc_status cc1, cc2;
@@ -4305,6 +4420,77 @@ swap_unlock:
 
 	return ret;
 }
+
+#if defined(CONFIG_PDIC_NOTIFIER)
+static int tcpm_sysfs_get_prop(struct _pdic_data_t *ppdic_data,
+					enum pdic_sysfs_property prop,
+					char *buf)
+{
+	int retval = -ENODEV;
+	struct tcpm_port *port =
+			(struct tcpm_port *)ppdic_data->drv_data;
+	enum typec_cc_status cc1, cc2;
+
+	if (!port) {
+		printk("%s : chip is null\n", __func__);
+		return retval;
+	}
+
+	switch (prop) {
+	case PDIC_SYSFS_PROP_CC_PIN_STATUS:
+		if (port->tcpc->get_cc(port->tcpc, &cc1, &cc2) == 0) {
+			if (!(cc1 == TYPEC_CC_OPEN))
+				retval = sprintf(buf, "1\n"); //CC1_ACTIVE
+			else if (!(cc2 == TYPEC_CC_OPEN))
+				retval = sprintf(buf, "2\n"); //CC2_ACTVIE
+			else
+				retval = sprintf(buf, "0\n"); //NO_DETERMINATION
+		}
+		pr_info("%s : PDIC_SYSFS_PROP_CC_PIN_STATUS : %s", __func__, buf);
+		break;
+	default:
+		pr_info("%s : prop read not supported prop (%d)\n",
+				__func__, prop);
+		retval = -ENODATA;
+		break;
+	}
+
+	return retval;
+}
+
+static ssize_t tcpm_sysfs_set_prop(struct _pdic_data_t *ppdic_data,
+				enum pdic_sysfs_property prop,
+				const char *buf, size_t size)
+{
+	ssize_t retval = size;
+	struct tcpm_port *port =
+			(struct tcpm_port *)ppdic_data->drv_data;
+
+	if (!port) {
+		printk("%s : chip is null : request prop = %d\n",
+				__func__, prop);
+		return -ENODEV;
+	}
+
+	switch (prop) {
+	default:
+		printk("%s : prop write not supported prop (%d)\n",
+				__func__, prop);
+		retval = -ENODATA;
+		return retval;
+	}
+	return size;
+}
+
+static int tcpm_sysfs_is_writeable(struct _pdic_data_t *ppdic_data,
+				enum pdic_sysfs_property prop)
+{
+	switch (prop) {
+	default:
+		return 0;
+	}
+}
+#endif /* CONFIG_PDIC_NOTIFIER */
 
 static void tcpm_init(struct tcpm_port *port)
 {
@@ -4791,6 +4977,10 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 {
 	struct tcpm_port *port;
 	int i, err;
+#if defined(CONFIG_PDIC_NOTIFIER)
+	ppdic_data_t ppdic_data;
+	ppdic_sysfs_property_t ppdic_sysfs_prop;
+#endif /* CONFIG_PDIC_NOTIFIER */
 
 	if (!dev || !tcpc ||
 	    !tcpc->get_vbus || !tcpc->set_cc || !tcpc->get_cc ||
@@ -4802,6 +4992,19 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 	if (!port)
 		return ERR_PTR(-ENOMEM);
 
+#if defined(CONFIG_PDIC_NOTIFIER)
+	get_pdic_device();
+	ppdic_data = devm_kzalloc(dev, sizeof(pdic_data_t), GFP_KERNEL);
+
+	if (!ppdic_data)
+		return ERR_PTR(-ENOMEM);
+
+	ppdic_sysfs_prop = devm_kzalloc(dev, sizeof(pdic_sysfs_property_t), GFP_KERNEL);
+
+	if (!ppdic_sysfs_prop)
+		return ERR_PTR(-ENOMEM);
+#endif
+
 	port->dev = dev;
 	port->tcpc = tcpc;
 
@@ -4811,6 +5014,13 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 	port->wq = create_singlethread_workqueue(dev_name(dev));
 	if (!port->wq)
 		return ERR_PTR(-ENOMEM);
+#if IS_ENABLED(CONFIG_PDIC_POLICY)
+	port->ic_data.dev = dev;
+	port->ic_data.support_pd = 1;
+	port->ic_data.drv_data = port;
+	port->ic_data.typec_implemented = 1;
+	port->pp_data = pdic_policy_init(&port->ic_data);
+#endif /* CONFIG_PDIC_POLICY */
 	INIT_DELAYED_WORK(&port->state_machine, tcpm_state_machine_work);
 	INIT_DELAYED_WORK(&port->vdm_state_machine, vdm_state_machine_work);
 	INIT_WORK(&port->event_work, tcpm_pd_event_handler);
@@ -4888,6 +5098,25 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 	tcpm_init(port);
 	mutex_unlock(&port->lock);
 
+#if IS_ENABLED(CONFIG_VBUS_NOTIFIER)
+	vbus_notifier_handle(port->vbus_present ? STATUS_VBUS_HIGH :
+				STATUS_VBUS_LOW);
+#endif /* CONFIG_VBUS_NOTIFIER */
+#if defined(CONFIG_PDIC_NOTIFIER)
+	ppdic_sysfs_prop->get_property = tcpm_sysfs_get_prop;
+	ppdic_sysfs_prop->set_property = tcpm_sysfs_set_prop;
+	ppdic_sysfs_prop->property_is_writeable = tcpm_sysfs_is_writeable;
+	ppdic_sysfs_prop->properties = tcpm_sysfs_properties;
+	ppdic_sysfs_prop->num_properties = ARRAY_SIZE(tcpm_sysfs_properties);
+	ppdic_data->pdic_sysfs_prop = ppdic_sysfs_prop;
+	ppdic_data->drv_data = port;
+	ppdic_data->name = "tcpm";
+	err = pdic_core_register_chip(ppdic_data);
+
+	if (err)
+		goto out_destroy_wq;
+#endif /* CONFIG_PDIC_NOTIFIER */
+
 	tcpm_log(port, "%s: registered", dev_name(dev));
 	return port;
 
@@ -4902,6 +5131,9 @@ void tcpm_unregister_port(struct tcpm_port *port)
 {
 	int i;
 
+#if defined(CONFIG_PDIC_NOTIFIER)
+	pdic_core_unregister_chip();
+#endif
 	tcpm_reset_port(port);
 	for (i = 0; i < ARRAY_SIZE(port->port_altmode); i++)
 		typec_unregister_altmode(port->port_altmode[i]);

@@ -65,7 +65,8 @@ static const char * const power_supply_charge_type_text[] = {
 static const char * const power_supply_health_text[] = {
 	"Unknown", "Good", "Overheat", "Dead", "Over voltage",
 	"Unspecified failure", "Cold", "Watchdog timer expire",
-	"Safety timer expire", "Over current", "Warm", "Cool", "Hot"
+	"Safety timer expire", "Over current", "Calibration required",
+	"Warm", "Cool", "Hot"
 };
 
 static const char * const power_supply_technology_text[] = {
@@ -104,53 +105,19 @@ static const char * const power_supply_typec_src_rp_text[] = {
 	"Rp-Default", "Rp-1.5A", "Rp-3A"
 };
 
-static ssize_t power_supply_show_usb_type(struct device *dev,
-					  enum power_supply_usb_type *usb_types,
-					  ssize_t num_usb_types,
-					  union power_supply_propval *value,
-					  char *buf)
-{
-	enum power_supply_usb_type usb_type;
-	ssize_t count = 0;
-	bool match = false;
-	int i;
-
-	for (i = 0; i < num_usb_types; ++i) {
-		usb_type = usb_types[i];
-
-		if (value->intval == usb_type) {
-			count += sprintf(buf + count, "[%s] ",
-					 power_supply_usb_type_text[usb_type]);
-			match = true;
-		} else {
-			count += sprintf(buf + count, "%s ",
-					 power_supply_usb_type_text[usb_type]);
-		}
-	}
-
-	if (!match) {
-		dev_warn(dev, "driver reporting unsupported connected type\n");
-		return -EINVAL;
-	}
-
-	if (count)
-		buf[count - 1] = '\n';
-
-	return count;
-}
 
 static ssize_t power_supply_show_property(struct device *dev,
 					  struct device_attribute *attr,
 					  char *buf) {
-	ssize_t ret;
+	ssize_t ret = 0;
 	struct power_supply *psy = dev_get_drvdata(dev);
-	enum power_supply_property psp = attr - power_supply_attrs;
+	const ptrdiff_t off = attr - power_supply_attrs;
 	union power_supply_propval value;
 
-	if (psp == POWER_SUPPLY_PROP_TYPE) {
+	if (off == POWER_SUPPLY_PROP_TYPE) {
 		value.intval = psy->desc->type;
 	} else {
-		ret = power_supply_get_property(psy, psp, &value);
+		ret = power_supply_get_property(psy, off, &value);
 
 		if (ret < 0) {
 			if (ret == -ENODATA)
@@ -164,70 +131,34 @@ static ssize_t power_supply_show_property(struct device *dev,
 		}
 	}
 
-	switch (psp) {
-	case POWER_SUPPLY_PROP_STATUS:
-		ret = sprintf(buf, "%s\n",
-			      power_supply_status_text[value.intval]);
-		break;
-	case POWER_SUPPLY_PROP_CHARGE_TYPE:
-		ret = sprintf(buf, "%s\n",
-			      power_supply_charge_type_text[value.intval]);
-		break;
-	case POWER_SUPPLY_PROP_HEALTH:
-		ret = sprintf(buf, "%s\n",
-			      power_supply_health_text[value.intval]);
-		break;
-	case POWER_SUPPLY_PROP_TECHNOLOGY:
-		ret = sprintf(buf, "%s\n",
-			      power_supply_technology_text[value.intval]);
-		break;
-	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
-		ret = sprintf(buf, "%s\n",
-			      power_supply_capacity_level_text[value.intval]);
-		break;
-	case POWER_SUPPLY_PROP_TYPE:
-	case POWER_SUPPLY_PROP_REAL_TYPE:
-		ret = sprintf(buf, "%s\n",
-			      power_supply_type_text[value.intval]);
-		break;
-	case POWER_SUPPLY_PROP_USB_TYPE:
-		ret = power_supply_show_usb_type(dev, psy->desc->usb_types,
-						 psy->desc->num_usb_types,
-						 &value, buf);
-		break;
-	case POWER_SUPPLY_PROP_SCOPE:
-		ret = sprintf(buf, "%s\n",
-			      power_supply_scope_text[value.intval]);
-		break;
-	case POWER_SUPPLY_PROP_TYPEC_MODE:
-		ret = sprintf(buf, "%s\n",
-			      power_supply_usbc_text[value.intval]);
-		break;
-	case POWER_SUPPLY_PROP_TYPEC_POWER_ROLE:
-		ret = sprintf(buf, "%s\n",
-			      power_supply_usbc_pr_text[value.intval]);
-		break;
-	case POWER_SUPPLY_PROP_TYPEC_SRC_RP:
-		ret = sprintf(buf, "%s\n",
-			      power_supply_typec_src_rp_text[value.intval]);
-		break;
-	case POWER_SUPPLY_PROP_DIE_HEALTH:
-	case POWER_SUPPLY_PROP_SKIN_HEALTH:
-	case POWER_SUPPLY_PROP_CONNECTOR_HEALTH:
-		ret = sprintf(buf, "%s\n",
-			      power_supply_health_text[value.intval]);
-		break;
-	case POWER_SUPPLY_PROP_CHARGE_COUNTER_EXT:
-		ret = sprintf(buf, "%lld\n", value.int64val);
-		break;
-	case POWER_SUPPLY_PROP_MODEL_NAME ... POWER_SUPPLY_PROP_SERIAL_NUMBER:
-		ret = sprintf(buf, "%s\n", value.strval);
-		break;
-	default:
-		ret = sprintf(buf, "%d\n", value.intval);
-	}
+	if (off == POWER_SUPPLY_PROP_STATUS)
+		return sprintf(buf, "%s\n",
+			       power_supply_status_text[value.intval]);
+	else if (off == POWER_SUPPLY_PROP_CHARGE_TYPE)
+		return sprintf(buf, "%s\n",
+			       power_supply_charge_type_text[value.intval]);
+	else if (off == POWER_SUPPLY_PROP_HEALTH)
+		return sprintf(buf, "%s\n",
+			       power_supply_health_text[value.intval]);
+	else if (off == POWER_SUPPLY_PROP_TECHNOLOGY)
+		return sprintf(buf, "%s\n",
+			       power_supply_technology_text[value.intval]);
+	else if (off == POWER_SUPPLY_PROP_CAPACITY_LEVEL)
+		return sprintf(buf, "%s\n",
+			       power_supply_capacity_level_text[value.intval]);
+	else if (off == POWER_SUPPLY_PROP_TYPE)
+		return sprintf(buf, "%s\n",
+			       power_supply_type_text[value.intval]);
+	else if (off == POWER_SUPPLY_PROP_SCOPE)
+		return sprintf(buf, "%s\n",
+			       power_supply_scope_text[value.intval]);
+	else if (off >= POWER_SUPPLY_PROP_MODEL_NAME)
+		return sprintf(buf, "%s\n", value.strval);
 
-	return ret;
+	if (off == POWER_SUPPLY_PROP_CHARGE_COUNTER_EXT)
+		return sprintf(buf, "%lld\n", value.int64val);
+	else
+		return sprintf(buf, "%d\n", value.intval);
 }
 
 static ssize_t power_supply_store_property(struct device *dev,
@@ -235,10 +166,11 @@ static ssize_t power_supply_store_property(struct device *dev,
 					   const char *buf, size_t count) {
 	ssize_t ret;
 	struct power_supply *psy = dev_get_drvdata(dev);
-	enum power_supply_property psp = attr - power_supply_attrs;
+	const ptrdiff_t off = attr - power_supply_attrs;
 	union power_supply_propval value;
 
-	switch (psp) {
+	/* maybe it is a enum property? */
+	switch (off) {
 	case POWER_SUPPLY_PROP_STATUS:
 		ret = sysfs_match_string(power_supply_status_text, buf);
 		break;
@@ -277,7 +209,7 @@ static ssize_t power_supply_store_property(struct device *dev,
 
 	value.intval = ret;
 
-	ret = power_supply_set_property(psy, psp, &value);
+	ret = power_supply_set_property(psy, off, &value);
 	if (ret < 0)
 		return ret;
 
@@ -596,10 +528,14 @@ int power_supply_uevent(struct device *dev, struct kobj_uevent_env *env)
 	char *prop_buf;
 	char *attrname;
 
+	dev_dbg(dev, "uevent\n");
+
 	if (!psy || !psy->desc) {
 		dev_dbg(dev, "No power supply yet\n");
 		return ret;
 	}
+
+	dev_dbg(dev, "POWER_SUPPLY_NAME=%s\n", psy->desc->name);
 
 	ret = add_uevent_var(env, "POWER_SUPPLY_NAME=%s", psy->desc->name);
 	if (ret)
@@ -641,6 +577,8 @@ int power_supply_uevent(struct device *dev, struct kobj_uevent_env *env)
 			ret = -ENOMEM;
 			goto out;
 		}
+
+		dev_dbg(dev, "prop %s=%s\n", attrname, prop_buf);
 
 		ret = add_uevent_var(env, "POWER_SUPPLY_%s=%s", attrname, prop_buf);
 		kfree(attrname);

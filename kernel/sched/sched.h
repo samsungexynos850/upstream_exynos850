@@ -66,6 +66,7 @@
 #include <linux/syscalls.h>
 #include <linux/task_work.h>
 #include <linux/tsacct_kern.h>
+#include <linux/ems.h>
 
 #include <asm/tlb.h>
 
@@ -482,7 +483,7 @@ extern void set_task_rq_fair(struct sched_entity *se,
 			     struct cfs_rq *prev, struct cfs_rq *next);
 #else /* !CONFIG_SMP */
 static inline void set_task_rq_fair(struct sched_entity *se,
-			     struct cfs_rq *prev, struct cfs_rq *next) { }
+			     struct rt_rq *prev, struct rt_rq *next) { }
 #endif /* CONFIG_SMP */
 #endif /* CONFIG_FAIR_GROUP_SCHED */
 
@@ -525,6 +526,7 @@ struct cfs_rq {
 	 * CFS load tracking
 	 */
 	struct sched_avg	avg;
+	struct multi_load	ml;
 #ifndef CONFIG_64BIT
 	u64			load_last_update_time_copy;
 #endif
@@ -535,6 +537,13 @@ struct cfs_rq {
 		unsigned long	util_avg;
 		unsigned long	runnable_sum;
 	} removed;
+
+	struct {
+		raw_spinlock_t	lock ____cacheline_aligned;
+		int		nr;
+		unsigned long	util_avg;
+		unsigned long	util_avg_s;
+	} ml_removed;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	unsigned long		tg_load_avg_contrib;
@@ -610,6 +619,32 @@ struct rt_rq {
 	unsigned long		rt_nr_total;
 	int			overloaded;
 	struct plist_head	pushable_tasks;
+
+	struct sched_avg	avg;
+	struct {
+		raw_spinlock_t	lock ____cacheline_aligned;
+		int		nr;
+		unsigned long	util_avg;
+	} removed;
+#ifndef CONFIG_64BIT
+	u64			load_last_update_time_copy_rt;
+#endif
+#ifdef CONFIG_RT_GROUP_SCHED
+	unsigned long		tg_load_avg_contrib;
+	long			propagate;
+	long			prop_runnable_sum;
+
+	/*
+	 *   h_load = weight * f(tg)
+	 *
+	 * Where f(tg) is the recursive weight fraction assigned to
+	 * this group.
+	 */
+	unsigned long		h_load;
+	u64			last_h_load_update;
+	struct sched_entity	*h_load_next;
+#endif /* CONFIG_RT_GROUP_SCHED */
+	struct sched_rt_entity *curr;
 
 #endif /* CONFIG_SMP */
 	int			rt_queued;
@@ -973,6 +1008,10 @@ struct rq {
 	u64			max_idle_balance_cost;
 #endif
 
+	struct part pa;
+
+	bool			ontime_migrating;
+
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
 	u64			prev_irq_time;
 #endif
@@ -1022,6 +1061,8 @@ struct rq {
 	struct cpuidle_state	*idle_state;
 	int			idle_state_idx;
 #endif
+	struct list_head uss_cfs_tasks;
+	struct list_head sse_cfs_tasks;
 };
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
@@ -1523,6 +1564,7 @@ static inline void set_task_rq(struct task_struct *p, unsigned int cpu)
 #endif
 
 #ifdef CONFIG_RT_GROUP_SCHED
+	frt_set_task_rq_rt(&p->rt, p->rt.rt_rq, tg->rt_rq[cpu]);
 	p->rt.rt_rq  = tg->rt_rq[cpu];
 	p->rt.parent = tg->rt_se[cpu];
 #endif
@@ -1683,6 +1725,7 @@ static inline int task_on_rq_migrating(struct task_struct *p)
 
 extern const int		sched_prio_to_weight[40];
 extern const u32		sched_prio_to_wmult[40];
+extern const int		rtprio_to_weight[51];
 
 /*
  * {de,en}queue flags:
@@ -2435,6 +2478,13 @@ static inline unsigned long cpu_util_dl(struct rq *rq)
 static inline unsigned long cpu_util_rt(struct rq *rq)
 {
 	return READ_ONCE(rq->avg_rt.util_avg);
+}
+
+static inline unsigned long cpu_util_freq(int cpu)
+{
+	struct rq *rq = cpu_rq(cpu);
+
+	return min(cpu_util_cfs(rq) + cpu_util_rt(rq), capacity_orig_of(cpu));
 }
 
 #else /* CONFIG_CPU_FREQ_GOV_SCHEDUTIL */

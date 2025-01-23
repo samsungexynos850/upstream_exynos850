@@ -808,11 +808,14 @@ static void dapm_set_mixer_path_status(struct snd_soc_dapm_path *p, int i,
 	} else {
 		/* since a virtual mixer has no backing registers to
 		 * decide which path to connect, it will try to match
-		 * with initial state.  This is to ensure
+		 * with initial value 0.  This is to ensure
 		 * that the default mixer choice will be
 		 * correctly powered up during initialization.
 		 */
-		p->connect = invert;
+		val = 0;
+		if (invert)
+			val = max - val;
+		p->connect = !!val;
 	}
 }
 
@@ -1233,6 +1236,18 @@ static int is_connected_input_ep(struct snd_soc_dapm_widget *widget,
 			is_connected_input_ep, custom_stop_condition);
 }
 
+int snd_soc_dapm_connected_output_ep(struct snd_soc_dapm_widget *widget,
+	struct list_head *list)
+{
+	return is_connected_output_ep(widget, list, NULL);
+}
+
+int snd_soc_dapm_connected_input_ep(struct snd_soc_dapm_widget *widget,
+	struct list_head *list)
+{
+	return is_connected_input_ep(widget, list, NULL);
+}
+
 /**
  * snd_soc_dapm_get_connected_widgets - query audio path and it's widgets.
  * @dai: the soc DAI.
@@ -1607,6 +1622,9 @@ static void dapm_seq_run(struct snd_soc_card *card,
 
 	list_for_each_entry_safe(w, n, list, power_list) {
 		ret = 0;
+
+		dev_info(w->dapm->dev, "dapm powering %s widget %s\n",
+				power_up ? "up" : "down", w->name);
 
 		/* Do we need to apply any queued changes? */
 		if (sort[w->id] != cur_sort || w->reg != cur_reg ||

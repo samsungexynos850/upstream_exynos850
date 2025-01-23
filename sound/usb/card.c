@@ -48,6 +48,10 @@
 #include <linux/usb/audio-v3.h>
 #include <linux/module.h>
 
+#ifdef CONFIG_SND_EXYNOS_USB_AUDIO
+#include <linux/usb/exynos_usb_audio.h>
+#endif
+
 #include <sound/control.h>
 #include <sound/core.h>
 #include <sound/info.h>
@@ -152,20 +156,19 @@ struct snd_usb_substream *find_snd_usb_substream(unsigned int card_num,
 	}
 
 	if (!chip || atomic_read(&chip->shutdown)) {
-		pr_debug("%s: instance of usb card # %d does not exist\n",
+		pr_err("%s: instance of usb card # %d does not exist\n",
 			__func__, card_num);
 		goto err;
 	}
 
 	if (pcm_idx >= chip->pcm_devs) {
-		usb_audio_err(chip, "%s: invalid pcm dev number %u > %d\n",
-			      __func__, pcm_idx, chip->pcm_devs);
+		pr_err("%s: invalid pcm dev number %u > %d\n", __func__,
+			pcm_idx, chip->pcm_devs);
 		goto err;
 	}
 
 	if (direction > SNDRV_PCM_STREAM_CAPTURE) {
-		usb_audio_err(chip, "%s: invalid direction %u\n", __func__,
-			      direction);
+		pr_err("%s: invalid direction %u\n", __func__, direction);
 		goto err;
 	}
 
@@ -174,7 +177,7 @@ struct snd_usb_substream *find_snd_usb_substream(unsigned int card_num,
 			subs = &as->substream[direction];
 			if (subs->interface < 0 && !subs->data_endpoint &&
 			    !subs->sync_endpoint) {
-				usb_audio_err(chip, "%s: stream disconnected, bail out\n",
+				pr_err("%s: stream disconnected, bail out\n",
 					      __func__);
 				subs = NULL;
 				goto err;
@@ -248,7 +251,7 @@ static int snd_usb_create_stream(struct snd_usb_audio *chip, int ctrlif, int int
 	}
 
 	if (usb_interface_claimed(iface)) {
-		dev_dbg(&dev->dev, "%d:%d: skipping, already claimed\n",
+		dev_err(&dev->dev, "%d:%d: skipping, already claimed\n",
 			ctrlif, interface);
 		return -EINVAL;
 	}
@@ -272,7 +275,7 @@ static int snd_usb_create_stream(struct snd_usb_audio *chip, int ctrlif, int int
 	if ((altsd->bInterfaceClass != USB_CLASS_AUDIO &&
 	     altsd->bInterfaceClass != USB_CLASS_VENDOR_SPEC) ||
 	    altsd->bInterfaceSubClass != USB_SUBCLASS_AUDIOSTREAMING) {
-		dev_dbg(&dev->dev,
+		dev_err(&dev->dev,
 			"%u:%d: skipping non-supported interface %d\n",
 			ctrlif, interface, altsd->bInterfaceClass);
 		/* skip non-supported classes */
@@ -654,7 +657,11 @@ static int usb_audio_probe(struct usb_interface *intf,
 	struct usb_host_interface *alts;
 	int ifnum;
 	u32 id;
+#ifdef CONFIG_SND_EXYNOS_USB_AUDIO
+	struct usb_interface_descriptor *altsd;
+#endif
 
+	pr_info("%s\n", __func__);
 	alts = &intf->altsetting[0];
 	ifnum = get_iface_desc(alts)->bInterfaceNumber;
 	id = USB_ID(le16_to_cpu(dev->descriptor.idVendor),
@@ -667,6 +674,25 @@ static int usb_audio_probe(struct usb_interface *intf,
 	err = snd_usb_apply_boot_quirk(dev, intf, quirk, id);
 	if (err < 0)
 		return err;
+
+#ifdef CONFIG_SND_EXYNOS_USB_AUDIO
+	altsd = get_iface_desc(alts);
+	if ((altsd->bInterfaceClass == USB_CLASS_AUDIO ||
+		altsd->bInterfaceClass == USB_CLASS_VENDOR_SPEC) &&
+		altsd->bInterfaceSubClass == USB_SUBCLASS_MIDISTREAMING) {
+			pr_info("USB_AUDIO_IPC : %s - MIDI device detected!\n", __func__);
+	} else {
+		pr_info("USB_AUDIO_IPC : %s - No MIDI device detected!\n", __func__);
+		if (!usb_audio->is_audio) {
+			pr_info("USB_AUDIO_IPC : %s - USB Audio set!\n", __func__);
+			exynos_usb_audio_set_device(dev);
+			exynos_usb_audio_conn(1);
+			exynos_usb_audio_hcd(dev);
+			exynos_usb_audio_desc(dev);
+			exynos_usb_audio_map_buf(dev);
+		}
+	}
+#endif
 
 	/*
 	 * found a config.  now register to ALSA
@@ -760,6 +786,9 @@ static int usb_audio_probe(struct usb_interface *intf,
 	usb_set_intfdata(intf, chip);
 	atomic_dec(&chip->active);
 	mutex_unlock(&register_mutex);
+
+	pr_info("%s done\n", __func__);
+
 	return 0;
 
  __error:
@@ -789,6 +818,10 @@ static void usb_audio_disconnect(struct usb_interface *intf)
 		return;
 
 	card = chip->card;
+
+#ifdef CONFIG_SND_EXYNOS_USB_AUDIO
+	exynos_usb_audio_conn(0);
+#endif
 
 	mutex_lock(&register_mutex);
 	if (atomic_inc_return(&chip->shutdown) == 1) {

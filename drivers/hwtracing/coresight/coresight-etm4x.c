@@ -9,6 +9,7 @@
 #include <linux/types.h>
 #include <linux/device.h>
 #include <linux/io.h>
+#include <linux/of.h>
 #include <linux/err.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
@@ -77,6 +78,7 @@ static bool etm4_arch_supported(u8 arch)
 	/* Mask out the minor version number */
 	switch (arch & 0xf0) {
 	case ETM_ARCH_V4:
+	case ETM_ARCH_V4_2:
 		break;
 	default:
 		return false;
@@ -127,10 +129,14 @@ static int etm4_enable_hw(struct etmv4_drvdata *drvdata)
 	writel_relaxed(config->pe_sel, drvdata->base + TRCPROCSELR);
 	writel_relaxed(config->cfg, drvdata->base + TRCCONFIGR);
 	/* nothing specific implemented */
-	writel_relaxed(0x0, drvdata->base + TRCAUXCTLR);
+	writel_relaxed(0x2, drvdata->base + TRCAUXCTLR);
 	writel_relaxed(config->eventctrl0, drvdata->base + TRCEVENTCTL0R);
 	writel_relaxed(config->eventctrl1, drvdata->base + TRCEVENTCTL1R);
 	writel_relaxed(config->stall_ctrl, drvdata->base + TRCSTALLCTLR);
+
+	/* Global timestamp tracing ON */
+	writel_relaxed(0x801, drvdata->base + TRCCONFIGR);
+
 	writel_relaxed(config->ts_ctrl, drvdata->base + TRCTSCTLR);
 	writel_relaxed(config->syncfreq, drvdata->base + TRCSYNCPR);
 	writel_relaxed(config->ccctlr, drvdata->base + TRCCCCTLR);
@@ -743,26 +749,28 @@ static void etm4_init_arch_data(void *info)
 	drvdata->nrseqstate = BMVAL(etmidr5, 25, 27);
 	/* NUMCNTR, bits[30:28] number of counters available for tracing */
 	drvdata->nr_cntr = BMVAL(etmidr5, 28, 30);
-	CS_LOCK(drvdata->base);
 }
 
 static void etm4_set_default_config(struct etmv4_config *config)
 {
-	/* disable all events tracing */
-	config->eventctrl0 = 0x0;
+	/* set events tracing */
+	config->eventctrl0 = 0x1000;
 	config->eventctrl1 = 0x0;
 
-	/* disable stalling */
-	config->stall_ctrl = 0x0;
+	/* set threshold level */
+	config->stall_ctrl = 0xc;
 
-	/* enable trace synchronization every 4096 bytes, if available */
-	config->syncfreq = 0xC;
+	/* enable trace synchronization every 256 bytes, if available */
+	config->syncfreq = 0x8;
 
 	/* disable timestamp event */
 	config->ts_ctrl = 0x0;
 
 	/* TRCVICTLR::EVENT = 0x01, select the always on logic */
 	config->vinst_ctrl |= BIT(0);
+
+	/* Sets the threshold for instruction trace cycle counting */
+	config->ccctlr = 0x4;
 }
 
 static u64 etm4_get_ns_access_type(struct etmv4_config *config)
@@ -1099,7 +1107,7 @@ static int etm4_dying_cpu(unsigned int cpu)
 
 static void etm4_init_trace_id(struct etmv4_drvdata *drvdata)
 {
-	drvdata->trcid = coresight_get_trace_id(drvdata->cpu);
+	drvdata->trcid = drvdata->cpu + 1;
 }
 
 static int etm4_cpu_save(struct etmv4_drvdata *drvdata)
@@ -1394,6 +1402,10 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
 	struct coresight_desc desc = { 0 };
 	struct device_node *np = adev->dev.of_node;
 
+	/* Resolve conflict with coresight-cpu-debug */
+	if(!of_property_read_bool(np, "is-etm"))
+		return -ENODEV;
+
 	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
 	if (!drvdata)
 		return -ENOMEM;
@@ -1512,10 +1524,13 @@ err_arch_supported:
 
 static const struct amba_id etm4_ids[] = {
 	ETM4x_AMBA_ID(0x000bb95d),		/* Cortex-A53 */
+	ETM4x_AMBA_ID(0x000bbd05),		/* Cortex-A55 */
 	ETM4x_AMBA_ID(0x000bb95e),		/* Cortex-A57 */
 	ETM4x_AMBA_ID(0x000bb95a),		/* Cortex-A72 */
 	ETM4x_AMBA_ID(0x000bb959),		/* Cortex-A73 */
+	ETM4x_AMBA_ID(0x000bbd0b),		/* Cortex-A76 */
 	ETM4x_AMBA_ID(0x000bb9da),		/* Cortex-A35 */
+	ETM4x_AMBA_ID(0x000ce004),		/* Samsung-M5 */
 	{},
 };
 

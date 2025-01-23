@@ -28,6 +28,7 @@
 #include <linux/interrupt.h>
 #include <linux/debug_locks.h>
 #include <linux/osq_lock.h>
+#include <linux/sec_debug.h>
 
 #ifdef CONFIG_DEBUG_MUTEXES
 # include "mutex-debug.h"
@@ -984,6 +985,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 
 	waiter.task = current;
 
+	secdbg_dtsk_set_data(DTYPE_MUTEX, (void *)lock);
 	set_current_state(state);
 	for (;;) {
 		/*
@@ -1039,6 +1041,7 @@ __mutex_lock_common(struct mutex *lock, long state, unsigned int subclass,
 	spin_lock(&lock->wait_lock);
 acquired:
 	__set_current_state(TASK_RUNNING);
+	secdbg_dtsk_set_data(DTYPE_NONE, NULL);
 
 	if (ww_ctx) {
 		/*
@@ -1067,6 +1070,7 @@ skip_wait:
 
 err:
 	__set_current_state(TASK_RUNNING);
+	secdbg_dtsk_set_data(DTYPE_NONE, NULL);
 	__mutex_remove_waiter(lock, &waiter);
 err_early_kill:
 	spin_unlock(&lock->wait_lock);

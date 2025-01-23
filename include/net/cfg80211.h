@@ -817,6 +817,14 @@ struct survey_info {
  *	CFG80211_MAX_WEP_KEYS WEP keys
  * @wep_tx_key: key index (0..3) of the default TX static WEP key
  * @psk: PSK (for devices supporting 4-way-handshake offload)
+ * @sae_pwe: The mechanisms allowed for SAE PWE derivation
+ *	NL80211_SAE_PWE_UNSPECIFIED: Not-specified, used to indicate userspace
+ *		did not specify any preference. The driver should follow its
+ *		internal policy in such a scenario.
+ *	NL80211_SAE_PWE_HUNT_AND_PECK: Allow hunting-and-pecking loop only
+ *	NL80211_SAE_PWE_HASH_TO_ELEMENT: Allow hash-to-element only
+ *	NL80211_SAE_PWE_BOTH: Allow either hunting-and-pecking loop
+ *		or hash-to-element
  */
 struct cfg80211_crypto_settings {
 	u32 wpa_versions;
@@ -832,6 +840,9 @@ struct cfg80211_crypto_settings {
 	struct key_params *wep_keys;
 	int wep_tx_key;
 	const u8 *psk;
+#ifdef CONFIG_SCSC_WLAN_SAE_PWE
+	enum nl80211_sae_pwe_mechanism sae_pwe;
+#endif
 };
 
 /**
@@ -5162,27 +5173,6 @@ cfg80211_inform_bss_frame(struct wiphy *wiphy,
 	};
 
 	return cfg80211_inform_bss_frame_data(wiphy, &data, mgmt, len, gfp);
-}
-
-/**
- * cfg80211_gen_new_bssid - generate a nontransmitted BSSID for multi-BSSID
- * @bssid: transmitter BSSID
- * @max_bssid: max BSSID indicator, taken from Multiple BSSID element
- * @mbssid_index: BSSID index, taken from Multiple BSSID index element
- * @new_bssid: calculated nontransmitted BSSID
- */
-static inline void cfg80211_gen_new_bssid(const u8 *bssid, u8 max_bssid,
-					  u8 mbssid_index, u8 *new_bssid)
-{
-	u64 bssid_u64 = ether_addr_to_u64(bssid);
-	u64 mask = GENMASK_ULL(max_bssid - 1, 0);
-	u64 new_bssid_u64;
-
-	new_bssid_u64 = bssid_u64 & ~mask;
-
-	new_bssid_u64 |= ((bssid_u64 & mask) + mbssid_index) & mask;
-
-	u64_to_ether_addr(new_bssid_u64, new_bssid);
 }
 
 /**

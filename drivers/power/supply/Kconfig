@@ -646,4 +646,16 @@ config CHARGER_CROS_USBPD
 	  what is connected to USB PD ports from the EC and converts
 	  that into power_supply properties.
 
+config BATTERY_S2MU00X
+	tristate "S2MU00x battery driver"
+	depends on I2C
+	help
+	  Say Y here to enable support for S2MU00x battery driver.
+
+config MANAGER_S2M_CHARGER
+	tristate "S2M_CHG_MANAGER battery driver"
+	help
+	  Say Y here to enable support for S2MXXXX charging manager driver.
+	  This charging manager driver supports only the basic functions.
+
 endif # POWER_SUPPLY

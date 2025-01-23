@@ -105,6 +105,7 @@ int dwc3_gadget_ep0_set_halt(struct usb_ep *ep, int value);
 int dwc3_gadget_ep0_queue(struct usb_ep *ep, struct usb_request *request,
 		gfp_t gfp_flags);
 int __dwc3_gadget_ep_set_halt(struct dwc3_ep *dep, int value, int protocol);
+void dwc3_ep0_send_delayed_status(struct dwc3 *dwc);
 
 /**
  * dwc3_gadget_ep_get_transfer_index - Gets transfer index from HW
@@ -120,5 +121,11 @@ static inline void dwc3_gadget_ep_get_transfer_index(struct dwc3_ep *dep)
 	res_id = dwc3_readl(dep->regs, DWC3_DEPCMD);
 	dep->resource_index = DWC3_DEPCMD_GET_RSC_IDX(res_id);
 }
+
+/**
+ * ISR for DWC3 gadget was changed because of RNDIS performance.
+ * However, previous ISR code was not removed to track the history.
+ */
+#undef DWC3_GADGET_IRQ_ORG
 
 #endif /* __DRIVERS_USB_DWC3_GADGET_H */

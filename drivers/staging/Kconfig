@@ -24,6 +24,8 @@ menuconfig STAGING
 
 if STAGING
 
+source "drivers/staging/nanohub/Kconfig"
+
 source "drivers/staging/wlan-ng/Kconfig"
 
 source "drivers/staging/comedi/Kconfig"
@@ -121,7 +123,5 @@ source "drivers/staging/mt7621-dts/Kconfig"
 source "drivers/staging/gasket/Kconfig"
 
 source "drivers/staging/axis-fifo/Kconfig"
-
-source "drivers/staging/erofs/Kconfig"
 
 endif # STAGING

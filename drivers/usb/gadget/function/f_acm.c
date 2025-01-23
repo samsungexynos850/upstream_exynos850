@@ -535,15 +535,20 @@ static int acm_notify_serial_state(struct f_acm *acm)
 	__le16			serial_state;
 
 	spin_lock(&acm->lock);
-	if (acm->notify_req) {
-		dev_dbg(&cdev->gadget->dev, "acm ttyGS%d serial state %04x\n",
-			acm->port_num, acm->serial_state);
-		serial_state = cpu_to_le16(acm->serial_state);
-		status = acm_cdc_notify(acm, USB_CDC_NOTIFY_SERIAL_STATE,
-				0, &serial_state, sizeof(acm->serial_state));
+	if (acm->notify->enabled) {
+		if (acm->notify_req) {
+			dev_dbg(&cdev->gadget->dev, "acm ttyGS%d serial state %04x\n",
+				acm->port_num, acm->serial_state);
+			serial_state = cpu_to_le16(acm->serial_state);
+			status = acm_cdc_notify(acm, USB_CDC_NOTIFY_SERIAL_STATE,
+					0, &serial_state, sizeof(acm->serial_state));
+		} else {
+			acm->pending = true;
+			status = 0;
+		}
 	} else {
-		acm->pending = true;
-		status = 0;
+		status = -EAGAIN;
+		printk(KERN_DEBUG "usb: %s acm function already disabled\n", __func__);
 	}
 	spin_unlock(&acm->lock);
 	return status;
@@ -701,7 +706,7 @@ fail:
 	if (acm->notify_req)
 		gs_free_req(acm->notify, acm->notify_req);
 
-	ERROR(cdev, "%s/%p: can't bind, err %d\n", f->name, f, status);
+	ERROR(cdev, "%s/%pK: can't bind, err %d\n", f->name, f, status);
 
 	return status;
 }
@@ -710,7 +715,9 @@ static void acm_unbind(struct usb_configuration *c, struct usb_function *f)
 {
 	struct f_acm		*acm = func_to_acm(f);
 
+#ifndef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
 	acm_string_defs[0].id = 0;
+#endif
 	usb_free_all_descriptors(f);
 	if (acm->notify_req)
 		gs_free_req(acm->notify, acm->notify_req);
@@ -817,4 +824,16 @@ static struct usb_function_instance *acm_alloc_instance(void)
 	return &opts->func_inst;
 }
 DECLARE_USB_FUNCTION_INIT(acm, acm_alloc_instance, acm_alloc_func);
+#ifdef CONFIG_USB_ANDROID_SAMSUNG_COMPOSITE
+static int __init acm_init(void)
+{
+	return usb_function_register(&acmusb_func);
+}
+static void __exit acm_exit(void)
+{
+	return usb_function_unregister(&acmusb_func);
+}
+module_init(acm_init);
+module_exit(acm_exit);
+#endif
 MODULE_LICENSE("GPL");
