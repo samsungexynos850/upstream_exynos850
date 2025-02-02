@@ -986,6 +986,7 @@ of_fwnode_device_get_match_data(const struct fwnode_handle *fwnode,
 	return of_device_get_match_data(dev);
 }
 
+#ifdef ENABLE_DEVICE_LINKING_BY_DT_PROPERTY
 static bool of_is_ancestor_of(struct device_node *test_ancestor,
 			      struct device_node *child)
 {
@@ -1031,8 +1032,20 @@ static int of_link_to_phandle(struct device *dev, struct device_node *sup_np,
 	 * Find the device node that contains the supplier phandle.  It may be
 	 * @sup_np or it may be an ancestor of @sup_np.
 	 */
-	while (sup_np && !of_find_property(sup_np, "compatible", NULL))
+	while (sup_np) {
+
+		/* Don't allow linking to a disabled supplier */
+		if (!of_device_is_available(sup_np)) {
+			of_node_put(sup_np);
+			sup_np = NULL;
+		}
+
+		if (of_find_property(sup_np, "compatible", NULL))
+			break;
+
 		sup_np = of_get_next_parent(sup_np);
+	}
+
 	if (!sup_np) {
 		dev_dbg(dev, "Not linking to %pOFP - No device\n", tmp_np);
 		return -ENODEV;
@@ -1064,6 +1077,7 @@ static int of_link_to_phandle(struct device *dev, struct device_node *sup_np,
 	put_device(sup_dev);
 	return ret;
 }
+#endif
 
 /**
  * parse_prop_cells - Property parsing function for suppliers
@@ -1267,6 +1281,7 @@ static const struct supplier_bindings of_supplier_bindings[] = {
 	{}
 };
 
+#ifdef ENABLE_DEVICE_LINKING_BY_DT_PROPERTY
 /**
  * of_link_property - Create device links to suppliers listed in a property
  * @dev: Consumer device
@@ -1327,14 +1342,14 @@ static int of_link_to_suppliers(struct device *dev,
 		if (of_link_property(dev, con_np, p->name))
 			ret = -ENODEV;
 
-	for_each_child_of_node(con_np, child)
+	for_each_available_child_of_node(con_np, child)
 		if (of_link_to_suppliers(dev, child) && !ret)
 			ret = -EAGAIN;
 
 	return ret;
 }
 
-static bool of_devlink;
+static bool of_devlink = true;
 core_param(of_devlink, of_devlink, bool, 0);
 
 static int of_fwnode_add_links(const struct fwnode_handle *fwnode,
@@ -1348,6 +1363,7 @@ static int of_fwnode_add_links(const struct fwnode_handle *fwnode,
 
 	return of_link_to_suppliers(dev, to_of_node(fwnode));
 }
+#endif
 
 const struct fwnode_operations of_fwnode_ops = {
 	.get = of_fwnode_get,
@@ -1365,6 +1381,10 @@ const struct fwnode_operations of_fwnode_ops = {
 	.graph_get_remote_endpoint = of_fwnode_graph_get_remote_endpoint,
 	.graph_get_port_parent = of_fwnode_graph_get_port_parent,
 	.graph_parse_endpoint = of_fwnode_graph_parse_endpoint,
+#ifdef ENABLE_DEVICE_LINKING_BY_DT_PROPERTY
 	.add_links = of_fwnode_add_links,
+#else
+	.add_links = NULL,
+#endif
 };
 EXPORT_SYMBOL_GPL(of_fwnode_ops);
