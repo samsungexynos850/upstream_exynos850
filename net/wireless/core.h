@@ -174,12 +174,23 @@ static inline struct cfg80211_internal_bss *bss_from_pub(struct cfg80211_bss *pu
 static inline void cfg80211_hold_bss(struct cfg80211_internal_bss *bss)
 {
 	atomic_inc(&bss->hold);
+	if (bss->pub.transmitted_bss) {
+		bss = container_of(bss->pub.transmitted_bss,
+				   struct cfg80211_internal_bss, pub);
+		atomic_inc(&bss->hold);
+	}
 }
 
 static inline void cfg80211_unhold_bss(struct cfg80211_internal_bss *bss)
 {
 	int r = atomic_dec_return(&bss->hold);
 	WARN_ON(r < 0);
+	if (bss->pub.transmitted_bss) {
+		bss = container_of(bss->pub.transmitted_bss,
+				   struct cfg80211_internal_bss, pub);
+		r = atomic_dec_return(&bss->hold);
+		WARN_ON(r < 0);
+	}
 }
 
 
@@ -408,6 +419,8 @@ void cfg80211_sme_abandon_assoc(struct wireless_dev *wdev);
 
 /* internal helpers */
 bool cfg80211_supported_cipher_suite(struct wiphy *wiphy, u32 cipher);
+bool cfg80211_valid_key_idx(struct cfg80211_registered_device *rdev,
+                int key_idx, bool pairwise);
 int cfg80211_validate_key_settings(struct cfg80211_registered_device *rdev,
 				   struct key_params *params, int key_idx,
 				   bool pairwise, const u8 *mac_addr);

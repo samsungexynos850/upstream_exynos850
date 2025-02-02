@@ -35,22 +35,13 @@ static struct file *ovl_open_realfile(const struct file *file,
 	const struct cred *old_cred;
 	int flags = file->f_flags | OVL_OPEN_FLAGS;
 	int acc_mode = ACC_MODE(flags);
-	int err;
 
 	if (flags & O_APPEND)
 		acc_mode |= MAY_APPEND;
 
 	old_cred = ovl_override_creds(inode->i_sb);
-	err = inode_permission(realinode, MAY_OPEN | acc_mode);
-	if (err) {
-		realfile = ERR_PTR(err);
-	} else {
-		if (!inode_owner_or_capable(realinode))
-			flags &= ~O_NOATIME;
-
-		realfile = open_with_fake_path(&file->f_path, flags, realinode,
-					       current_cred());
-	}
+	realfile = open_with_fake_path(&file->f_path, flags, realinode,
+				       current_cred());
 	ovl_revert_creds(old_cred);
 
 	pr_debug("open(%p[%pD2/%c], 0%o) -> (%p, 0%o)\n",

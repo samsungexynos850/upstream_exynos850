@@ -26,12 +26,13 @@
 #include <linux/thermal.h>
 #include <linux/cpufreq.h>
 #include <linux/err.h>
-#include <linux/idr.h>
 #include <linux/pm_opp.h>
 #include <linux/slab.h>
 #include <linux/cpu.h>
 #include <linux/cpu_cooling.h>
 #include <linux/debug-snapshot.h>
+#include <linux/energy_model.h>
+#include <linux/of_device.h>
 
 #include <trace/events/thermal.h>
 
@@ -524,7 +525,11 @@ static int cpufreq_set_cur_state(struct thermal_cooling_device *cdev,
 	cpufreq_cdev->cpufreq_state = state;
 	cpufreq_cdev->clipped_freq = clip_freq;
 
-	cpufreq_update_policy(cpufreq_cdev->policy->cpu);
+	/* Check if the device has a platform mitigation function that
+	 * can handle the CPU freq mitigation, if not, notify cpufreq
+	 * framework.
+	 */
+    cpufreq_update_policy(cpufreq_cdev->policy->cpu);
 
 	return 0;
 }
@@ -874,7 +879,6 @@ __cpufreq_cooling_register(struct device_node *np,
 
 	snprintf(dev_name, sizeof(dev_name), "thermal-cpufreq-%d",
 		 cpufreq_cdev->id);
-
 	/* Fill freq-table in descending order of frequencies */
 	for (i = 0, freq = -1; i <= cpufreq_cdev->max_level; i++) {
 		freq = find_next_max(policy->freq_table, freq);
@@ -909,7 +913,7 @@ __cpufreq_cooling_register(struct device_node *np,
 	cdev = thermal_of_cooling_device_register(np, dev_name, cpufreq_cdev,
 						  cooling_ops);
 	if (IS_ERR(cdev))
-		goto remove_ida;
+		goto free_idle_time;
 
 	cpufreq_cdev->clipped_freq = cpufreq_cdev->freq_table[0].frequency;
 	cpufreq_cdev->cdev = cdev;
@@ -1006,6 +1010,37 @@ of_cpufreq_cooling_register(struct cpufreq_policy *policy)
 EXPORT_SYMBOL_GPL(of_cpufreq_cooling_register);
 
 /**
+ * cpufreq_platform_cooling_register() - create cpufreq cooling device with
+ * additional platform specific mitigation function.
+ *
+ * @clip_cpus: cpumask of cpus where the frequency constraints will happen
+ * @plat_ops: the platform mitigation functions that will be called insted of
+ * cpufreq, if provided.
+ *
+ * Return: a valid struct thermal_cooling_device pointer on success,
+ * on failure, it returns a corresponding ERR_PTR().
+ */
+struct thermal_cooling_device *
+cpufreq_platform_cooling_register(struct cpufreq_policy *policy,
+				  struct cpu_cooling_ops *plat_ops)
+{
+	struct device_node *cpu_node;
+	struct thermal_cooling_device *cdev = NULL;
+
+	cpu_node = of_cpu_device_node_get(policy->cpu);
+	if (!cpu_node) {
+		pr_err("No cpu node\n");
+		return ERR_PTR(-EINVAL);
+	}
+	cdev = __cpufreq_cooling_register(cpu_node, policy, false,
+					  (get_static_t) plat_ops);
+
+	of_node_put(cpu_node);
+	return cdev;
+}
+EXPORT_SYMBOL(cpufreq_platform_cooling_register);
+
+/**
  * cpufreq_cooling_unregister - function to remove cpufreq cooling device.
  * @cdev: thermal cooling device pointer.
  *
@@ -1032,7 +1067,6 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
 					    CPUFREQ_POLICY_NOTIFIER);
 
 	thermal_cooling_device_unregister(cpufreq_cdev->cdev);
-	ida_simple_remove(&cpufreq_ida, cpufreq_cdev->id);
 	kfree(cpufreq_cdev->idle_time);
 	kfree(cpufreq_cdev->freq_table);
 	kfree(cpufreq_cdev);
