@@ -781,7 +781,9 @@ void *exynos_fmp_init(struct platform_device *pdev)
 #endif
 
 	fmp_dev = &pdev->dev;
+#ifdef CONFIG_EXYNOS_FMP_FIPS
 	fmp->fips_run = 0;
+#endif
 	dev_info(fmp->dev, "Exynos FMP driver is initialized\n");
 	return fmp;
 
