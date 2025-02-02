@@ -1018,4 +1018,4 @@ regist:
 
 	return ret;
 }
-device_initcall(exynos_gpu_cooling_init);
+late_initcall(exynos_gpu_cooling_init);

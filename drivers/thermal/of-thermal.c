@@ -20,8 +20,6 @@
 
 #include "thermal_core.h"
 
-/***   Private data structures to represent thermal device tree data ***/
-
 /**
  * struct __sensor_param - Holds individual sensor data
  * @sensor_data: sensor driver private data passed as input argument
@@ -39,7 +37,7 @@ struct __sensor_param {
 	struct list_head first_tz;
 };
 
-/**
+/*
  * struct virtual_sensor - internal representation of a virtual thermal zone
  * @num_sensors - number of sensors this virtual sensor will reference to
  *		  estimate temperature
@@ -155,11 +153,10 @@ static int of_thermal_throttle_hotplug(struct thermal_zone_device *tz)
 {
 	struct __thermal_zone *data = tz->devdata;
 	int ret = 0;
-
-	if (!data->ops->throttle_cpu_hotplug)
+	if (!data->senps->ops->throttle_cpu_hotplug)
 		return -EINVAL;
 
-	ret = data->ops->throttle_cpu_hotplug(data->sensor_data, tz->temperature);
+	ret = data->senps->ops->throttle_cpu_hotplug(data->senps->sensor_data, tz->temperature);
 
 	return ret;
 }
@@ -722,6 +719,7 @@ thermal_zone_of_sensor_register(struct device *dev, int sensor_id, void *data,
 		if (sensor_specs.np == sensor_np && id == sensor_id) {
 			first_tzd = thermal_zone_of_add_sensor(child, sensor_np,
 							 sens_param);
+
 			of_node_put(sensor_specs.np);
 			of_node_put(child);
 			goto exit;

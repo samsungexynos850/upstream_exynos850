@@ -529,7 +529,7 @@ static int cpufreq_set_cur_state(struct thermal_cooling_device *cdev,
 	 * can handle the CPU freq mitigation, if not, notify cpufreq
 	 * framework.
 	 */
-    cpufreq_update_policy(cpufreq_cdev->policy->cpu);
+	cpufreq_update_policy(cpufreq_cdev->policy->cpu);
 
 	return 0;
 }
@@ -879,6 +879,7 @@ __cpufreq_cooling_register(struct device_node *np,
 
 	snprintf(dev_name, sizeof(dev_name), "thermal-cpufreq-%d",
 		 cpufreq_cdev->id);
+
 	/* Fill freq-table in descending order of frequencies */
 	for (i = 0, freq = -1; i <= cpufreq_cdev->max_level; i++) {
 		freq = find_next_max(policy->freq_table, freq);
@@ -1033,7 +1034,7 @@ cpufreq_platform_cooling_register(struct cpufreq_policy *policy,
 		return ERR_PTR(-EINVAL);
 	}
 	cdev = __cpufreq_cooling_register(cpu_node, policy, false,
-					  (get_static_t) plat_ops);
+					 (get_static_t) plat_ops);
 
 	of_node_put(cpu_node);
 	return cdev;
