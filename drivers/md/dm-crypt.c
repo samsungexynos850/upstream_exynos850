@@ -915,7 +915,6 @@ static bool crypt_integrity_hmac(struct crypt_config *cc)
 	return crypt_integrity_aead(cc) && cc->key_mac_size;
 }
 
-
 /* Get sg containing data */
 static struct scatterlist *crypt_get_sg_data(struct crypt_config *cc,
 					     struct scatterlist *sg)
