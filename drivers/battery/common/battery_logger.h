@@ -2,7 +2,7 @@
  * battery_logger.h
  * Samsung Mobile Charger Header
  *
- * Copyright (C) 2021 Samsung Electronics, Inc.
+ * Copyright (C) 2012 Samsung Electronics, Inc.
  *
  *
  * This software is licensed under the terms of the GNU General Public
@@ -19,15 +19,9 @@
 #ifndef __BATTERY_LOGGER_H
 #define __BATTERY_LOGGER_H __FILE__
 
-#if defined(CONFIG_BATTERY_LOGGING)
 extern void store_battery_log(const char *fmt, ...);
 extern int register_batterylog_proc(void);
 extern void unregister_batterylog_proc(void);
-#else
-static inline void store_battery_log(const char *fmt, ...) {}
-static inline int register_batterylog_proc(void)
-{ return 0; }
-static inline void unregister_batterylog_proc(void) {}
-#endif
+extern unsigned int lpcharge;
 
 #endif /* __BATTERY_LOGGER_H */
