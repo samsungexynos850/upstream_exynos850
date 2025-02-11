@@ -19,6 +19,8 @@
 #include "is-param.h"
 
 
+#define SET_CPU_AFFINITY	/* enable @ Exynos3475 */
+
 #if !defined(DISABLE_LIB)
 /* #define LIB_MEM_TRACK */
 #endif
@@ -28,7 +30,7 @@
 #endif
 
 #define LIB_ISP_OFFSET		(0x00000080)
-#define LIB_ISP_CODE_SIZE	(0x00440000) //+ 1M
+#define LIB_ISP_CODE_SIZE	(0x00340000)
 
 #define LIB_VRA_OFFSET		(0x00000400)
 #define LIB_VRA_CODE_SIZE	(0x00080000)
@@ -329,7 +331,6 @@ struct fd_info {
 int is_load_bin(void);
 void is_load_clear(void);
 int is_init_ddk_thread(void);
-void is_set_ddk_thread_affinity(void);
 void is_flush_ddk_thread(void);
 void check_lib_memory_leak(void);
 

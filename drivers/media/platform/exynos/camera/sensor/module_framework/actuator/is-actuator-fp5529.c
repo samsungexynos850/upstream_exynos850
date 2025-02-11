@@ -284,7 +284,7 @@ int sensor_fp5529_actuator_init(struct v4l2_subdev *subdev, u32 val)
 	struct is_actuator *actuator;
 	struct is_caldata_list_fp5529 *cal_data = NULL;
 	struct i2c_client *client = NULL;
-	unsigned long cal_addr;
+	long cal_addr;
 
 #ifdef USE_CAMERA_HW_BIG_DATA
 	struct cam_hw_param *hw_param = NULL;
@@ -314,12 +314,7 @@ int sensor_fp5529_actuator_init(struct v4l2_subdev *subdev, u32 val)
 	}
 
 	/* EEPROM AF calData address */
-#ifdef USE_STANDARD_CAL_OEM_BASE
-	cal_addr = gPtr_lib_support.minfo->kvaddr_cal[SENSOR_POSITION_REAR] + EEPROM_STANDARD_CAL_OEM_BASE;
-#else
 	cal_addr = gPtr_lib_support.minfo->kvaddr_cal[SENSOR_POSITION_REAR] + EEPROM_OEM_BASE;
-#endif
-
 	cal_data = (struct is_caldata_list_fp5529 *)(cal_addr);
 
 	/* Read into EEPROM data or default setting */
@@ -460,13 +455,15 @@ int sensor_fp5529_actuator_soft_landing(struct v4l2_subdev *subdev)
 	sensor_fp5529_actuator_wait_busy(subdev);
 
 	/*It may be required for further tuning*/
+#if 0
 	/*  Set NRC_STEP */
 	i2c_data[0] = REG_LAD_STEP;
-	i2c_data[1] = 0x85;
+	i2c_data[1] = 0xf5;
 	ret = is_sensor_addr8_write8(client, i2c_data[0], i2c_data[1]);
 	if (ret < 0)
 		goto p_err;
 	sensor_fp5529_actuator_wait_busy(subdev);
+#endif
 
 	/*It may be required for further tuning*/
 #if 0
@@ -477,6 +474,7 @@ int sensor_fp5529_actuator_soft_landing(struct v4l2_subdev *subdev)
 	if(ret < 0)
 		goto p_err;
 	sensor_fp5529_actuator_wait_busy(subdev);
+#endif
 
 	/* Enable RING Mode*/
 	i2c_data[0] = REG_CONTROL;
@@ -485,7 +483,6 @@ int sensor_fp5529_actuator_soft_landing(struct v4l2_subdev *subdev)
 	if (ret < 0)
 		goto p_err;
 	sensor_fp5529_actuator_wait_busy(subdev);
-
 	/* Set SAC[2:0] and SAC[7:2] as 101 00 001 i.e SAC4 & clock divide x1   */
 	i2c_data[0] = REG_ACC_MODE;
 	i2c_data[1] = (0x05 << 5) | 0x01;
@@ -493,7 +490,7 @@ int sensor_fp5529_actuator_soft_landing(struct v4l2_subdev *subdev)
 	if (ret < 0)
 		goto p_err;
 	sensor_fp5529_actuator_wait_busy(subdev);
-#endif
+
 
 	/*  Set up for NRC now complete...  RING_MODE Enabled + SAC[2:0] set Enable NRC_EN */
 	i2c_data[0] = REG_LAD_EN;
@@ -704,45 +701,45 @@ int sensor_fp5529_actuator_probe(struct i2c_client *client,
 		if (ret) {
 			pr_info("place read is fail(%d)", ret);
 			place = 0;
-		}
+	}
 		probe_info("%s sensor_id(%d) actuator_place(%d)\n", __func__, sensor_id[i], place);
 
 		device = &core->sensor[sensor_id[i]];
 
 		actuator = kzalloc(sizeof(struct is_actuator), GFP_KERNEL);
-		if (!actuator) {
+	if (!actuator) {
 			err("actuator is NULL");
-			ret = -ENOMEM;
-			goto p_err;
-		}
+		ret = -ENOMEM;
+		goto p_err;
+	}
 
-		subdev_actuator = kzalloc(sizeof(struct v4l2_subdev), GFP_KERNEL);
-		if (!subdev_actuator) {
-			err("subdev_actuator is NULL");
-			ret = -ENOMEM;
+	subdev_actuator = kzalloc(sizeof(struct v4l2_subdev), GFP_KERNEL);
+	if (!subdev_actuator) {
+		err("subdev_actuator is NULL");
+		ret = -ENOMEM;
 			kfree(actuator);
-			goto p_err;
-		}
+		goto p_err;
+	}
 
-		/* This name must is match to sensor_open_extended actuator name */
-		actuator->id = ACTUATOR_NAME_FP5529;
-		actuator->subdev = subdev_actuator;
+	/* This name must is match to sensor_open_extended actuator name */
+	actuator->id = ACTUATOR_NAME_FP5529;
+	actuator->subdev = subdev_actuator;
 		actuator->device = sensor_id[i];
-		actuator->client = client;
-		actuator->position = 0;
-		actuator->max_position = FP5529_POS_MAX_SIZE;
-		actuator->pos_size_bit = FP5529_POS_SIZE_BIT;
-		actuator->pos_direction = FP5529_POS_DIRECTION;
-		actuator->i2c_lock = NULL;
+	actuator->client = client;
+	actuator->position = 0;
+	actuator->max_position = FP5529_POS_MAX_SIZE;
+	actuator->pos_size_bit = FP5529_POS_SIZE_BIT;
+	actuator->pos_direction = FP5529_POS_DIRECTION;
+        actuator->i2c_lock = NULL;
 
-		device->subdev_actuator[place] = subdev_actuator;
-		device->actuator[place] = actuator;
+	device->subdev_actuator[place] = subdev_actuator;
+	device->actuator[place] = actuator;
 
-		v4l2_i2c_subdev_init(subdev_actuator, client, &subdev_ops);
-		v4l2_set_subdevdata(subdev_actuator, actuator);
-		v4l2_set_subdev_hostdata(subdev_actuator, device);
+	v4l2_i2c_subdev_init(subdev_actuator, client, &subdev_ops);
+	v4l2_set_subdevdata(subdev_actuator, actuator);
+	v4l2_set_subdev_hostdata(subdev_actuator, device);
 
-		snprintf(subdev_actuator->name, V4L2_SUBDEV_NAME_SIZE, "actuator-subdev.%d", actuator->id);
+	snprintf(subdev_actuator->name, V4L2_SUBDEV_NAME_SIZE, "actuator-subdev.%d", actuator->id);
 	}
 
 	probe_info("%s done\n", __func__);

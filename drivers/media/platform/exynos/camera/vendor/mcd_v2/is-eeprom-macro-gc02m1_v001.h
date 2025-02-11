@@ -2,60 +2,29 @@
 #define IS_EEPROM_MACRO_GC02M1_V001_H
 
 /* Reference File
- * 20200831_A12_M12s_CAM3((Macro_2M_GC02M1)_EEPROM_Rear_Cal map V008.001.xlsx
+ * Universal EEPROM map data V001_20191210_for_A21s_Nacho_8K_(GC02M1_2M_Macro).xlsx
  */
 
-#define IS_REAR4_MAX_CAL_SIZE              (0x1DCF - 0x0000 + 0x1) /* It should be bigger than output of GetCalSize() from ap2ap library */
+#define IS_REAR4_MAX_CAL_SIZE (8 * 1024)
 
-#define MACRO_HEADER_CHECKSUM_LEN          (0x00FB - 0x0000 + 0x1)
-#define MACRO_OEM_CHECKSUM_LEN             (0x019B - 0x0100 + 0x1)
-#define MACRO_AWB_CHECKSUM_LEN             (0x01AB - 0x01A0 + 0x1)
-#define MACRO_SHADING_CHECKSUM_LEN         (0x05AB - 0x01B0 + 0x1)
-#define MACRO_AWB_SEC2LSI_CHECKSUM_LEN     (0x01AB - 0x01A0 + 0x1)
-#define MACRO_SHADING_SEC2LSI_CHECKSUM_LEN (0x1B9B - 0x01B0 + 0x1)
+#define MACRO_HEADER_CHECKSUM_LEN     (0x00FB - 0x0000 + 0x1)
+#define MACRO_OEM_CHECKSUM_LEN        (0x0189 - 0x0100 + 0x1)
+#define MACRO_AWB_CHECKSUM_LEN        (0x023B - 0x01C0 + 0x1)
+#define MACRO_SHADING_CHECKSUM_LEN    (0x1C4F - 0x0260 + 0x1)
+#define MACRO_AE_CHECKSUM_LEN         (0x1CCF - 0x1C70 + 0x1)
 
-struct rom_ap2ap_standard_cal_data macro_gc02m1_ap2ap_standard_cal_info = {
-	.rom_orig_start_addr                                       = 0x0,
-	.rom_orig_end_addr                                         = 0x7CF,
-	.rom_lsi_start_addr                                        = 0x0,
-	.rom_lsi_end_addr                                          = 0x1DBF,
-};
-
-struct rom_extend_cal_addr macro_gc02m1_ap2ap_extend_cal_addr = {
-	.name = EXTEND_AP2AP_STANDARD_CAL,
-	.data = &macro_gc02m1_ap2ap_standard_cal_info,
-	.next = NULL,
-};
-
-struct rom_standard_cal_data macro_gc02m1_standard_cal_info = {
-	.rom_standard_cal_start_addr                               = -1,
-	.rom_standard_cal_end_addr                                 = -1,
-	.rom_standard_cal_module_crc_addr                          = -1,
-	.rom_standard_cal_module_checksum_len                      = -1,
-	.rom_header_standard_cal_end_addr                          = -1,
-	.rom_standard_cal_sec2lsi_end_addr                         = -1,
-
-	// reference data only
-	.rom_awb_start_addr                                        = 0x01A0,
-	.rom_awb_end_addr                                          = 0x01A7,
-	.rom_shading_start_addr                                    = 0x01B0,
-	.rom_shading_end_addr                                      = 0x05A8,
-
-	.rom_awb_sec2lsi_start_addr                                = 0x01A0,
-	.rom_awb_sec2lsi_end_addr                                  = 0x01A7,
-	.rom_awb_sec2lsi_checksum_addr                             = 0x01AC,
-	.rom_awb_sec2lsi_checksum_len                              = MACRO_AWB_SEC2LSI_CHECKSUM_LEN,
-
-	.rom_shading_sec2lsi_start_addr                            = 0x01B0,
-	.rom_shading_sec2lsi_end_addr                              = 0x1B97,
-	.rom_shading_sec2lsi_checksum_addr                         = 0x1B9C,
-	.rom_shading_sec2lsi_checksum_len                          = MACRO_SHADING_SEC2LSI_CHECKSUM_LEN,
+struct rom_ae_cal_data macro_gc02m1_ae_cal_info = {
+	.rom_header_main_ae_start_addr  = 0x28,
+	.rom_header_main_ae_end_addr    = 0x2C,
+	.rom_ae_module_info_start_addr  = 0x1CD0,
+	.rom_ae_checksum_addr           = 0x1CEC,
+	.rom_ae_checksum_len            = MACRO_AE_CHECKSUM_LEN,
 };
 
 const struct rom_extend_cal_addr macro_gc02m1_extend_cal_addr = {
-	.name = EXTEND_STANDARD_CAL,
-	.data = &macro_gc02m1_standard_cal_info,
-	.next = &macro_gc02m1_ap2ap_extend_cal_addr,
+	.name = EXTEND_AE_CAL,
+	.data = &macro_gc02m1_ae_cal_info,
+	.next = NULL,
 };
 
 const struct is_vender_rom_addr macro_gc02m1_cal_addr = {
@@ -66,9 +35,9 @@ const struct is_vender_rom_addr macro_gc02m1_cal_addr = {
 	.rom_max_cal_size                          = IS_REAR4_MAX_CAL_SIZE,
 
 	.rom_header_cal_data_start_addr            = 0x00,
-	.rom_header_main_module_info_start_addr    = 0x5E,
-	.rom_header_cal_map_ver_start_addr         = 0x90,
-	.rom_header_project_name_start_addr        = 0x98,
+	.rom_header_main_module_info_start_addr    = 0x40,
+	.rom_header_cal_map_ver_start_addr         = 0x50,
+	.rom_header_project_name_start_addr        = 0x58,
 	.rom_header_module_id_addr                 = 0xAE,
 	.rom_header_main_sensor_id_addr            = 0xB8,
 
@@ -97,24 +66,24 @@ const struct is_vender_rom_addr macro_gc02m1_cal_addr = {
 	.rom_header_sub_shading_start_addr         = -1,
 	.rom_header_sub_shading_end_addr           = -1,
 
-	.rom_header_main_mtf_data_addr             = 0x0134,
+	.rom_header_main_mtf_data_addr             = -1,
 	.rom_header_sub_mtf_data_addr              = -1,
 
 	.rom_header_checksum_addr                  = 0xFC,
 	.rom_header_checksum_len                   = MACRO_HEADER_CHECKSUM_LEN,
 
-	.rom_oem_af_inf_position_addr              = -1,
-	.rom_oem_af_macro_position_addr            = -1,
-	.rom_oem_module_info_start_addr            = -1,
-	.rom_oem_checksum_addr                     = 0x019C,
+	.rom_oem_af_inf_position_addr              = 0x0100,
+	.rom_oem_af_macro_position_addr            = 0x0108,
+	.rom_oem_module_info_start_addr            = 0x018A,
+	.rom_oem_checksum_addr                     = 0x01BC,
 	.rom_oem_checksum_len                      = MACRO_OEM_CHECKSUM_LEN, /* AF checksum length */
 
-	.rom_awb_module_info_start_addr            = -1,
-	.rom_awb_checksum_addr                     = 0x01AC,
+	.rom_awb_module_info_start_addr            = 0x023C,
+	.rom_awb_checksum_addr                     = 0x025C,
 	.rom_awb_checksum_len                      = MACRO_AWB_CHECKSUM_LEN,
 
-	.rom_shading_module_info_start_addr        = -1,
-	.rom_shading_checksum_addr                 = 0x05AC,
+	.rom_shading_module_info_start_addr        = 0x1C50,
+	.rom_shading_checksum_addr                 = 0x1C6C,
 	.rom_shading_checksum_len                  = MACRO_SHADING_CHECKSUM_LEN,
 
 	.rom_sensor_cal_module_info_start_addr     = -1,

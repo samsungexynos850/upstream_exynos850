@@ -1226,7 +1226,7 @@ enum aa_ae_extra_mode {
 enum aa_dynamic_bds_mode {
 	AA_DYNAMIC_BDS_MODE_OFF = 0,
 	AA_DYNAMIC_BDS_MODE_LOW_LIGHT_ON = 1,	/* IQ controlled */
-	AA_DYNAMIC_BDS_MODE_SYSTEM_ON  = 2,		/* HAL controlled */
+	AA_DYNAMIC_BDS_MODE_SYSTEM_ON = 2,		/* HAL controlled */
 };
 
 enum aa_enable_dynamicshot {
@@ -1309,7 +1309,7 @@ struct camera2_aa_ctl {
 	uint32_t			vendor_captureExposureTime;
 	float				vendor_objectDistanceCm;
 	int32_t				vendor_colorTempKelvin;
-	enum aa_enable_dynamicshot vendor_enableDynamicShotDm;
+	enum aa_enable_dynamicshot	vendor_enableDynamicShotDm;
 	float				vendor_expBracketing[15];
 	float				vendor_expBracketingCapture;
 	enum aa_supernightmode		vendor_superNightShotMode;
@@ -1325,8 +1325,8 @@ struct camera2_aa_ctl {
 	int32_t				vendor_memTotal;
 	struct depth_info	vendor_depthInfo;
 	enum aa_ae_extra_mode	vendor_aeExtraMode;
-	enum aa_dynamic_bds_mode vendor_enableDynamicBds;
-	enum aa_transient_capture_action vendor_transientCaptureAction;
+	enum aa_dynamic_bds_mode	vendor_enableDynamicBds;
+	enum aa_transient_capture_action	vendor_transientCaptureAction;
 	uint32_t			vendor_reserved[29];
 };
 

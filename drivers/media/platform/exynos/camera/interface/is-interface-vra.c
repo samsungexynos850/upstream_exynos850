@@ -356,7 +356,10 @@ void __nocfi is_lib_vra_task_work(struct kthread_work *work)
 int is_lib_vra_init_task(struct is_lib_vra *lib_vra)
 {
 	s32 ret = 0;
-	u32 j, cpu;
+	u32 j;
+#ifdef SET_CPU_AFFINITY
+	u32 cpu = 0;
+#endif
 	struct sched_param param = { .sched_priority = IS_MAX_PRIO - 3 };
 
 	if (unlikely(!lib_vra)) {
@@ -393,10 +396,11 @@ int is_lib_vra_init_task(struct is_lib_vra *lib_vra)
 			is_lib_vra_task_work);
 	}
 
+#ifdef SET_CPU_AFFINITY
 	cpu = TASK_VRA_AFFINITY;
-	set_cpus_allowed_ptr(lib_vra->task_vra.task, cpumask_of(cpu));
-	dbg_lib(3, "is_lib_vra: affinity %d\n", cpu);
-
+	ret = set_cpus_allowed_ptr(lib_vra->task_vra.task, cpumask_of(cpu));
+	dbg_lib(3, "lib_vra_task_init: affinity cpu(%d) (%d)\n", cpu, ret);
+#endif
 	return 0;
 }
 

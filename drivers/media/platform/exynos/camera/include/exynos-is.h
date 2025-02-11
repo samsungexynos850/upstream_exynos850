@@ -132,7 +132,6 @@ struct exynos_platform_is {
 	struct pinctrl *pinctrl;
 	/* These fields are to return qos value for dvfs scenario */
 	u32 dvfs_data[IS_DVFS_TABLE_IDX_MAX][IS_SN_END][IS_DVFS_END];
-	const char *dvfs_cpu[IS_DVFS_TABLE_IDX_MAX][IS_SN_END];
 
 	/* For host clock gating */
 	struct exynos_is_clk_gate_info *gate_info;

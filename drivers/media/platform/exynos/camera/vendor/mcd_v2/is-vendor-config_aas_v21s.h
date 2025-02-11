@@ -1,5 +1,5 @@
-#ifndef IS_VENDOR_CONFIG_AAV_V14_H
-#define IS_VENDOR_CONFIG_AAV_V14_H
+#ifndef IS_VENDOR_CONFIG_AAS_V21S_H
+#define IS_VENDOR_CONFIG_AAS_V21S_H
 
 #define VENDER_PATH
 
@@ -7,37 +7,25 @@
 #define ROM_DEBUG
 #define ROM_CRC32_DEBUG
 //#define SKIP_CHECK_CRC                                        /* Skip the CRC CHECK of cal data */
+//#define USE_SHARED_ROM_REAR3                                  /* Rear3 Camera share the ROM with Rear(Wide)*/
 
 //#define USE_AE_CAL                                          /* USE Ae cal data in rear camera, Only VENDER_CAL_STRUCT_VER2 */
 
-#define SUPPORT_SENSOR_DUALIZATION                            /* Support dualization */
-#define BOKEH_NO_ROM_SUPPORT                                  /* Support dualization for no rom bokeh sensor */
-#define APPLY_MIRROR_VERTICAL_FLIP                            /* Need To Apply Mirror and Vertical Flip */
 
 /***** SUPPORT CAMERA DEFINE *****/
-#define IS_VENDOR_SENSOR_COUNT 4                              /* REAR_0, FRONT_0, REAR_2, REAR_3 */
+#define IS_VENDOR_SENSOR_COUNT 5                              /* REAR_0, FRONT_0, REAR_2, REAR_3, REAR_4 */
 
-//#define REAR_SUB_CAMERA            (SENSOR_POSITION_REAR2)    /* Supported Camera Type for rear bokeh */
+#define REAR_SUB_CAMERA            (SENSOR_POSITION_REAR2)    /* Supported Camera Type for rear bokeh */
 #define REAR_ULTRA_WIDE_CAMERA     (SENSOR_POSITION_REAR3)    /* Supported Camera Type for rear ultra wide */
 #define REAR_MACRO_CAMERA          (SENSOR_POSITION_REAR4)    /* Supported Camera Type for rear ultra wide */
 //#define FRONT_SUB_CAMERA         (SENSOR_POSITION_FRONT2)   /* Supported Camera Type for front bokeh */
 
-#define CAMERA_REAR2             (REAR_ULTRA_WIDE_CAMERA)   /* For Rear2 of SYSFS */
-//#define CAMERA_REAR2               (REAR_SUB_CAMERA)          /* For Rear3 of SYSFS */
-#define CAMERA_REAR3               (REAR_MACRO_CAMERA)          /* For Rear3 of SYSFS */
+#define CAMERA_REAR2               (REAR_ULTRA_WIDE_CAMERA)   /* For Rear2 of SYSFS */
+#define CAMERA_REAR3               (REAR_SUB_CAMERA)          /* For Rear3 of SYSFS */
+#define CAMERA_REAR4               (REAR_MACRO_CAMERA)          /* For Rear3 of SYSFS */
 //#define CAMERA_FRONT2            (FRONT_SUB_CAMERA)         /* For Front2 of SYSFS */
 
-#define SENSOR_OTP_HI1336B
-#define SENSOR_OTP_HI556
-#define SENSOR_OTP_HI556_STANDARD_CAL
 
-#define USES_STANDARD_CAL_RELOAD
-
-#define READ_DUAL_CAL_FIRMWARE_DATA
-#define DUAL_CAL_DATA_PATH "/vendor/etc/SetMultiCalInfo.bin"
-#define DUAL_CAL_DATA_SIZE_DEFAULT (0x080C)
-
-#define USE_CAMERA_MIPI_CLOCK_VARIATION
 /***** SUPPORT FUCNTION DEFINE *****/
 #define SAMSUNG_LIVE_OUTFOCUS                                 /* Allocate memory For Dual Camera */
 #define ENABLE_REMOSAIC_CAPTURE                               /* Base Remosaic */
@@ -74,14 +62,9 @@
 #define CSI_SCENARIO_SEN_FRONT	(1)
 #endif
 
-//#define SM5714_DEBUG_PRINT_REGMAP
-
 /* For the demands to modify DVFS CAM Level only in 16:9 ratio of rear recording.
  * This modification is only limited to A21s.
  */
-//#define USE_SPECIFIC_MIPISPEED
+#define USE_SPECIFIC_MIPISPEED
 
-#define JN1_MODIFY_REMOSAIC_CAL_ORDER
-#define PUT_30MS_BETWEEN_EACH_CAL_LOADING
-
-#endif /* IS_VENDOR_CONFIG_AAV_V14_H */
+#endif /* IS_VENDOR_CONFIG_AAS_V21S_H */

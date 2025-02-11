@@ -744,7 +744,7 @@ static int is_resourcemgr_deinit_secure_mem(struct is_resourcemgr *resourcemgr)
 static struct vm_struct is_lib_vm;
 static struct vm_struct is_heap_vm;
 static struct vm_struct is_heap_rta_vm;
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 static struct vm_struct is_lib_vm_for_rkp;
 #endif
 #if defined(RESERVED_MEM_IN_DT)
@@ -770,7 +770,7 @@ static int __init is_reserved_mem_setup(struct reserved_mem *rmem)
 	const __be32 *prop;
 	u64 kbase;
 	int len;
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 	rkp_dynamic_load_t rkp_dyn;
 	int ret;
 #endif
@@ -795,7 +795,7 @@ static int __init is_reserved_mem_setup(struct reserved_mem *rmem)
 
 	BUG_ON(rmem->size < LIB_SIZE);
 
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 	memcpy(&is_lib_vm_for_rkp, &is_lib_vm, sizeof(struct vm_struct));
 
 	is_lib_vm_for_rkp.addr = (void *)rounddown((u64)is_lib_vm_for_rkp.addr, SECTION_SIZE);
@@ -831,7 +831,7 @@ RESERVEDMEM_OF_DECLARE(is_lib, "exynos,is_lib", is_reserved_mem_setup);
 static int __init is_lib_mem_alloc(char *str)
 {
 	ulong addr = 0;
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 	rkp_dynamic_load_t rkp_dyn;
 	int ret;
 #endif
@@ -848,7 +848,7 @@ static int __init is_lib_mem_alloc(char *str)
 	is_lib_vm.phys_addr = memblock_alloc(LIB_SIZE, SZ_2M);
 	is_lib_vm.addr = (void *)addr;
 	is_lib_vm.size = LIB_SIZE + PAGE_SIZE;
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 	memcpy(&is_lib_vm_for_rkp, &is_lib_vm, sizeof(struct vm_struct));
 
 	is_lib_vm_for_rkp.addr = (void *)rounddown((u64)is_lib_vm_for_rkp.addr, SECTION_SIZE);
@@ -895,7 +895,7 @@ static int is_lib_mem_map(void)
 	struct page **pages;
 	pgprot_t prot;
 
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 	prot = PAGE_KERNEL_RKP_RO;
 #else
 	prot = PAGE_KERNEL;

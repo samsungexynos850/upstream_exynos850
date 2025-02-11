@@ -140,7 +140,6 @@ static int parse_dvfs_data(struct exynos_platform_is *pdata, struct device_node 
 	int i;
 	u32 temp;
 	char *pprop;
-	const char *name;
 
 	pprop = __getname();
 	if (unlikely(!pprop))
@@ -169,9 +168,6 @@ static int parse_dvfs_data(struct exynos_platform_is *pdata, struct device_node 
 
 		snprintf(pprop, PATH_MAX, "%s%s", is_dvfs_dt_arr[i].parse_scenario_nm, "hpg");
 		DT_READ_U32(np, pprop, pdata->dvfs_data[index][is_dvfs_dt_arr[i].scenario_id][IS_DVFS_HPG]);
-
-		snprintf(pprop, PATH_MAX, "%s%s", is_dvfs_dt_arr[i].parse_scenario_nm, "cpu");
-		DT_READ_STR(np, pprop, pdata->dvfs_cpu[index][is_dvfs_dt_arr[i].scenario_id]);
 	}
 	__putname(pprop);
 
@@ -189,7 +185,6 @@ static int parse_dvfs_data(struct exynos_platform_is *pdata, struct device_node 
 		probe_info("[%d][%d][MIF] = %d\n", index, i, pdata->dvfs_data[index][i][IS_DVFS_MIF]);
 		probe_info("[%d][%d][I2C] = %d\n", index, i, pdata->dvfs_data[index][i][IS_DVFS_I2C]);
 		probe_info("[%d][%d][HPG] = %d\n", index, i, pdata->dvfs_data[index][i][IS_DVFS_HPG]);
-		probe_info("[%d][%d][CPU] = %s\n", index, i, pdata->dvfs_cpu[index][i]);
 	}
 #endif
 	return 0;

@@ -66,11 +66,6 @@
 
 #include "is-vender-specific.h"
 
-#if defined(CONFIG_LEDS_SM5714)
-#include <linux/sm5714.h>
-bool fled_prepared = false;
-#endif
-
 /* Default setting values */
 #define DEFAULT_PREVIEW_STILL_WIDTH		(1280) /* sensor margin : 16 */
 #define DEFAULT_PREVIEW_STILL_HEIGHT		(720) /* sensor margin : 12 */
@@ -1831,16 +1826,6 @@ int is_ischain_power(struct is_device_ischain *device, int on)
 			merr("is_runtime_suspend_post is fail(%d)", device, ret);
 
 		set_bit(IS_ISCHAIN_LOADED, &device->state);
-
-#if defined(CONFIG_LEDS_SM5714)
-		if (core->current_position == SENSOR_POSITION_REAR
-			|| core->current_position == SENSOR_POSITION_REAR4) {
-			info("%s PREPARE_FLASH\n", __func__);
-			sm5714_fled_mode_ctrl(SM5714_FLED_MODE_PREPARE_FLASH, 0);
-			fled_prepared = true;
-		}
-#endif
-
 		set_bit(IS_ISCHAIN_POWER_ON, &device->state);
 	} else {
 		/* FIMC-IS local power down */
@@ -1856,15 +1841,6 @@ int is_ischain_power(struct is_device_ischain *device, int on)
 		ret = is_ischain_runtime_suspend(dev);
 		if (ret)
 			merr("is_runtime_suspend is fail(%d)", device, ret);
-#endif
-
-#if defined(CONFIG_LEDS_SM5714)
-		if (core->current_position == SENSOR_POSITION_REAR
-			|| core->current_position == SENSOR_POSITION_REAR4 || fled_prepared) {
-			info("%s CLOSE_FLASH\n", __func__);
-			sm5714_fled_mode_ctrl(SM5714_FLED_MODE_CLOSE_FLASH, 0);
-			fled_prepared = false;
-		}
 #endif
 
 		clear_bit(IS_ISCHAIN_POWER_ON, &device->state);

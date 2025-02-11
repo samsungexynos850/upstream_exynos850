@@ -368,8 +368,6 @@ int is_itf_stream_on_wrap(struct is_device_ischain *device)
 	hw_map = hardware->hw_map[instance];
 	group_leader = get_ischain_leader_group(device);
 
-	is_set_ddk_thread_affinity();
-
 	ret = is_hardware_sensor_start(hardware, instance, hw_map, group_leader);
 	if (ret) {
 		merr("is_hardware_stream_on is fail(%d)", device, ret);

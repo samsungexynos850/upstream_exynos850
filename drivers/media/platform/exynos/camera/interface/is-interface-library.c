@@ -28,7 +28,7 @@
 #include "../is-device-ischain.h"
 #include "is-vender.h"
 #include "votf/camerapp-votf.h"
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 #include <linux/rkp.h>
 #endif
 
@@ -1761,6 +1761,9 @@ int is_init_ddk_thread(void)
 	struct sched_param param = { .sched_priority = IS_MAX_PRIO - 1 };
 	char name[30];
 	int i, j, ret = 0;
+#ifdef SET_CPU_AFFINITY
+	u32 cpu = 0;
+#endif
 
 	struct is_lib_support *lib = &gPtr_lib_support;
 
@@ -1795,43 +1798,16 @@ int is_init_ddk_thread(void)
 					lib_task_work);
 		}
 
+		if (i != TASK_RTA) {
+#ifdef SET_CPU_AFFINITY
+			cpu = lib_get_task_affinity(i);
+			ret = set_cpus_allowed_ptr(lib->task_taaisp[i].task, cpumask_of(cpu));
+			dbg_lib(3, "%s: task(%d) affinity cpu(%d) (%d)\n", __func__, i, cpu, ret);
+#endif
+		}
 	}
 
 	return ret;
-}
-
-void is_set_ddk_thread_affinity(void)
-{
-	struct is_lib_support *lib = &gPtr_lib_support;
-	struct is_core *core;
-	struct task_struct *task;
-	int i;
-	const char *cpus;
-
-	core = (struct is_core *)platform_get_drvdata(lib->pdev);
-	cpus = core->resourcemgr.dvfs_ctrl.cur_cpus;
-
-	for (i = 0 ; i < TASK_INDEX_MAX; i++) {
-		if (i == TASK_RTA)
-			continue;
-
-		task = lib->task_taaisp[i].task;
-
-		if (!cpus) {
-			/* Legacy mode */
-			u32 cpu = lib_get_task_affinity(i);
-
-			set_cpus_allowed_ptr(task, cpumask_of(cpu));
-			dbg_lib(3, "lib_%d_worker: affinity %d\n", i, cpu);
-		} else {
-			/* DT mode */
-			struct cpumask cpumask;
-
-			cpulist_parse(cpus, &cpumask);
-			set_cpus_allowed_ptr(task, &cpumask);
-			dbg_lib(3, "lib_%d_worker: affinity %s\n", i, cpus);
-		}
-	}
 }
 
 void is_flush_ddk_thread(void)
@@ -2522,7 +2498,7 @@ int __nocfi is_load_ddk_bin(int loadType)
 	struct device *device = &gPtr_lib_support.pdev->dev;
 	/* fixup the memory attribute for every region */
 	ulong lib_addr;
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 	rkp_dynamic_load_t rkp_dyn;
 	static rkp_dynamic_load_t rkp_dyn_before = {0};
 #endif
@@ -2571,7 +2547,7 @@ int __nocfi is_load_ddk_bin(int loadType)
 #endif
 
 	if (loadType == BINARY_LOAD_ALL) {
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 		memset(&rkp_dyn, 0, sizeof(rkp_dyn));
 		rkp_dyn.binary_base = lib_addr;
 		rkp_dyn.binary_size = bin.size;
@@ -2615,7 +2591,7 @@ int __nocfi is_load_ddk_bin(int loadType)
 			goto fail;
 		}
 
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 		ret = uh_call(UH_APP_RKP, RKP_DYNAMIC_LOAD, RKP_DYN_COMMAND_INS, (u64)&rkp_dyn, 0, 0);
 		if (ret) {
 			err_lib("fail to load verify FIMC in EL2");
@@ -2755,7 +2731,7 @@ int __nocfi is_load_rta_bin(int loadType)
 	os_system_func_t os_system_funcs[100];
 	ulong lib_rta = RTA_LIB_ADDR;
 
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 	rkp_dynamic_load_t rkp_dyn;
 	static rkp_dynamic_load_t rkp_dyn_before = {0};
 #endif
@@ -2779,7 +2755,7 @@ int __nocfi is_load_rta_bin(int loadType)
 	}
 
 	if (loadType == BINARY_LOAD_ALL) {
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 		memset(&rkp_dyn, 0, sizeof(rkp_dyn));
 		rkp_dyn.binary_base = lib_rta;
 		rkp_dyn.binary_size = bin.size;
@@ -2807,7 +2783,7 @@ int __nocfi is_load_rta_bin(int loadType)
 			ret = -EBADF;
 			goto fail;
 		}
-#ifdef CONFIG_RKP
+#ifdef CONFIG_UH_RKP
 		ret = uh_call(UH_APP_RKP, RKP_DYNAMIC_LOAD, RKP_DYN_COMMAND_INS,(u64)&rkp_dyn, 0, 0);
 		if (ret) {
 			err_lib("fail to load verify FIMC in EL2");

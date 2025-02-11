@@ -86,7 +86,6 @@ struct is_dvfs_ctrl {
 	u32 dvfs_table_idx;
 	u32 dvfs_table_max;
 	ulong state;
-	const char *cur_cpus;
 
 	struct is_dvfs_scenario_ctrl *static_ctrl;
 	struct is_dvfs_scenario_ctrl *dynamic_ctrl;

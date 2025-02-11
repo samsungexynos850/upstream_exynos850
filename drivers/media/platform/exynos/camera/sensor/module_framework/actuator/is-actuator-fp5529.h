@@ -12,8 +12,6 @@
 #ifndef IS_DEVICE_FP5529_H
 #define IS_DEVICE_FP5529_H
 
-#include "is-core.h"
-
 #define FP5529_POS_SIZE_BIT		ACTUATOR_POS_SIZE_10BIT
 #define FP5529_POS_MAX_SIZE		((1 << FP5529_POS_SIZE_BIT) - 1)
 #define FP5529_POS_DIRECTION		ACTUATOR_RANGE_INF_TO_MAC
@@ -26,25 +24,16 @@ struct is_caldata_list_fp5529 {
 	u32 af_macro_position_type;
 	u32 af_macro_position_worst;
 	u32 af_default_position;
-
-/* Standard Cal uses 4 bytes as reserved */
-#ifdef USE_STANDARD_CAL_OEM_BASE
-	u8 reserved0[4];
-#else
 	u8 reserved0[12];
-#endif
 
 	u16 info_position;
 	u16 mac_position;
 	u32 equipment_info1;
 	u32 equipment_info2;
-#ifndef USE_STANDARD_CAL_OEM_BASE
 	u32 equipment_info3;
-#endif
-
-	u8 control_mode;
-	u8 prescale;
-	u8 acctime;
+	u8 control_mode; 
+	u8 prescale;	
+	u8 acctime;   
 	u8 reserved1[13];
 	u8 reserved2[16];
 

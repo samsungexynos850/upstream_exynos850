@@ -99,20 +99,6 @@
 						vc2 = <2 HW_FORMAT_UNKNOWN 0 0		/* out */ HW_FORMAT_UNKNOWN VC_NOTHING 0 0>;
 						vc3 = <3 HW_FORMAT_UNKNOWN 0 0		/* out */ HW_FORMAT_UNKNOWN VC_NOTHING 0 0>;
 					};
-					mode6 {
-						common = <1632 1224 30 0 6 CSI_DATA_LANES_4  340 CSI_MODE_VC_ONLY LRTE_DISABLE PD_NONE EX_NONE>;
-						vc0 = <0 HW_FORMAT_RAW10 1632 1224	/* out */ HW_FORMAT_RAW10 VC_NOTHING 0 0>;
-						vc1 = <1 HW_FORMAT_UNKNOWN 0 0		/* out */ HW_FORMAT_UNKNOWN VC_NOTHING 0 0>;
-						vc2 = <2 HW_FORMAT_UNKNOWN 0 0		/* out */ HW_FORMAT_UNKNOWN VC_NOTHING 0 0>;
-						vc3 = <3 HW_FORMAT_UNKNOWN 0 0		/* out */ HW_FORMAT_UNKNOWN VC_NOTHING 0 0>;
-					};
-					mode7 {
-						common = <1632 916 30 0 7 CSI_DATA_LANES_4  340 CSI_MODE_VC_ONLY LRTE_DISABLE PD_NONE EX_NONE>;
-						vc0 = <0 HW_FORMAT_RAW10 1632 916	/* out */ HW_FORMAT_RAW10 VC_NOTHING 0 0>;
-						vc1 = <1 HW_FORMAT_UNKNOWN 0 0		/* out */ HW_FORMAT_UNKNOWN VC_NOTHING 0 0>;
-						vc2 = <2 HW_FORMAT_UNKNOWN 0 0		/* out */ HW_FORMAT_UNKNOWN VC_NOTHING 0 0>;
-						vc3 = <3 HW_FORMAT_UNKNOWN 0 0		/* out */ HW_FORMAT_UNKNOWN VC_NOTHING 0 0>;
-					};
 				};
 
 				power_seq {
@@ -130,8 +116,8 @@
 						30 { pname = "S2MPB03_VLDO5"; pin = <PIN_REGULATOR 1 0>; }; /* RCAM3_AVDD_2P8 */
 						40 { pname = "S2MPB03_VLDO4"; pin = <PIN_REGULATOR 1 0>; }; /* RCAM3_DVDD_1P2 */
 						50 { pname = "mipi_sel1"; pin = <PIN_OUTPUT 0 1000>; gpio = <&gpg2 5 0x1>; }; /* MIPI Select 1 : RCAM3 & FRONT  */
-						60 { pname = MCLK_FUNC; pin = <PIN_FUNCTION 2 2000>; };
-						70 { pname = MCLK_GPIO; pin = <PIN_MCLK 1 0>; };
+						60 { pname = MCLK_FUNC;	pin = <PIN_FUNCTION 2 2000>; };
+						70 { pname = MCLK_GPIO;	pin = <PIN_MCLK 1 0>; };
 						80 { pname = SEN_RST_HIGH; pin = <PIN_OUTPUT 1 1000>; gpio = <&gpa3 1 0x1>; };
 						90 { pname = I2C_ON; pin = <PIN_I2C 1 2000>; };
 					};
@@ -146,8 +132,8 @@
 						20 { pname = SEN_RST_LOW; pin = <PIN_OUTPUT 0 0>; gpio = <&gpa3 1 0x1>; };
 						30 { pname = I2C_OFF; pin = <PIN_I2C 0 0>; };
 						40 { pname = MCLK_GPIO; pin = <PIN_MCLK 0 0>; };
-						50 { pname = MCLK_FUNC; pin = <PIN_FUNCTION 0 0>; };
-						60 { pname = DELAY; pin = <PIN_NONE 0 500>; };
+						50 { pname = MCLK_FUNC;	pin = <PIN_FUNCTION 0 0>; };
+						60 { pname = DELAY;	pin = <PIN_NONE 0 500>; };
 						70 { pname = "S2MPB03_VLDO4"; pin = <PIN_REGULATOR 1 500>; }; /* RCAM3_DVDD_1P2 */
 						80 { pname = "S2MPB03_VLDO5"; pin = <PIN_REGULATOR 0 500>; };  /* RCAM3_AVDD_2P8 */
 						90 { pname = "S2MPB03_VLDO3"; pin = <PIN_REGULATOR 0 500>; }; /* CAM_VDDIO_1P8 */
@@ -177,11 +163,11 @@
 						20 { pname = "S2MPB03_VLDO3"; pin = <PIN_REGULATOR 1 0>; }; /* CAM_VDDIO_1P8 */
 						30 { pname = "S2MPB03_VLDO5"; pin = <PIN_REGULATOR 1 0>; }; /* RCAM3_AVDD_2P8 */
 						40 { pname = "S2MPB03_VLDO4"; pin = <PIN_REGULATOR 1 0>; }; /* RCAM3_DVDD_1P2 */
-						50 { pname = "mipi_sel1"; pin = <PIN_OUTPUT 0 1000>; gpio = <&gpg2 5 0x1>; }; /* MIPI Select 1 : RCAM3 & FRONT  */
-						60 { pname = MCLK_FUNC; pin = <PIN_FUNCTION 2 2000>; };
-						70 { pname = MCLK_GPIO; pin = <PIN_MCLK 1 0>; };
+						50 { pname = "mipi_sel1"; 		pin = <PIN_OUTPUT 0 1000>; 		 gpio = <&gpg2 5 0x1>; }; /* MIPI Select 1 : RCAM3 & FRONT  */
+						60 { pname = MCLK_FUNC;	pin = <PIN_FUNCTION 2 2000>; };
+						70 { pname = MCLK_GPIO;	pin = <PIN_MCLK 1 0>; };
 						80 { pname = SEN_RST_HIGH; pin = <PIN_OUTPUT 1 1000>; gpio = <&gpa3 1 0x1>; };
-						90 { pname = I2C_ON; pin = <PIN_I2C 1 2000>; };
+						90 { pname = I2C_ON; pin = <PIN_I2C 1 2000>; };						
 						100 { pname = DELAY; pin = <PIN_NONE 0 2000>; };
 					};
 
@@ -195,8 +181,8 @@
 						20 { pname = SEN_RST_LOW; pin = <PIN_OUTPUT 0 0>; gpio = <&gpa3 1 0x1>; };
 						30 { pname = I2C_OFF; pin = <PIN_I2C 0 0>; };
 						40 { pname = MCLK_GPIO; pin = <PIN_MCLK 0 0>; };
-						50 { pname = MCLK_FUNC; pin = <PIN_FUNCTION 0 0>; };
-						60 { pname = DELAY; pin = <PIN_NONE 0 500>; };
+						50 { pname = MCLK_FUNC;	pin = <PIN_FUNCTION 0 0>; };
+						60 { pname = DELAY;	pin = <PIN_NONE 0 500>; };
 						70 { pname = "S2MPB03_VLDO4"; pin = <PIN_REGULATOR 1 500>; }; /* RCAM3_DVDD_1P2 */
 						80 { pname = "S2MPB03_VLDO5"; pin = <PIN_REGULATOR 0 500>; };  /* RCAM3_AVDD_2P8 */
 						90 { pname = "S2MPB03_VLDO3"; pin = <PIN_REGULATOR 0 500>; }; /* CAM_VDDIO_1P8 */

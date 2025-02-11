@@ -13,6 +13,20 @@
 #define UW_SHADING_CHECKSUM_LEN    (0x1C4F - 0x0260 + 0x1)
 #define UW_AE_CHECKSUM_LEN         (0x1CCF - 0x1C70 + 0x1)
 
+struct rom_ae_cal_data uw_4ha_sr846_ae_cal_info = {
+	.rom_header_main_ae_start_addr  = 0x28,
+	.rom_header_main_ae_end_addr    = 0x2C,
+	.rom_ae_module_info_start_addr  = 0x1CD0,
+	.rom_ae_checksum_addr           = 0x1CEC,
+	.rom_ae_checksum_len            = UW_AE_CHECKSUM_LEN,
+};
+
+const struct rom_extend_cal_addr uw_4ha_sr846_extend_cal_addr = {
+	.name = EXTEND_AE_CAL,
+	.data = &uw_4ha_sr846_ae_cal_info,
+	.next = NULL,
+};
+
 const struct is_vender_rom_addr uw_4ha_sr846_cal_addr = {
 	/* Set '-1' if not used */
 

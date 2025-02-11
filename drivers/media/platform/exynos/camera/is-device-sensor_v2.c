@@ -2834,17 +2834,23 @@ p_err:
 int is_sensor_s_ext_ctrls(struct is_device_sensor *device,
 	struct v4l2_ext_controls *ctrls)
 {
-	int ret;
-	struct v4l2_subdev *subdev_module = device->subdev_module;
+	int ret = 0;
+	struct v4l2_subdev *subdev_module;
 
-	FIMC_BUG(!subdev_module);
+	WARN_ON(!device);
+	WARN_ON(!device->subdev_module);
+	WARN_ON(!device->subdev_csi);
+	WARN_ON(!ctrls);
+
+	subdev_module = device->subdev_module;
 
 	ret = v4l2_subdev_call(subdev_module, core, s_ext_ctrls, ctrls);
 	if (ret) {
 		err("s_ext_ctrls is fail(%d)", ret);
-		return ret;
+		goto p_err;
 	}
 
+p_err:
 	return ret;
 }
 

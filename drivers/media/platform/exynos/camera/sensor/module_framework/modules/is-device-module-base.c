@@ -37,7 +37,6 @@
 #include "is-dt.h"
 #include "is-device-module-base.h"
 #include "interface/is-interface-library.h"
-#include "is-vendor-config.h"
 #if defined(CONFIG_CAMERA_PAFSTAT)
 #include "pafstat/is-pafstat.h"
 #endif
@@ -1007,16 +1006,7 @@ int sensor_module_s_ext_ctrls(struct v4l2_subdev *subdev, struct v4l2_ext_contro
 #ifdef CONFIG_VENDER_MCD_V2
 		char *remosaic_cal = NULL;
 		int remosaic_cal_size = 0;
-#ifdef JN1_MODIFY_REMOSAIC_CAL_ORDER
-		if(device->position == SENSOR_POSITION_REAR)
-		{
-			ret = is_get_jn1_remosaic_cal_buf(device->position, &remosaic_cal, &remosaic_cal_size);
-		}
-		else
-#endif
-		{
-			ret = is_get_remosaic_cal_buf(device->position, &remosaic_cal, &remosaic_cal_size);
-		}
+		ret = is_get_remosaic_cal_buf(device->position, &remosaic_cal, &remosaic_cal_size);
 		if (ret == 0) {
 			info("remosaic cal[%d] : size(%d)", device->position, remosaic_cal_size);
 			ret = copy_to_user(ext_ctrl->ptr, remosaic_cal, remosaic_cal_size);

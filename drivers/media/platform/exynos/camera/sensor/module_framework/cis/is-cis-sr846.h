@@ -48,7 +48,7 @@
 
 #define SENSOR_SR846_DEBUG_INFO (1)
 #define USE_GROUP_PARAM_HOLD (0)
-#define SENSOR_SR846_OTP_READ (0)
+#define SENSOR_SR846_OTP_READ (1)
 
 #endif
 

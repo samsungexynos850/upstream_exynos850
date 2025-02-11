@@ -1054,13 +1054,15 @@ static int is_subdev_internal_alloc_buffer(struct is_subdev *subdev,
 	u32 buffer_size; /* single buffer */
 	u32 total_size; /* multi-buffer for FRO */
 	struct is_frame *frame;
+	struct is_device_ischain *device;
 	u32 batch_num;
 
 	FIMC_BUG(!subdev);
 
+	device = GET_DEVICE(subdev->vctx);
 	if (subdev->buffer_num > SUBDEV_INTERNAL_BUF_MAX || subdev->buffer_num <= 0) {
-		mserr("invalid internal buffer num size(%d)",
-			subdev, subdev, subdev->buffer_num);
+		merr("invalid internal buffer num size(%d)",
+			device, subdev->buffer_num);
 		return -EINVAL;
 	}
 
@@ -1068,8 +1070,8 @@ static int is_subdev_internal_alloc_buffer(struct is_subdev *subdev,
 				* subdev->bytes_per_pixel;
 
 	if (buffer_size <= 0) {
-		mserr("wrong internal subdev buffer size(%d)",
-					subdev, subdev, buffer_size);
+		merr("wrong internal subdev buffer size(%d)",
+					device, buffer_size);
 		return -EINVAL;
 	}
 
@@ -1079,9 +1081,8 @@ static int is_subdev_internal_alloc_buffer(struct is_subdev *subdev,
 	for (i = 0; i < subdev->buffer_num; i++) {
 		subdev->pb_subdev[i] = CALL_PTR_MEMOP(mem, alloc, mem->default_ctx, total_size, NULL, 0);
 		if (IS_ERR_OR_NULL(subdev->pb_subdev[i])) {
-			mserr("failed to allocate buffer for internal subdev",
-							subdev, subdev);
-			subdev->pb_subdev[i] = NULL;
+			merr("failed to allocate buffer for internal subdev",
+							device);
 			ret = -ENOMEM;
 			goto err_allocate_pb_subdev;
 		}
@@ -1089,7 +1090,7 @@ static int is_subdev_internal_alloc_buffer(struct is_subdev *subdev,
 
 	ret = frame_manager_open(&subdev->internal_framemgr, subdev->buffer_num);
 	if (ret) {
-		mserr("is_frame_open is fail(%d)", subdev, subdev, ret);
+		merr("is_frame_open is fail(%d)", device, ret);
 		ret = -EINVAL;
 		goto err_open_framemgr;
 	}
@@ -1147,10 +1148,8 @@ static int is_subdev_internal_alloc_buffer(struct is_subdev *subdev,
 
 err_open_framemgr:
 err_allocate_pb_subdev:
-	while (i-- > 0) {
-		if (subdev->pb_subdev[i])
-			CALL_VOID_BUFOP(subdev->pb_subdev[i], free, subdev->pb_subdev[i]);
-	}
+	while (i-- > 0)
+		CALL_VOID_BUFOP(subdev->pb_subdev[i], free, subdev->pb_subdev[i]);
 
 	return ret;
 };

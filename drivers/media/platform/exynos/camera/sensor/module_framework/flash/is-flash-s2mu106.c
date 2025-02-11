@@ -196,8 +196,6 @@ static int __init flash_s2mu106_probe(struct device *dev, struct i2c_client *cli
 	FIMC_BUG(!is_dev);
 	FIMC_BUG(!dev);
 
-	probe_info("%s start\n", __func__);
-
 	dnode = dev->of_node;
 
 	core = (struct is_core *)dev_get_drvdata(is_dev);
@@ -263,11 +261,7 @@ static int __init flash_s2mu106_probe(struct device *dev, struct i2c_client *cli
 			gpio_free(flash[i].flash_gpio);
 		}
 
-		flash[i].torch_gpio = of_get_named_gpio(dnode, "flash-set-gpio", 0);
-		
-		if(!gpio_is_valid(flash[i].torch_gpio))
-			flash[i].torch_gpio = of_get_named_gpio(dnode, "torch-gpio", 0);
-		
+		flash[i].torch_gpio = of_get_named_gpio(dnode, "torch-gpio", 0);
 		if (!gpio_is_valid(flash[i].torch_gpio)) {
 			dev_err(dev, "failed to get PIN_RESET\n");
 			kfree(flash);

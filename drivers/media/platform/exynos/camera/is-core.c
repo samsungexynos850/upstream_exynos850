@@ -158,16 +158,6 @@ static struct notifier_block exynos_is_mif_throttling_nb = {
 
 static int is_suspend(struct device *dev)
 {
-	struct pinctrl *pinctrl_cam = NULL;
-	pr_info("%s(%s)\n", __func__,dev_driver_string(dev));
-
-	pinctrl_cam = devm_pinctrl_get_select(dev, "sleep");
-	if (IS_ERR_OR_NULL(pinctrl_cam)) {
-		printk(KERN_ERR "%s: Failed to configure pin\n", __func__);
-	} else {
-		devm_pinctrl_put(pinctrl_cam);
-	}
-
 	pr_debug("FIMC_IS Suspend\n");
 	return 0;
 }

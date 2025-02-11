@@ -66,17 +66,3 @@ config CAMERA_FLASH_KTD2692_OBJ
         default n
         help
           Use to build KTD2692 driver.
-
-config CAMERA_FLASH_SM5714_OBJ
-        bool "Use SM5714"
-	depends on CAMERA_FLASH_SELECT
-        default n
-        help
-          Use to build SM5714 driver.
-
-config CAMERA_FLASH_AW36518_OBJ
-        bool "Use AW36518"
-        depends on CAMERA_FLASH_SELECT
-        default n
-        help
-          Use to build AW36518 driver.

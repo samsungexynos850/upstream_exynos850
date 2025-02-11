@@ -14,11 +14,8 @@
 #ifndef USE_VENDOR_PWR_PIN_NAME
 #define GC02M1_IOVDD	<>
 #define GC02M1_AVDD	<>
-#define GC02M1_DVDD	<>
 
 #define GC02M1_MACRO_IOVDD	<>
-#define GC02M1_MACRO_AVDD	<>
-#define GC02M1_MACRO_DVDD	<>
 #endif
 
 / {
@@ -46,8 +43,7 @@
 
 				gc02m1_iovdd-supply = GC02M1_IOVDD;
 				gc02m1_avdd-supply = GC02M1_AVDD;
-				gc02m1_dvdd-supply = GC02M1_DVDD;
-
+				
 				status = "okay";
 
 				/* sensor modes */
@@ -127,7 +123,6 @@
 				};
 			};
 
-#ifndef GC02M1_MACRO_NOT_USED
 			is_sensor_gc02m1_macro: is_sensor_gc02m1_macro@A4 {
 				compatible = "samsung,sensor-module";
 
@@ -146,9 +141,7 @@
 				sensor_name = "GC02M1";
 				setfile_name = "setfile_gc02m1_macro.bin";
 
-				gc02m1_macro_iovdd-supply = GC02M1_MACRO_IOVDD;
-				gc02m1_macro_avdd-supply = GC02M1_MACRO_AVDD;
-				gc02m1_macro_dvdd-supply = GC02M1_MACRO_DVDD;
+				gc02m1_macro_iovdd-supply = GC02M1_IOVDD;
 
 				status = "okay";
 
@@ -228,7 +221,7 @@
 					};
 				};
 			};
-#endif
+
 		}; /* end of __overlay__ */
 	}; /* end of fragment */
 }; /* end of root */

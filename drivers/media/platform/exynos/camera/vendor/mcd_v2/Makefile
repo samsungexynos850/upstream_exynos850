@@ -1,5 +1,4 @@
 obj-$(CONFIG_VENDER_MCD_V2) :=	is-vender.o \
-							is-vender-caminfo.o \
 							is-sec-define.o \
 							crc32.o \
 							is-sysfs.o \

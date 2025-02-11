@@ -68,7 +68,6 @@
 #define FW_ISP_COMPANY_STE		'S'
 #define FW_ISP_COMPANY_TI		'T'
 #define FW_ISP_COMPANY_DMC		'D'
-#define FW_ISP_COMPANY_LSI_STANDARD_CAL		'E'
 
 #define FW_SENSOR_MAKER_SF		'F'
 #define FW_SENSOR_MAKER_SLSI		'L'
@@ -123,7 +122,6 @@
 #define IS_2X5_SETF			"setfile_2x5.bin"
 #define IS_GM2_SETF			"setfile_gm2.bin"
 #define IS_GW1_SETF			"setfile_gw1.bin"
-#define IS_JN1_SETF			"setfile_jn1.bin"
 
 #define IS_IMX258_SETF			"setfile_imx258.bin"
 #define IS_IMX576_SETF			"setfile_imx576.bin"
@@ -132,7 +130,6 @@
 #define IS_IMX586_SETF			"setfile_imx586.bin"
 #define IS_IMX616_SETF			"setfile_imx616.bin"
 #define IS_IMX686_SETF			"setfile_imx686.bin"
-#define IS_IMX355_SETF			"setfile_imx355.bin"
 
 #define IS_SR556_SETF			"setfile_sr556.bin"
 #define IS_SR846_SETF			"setfile_sr846.bin"
@@ -141,14 +138,8 @@
 #define IS_GC5035_SETF			"setfile_gc5035.bin"
 #define IS_GC5035_MACRO_SETF		"setfile_gc5035_macro.bin"
 #define IS_HI1336_SETF			"setfile_hi1336.bin"
-#define IS_HI556_SETF			"setfile_hi556.bin"
 #define IS_GC02M1_SETF			"setfile_gc02m1.bin"
 #define IS_GC02M1_MACRO_SETF		"setfile_gc02m1_macro.bin"
-#define IS_GC02M2_MACRO_SETF		"setfile_gc02m2_macro.bin"
-#define IS_SC201_SETF			"setfile_sc201.bin"
-#define IS_SC201_MACRO_SETF		"setfile_sc201_macro.bin"
-#define IS_GC08A3_SETF			"setfile_gc08a3.bin"
-#define IS_SC501_SETF			"setfile_sc501.bin"
 
 #define IS_CAL_SDCARD_FRONT		"/data/cal_data_front.bin"
 #define IS_FW_FROM_SDCARD			"/data/media/0/CamFW_Main.bin"
@@ -241,10 +232,6 @@ struct is_rom_info {
 	char		ae_cal_ver[IS_AE_CAL_VER_SIZE+1];
 #endif
 
-	u32		standard_cal_section_crc_addr;
-	u32		standard_cal_start_addr;
-	u32		standard_cal_end_addr;
-
 	unsigned long		fw_size;
 	unsigned long		setfile_size;
 	u8		sensor_version;
@@ -254,6 +241,7 @@ struct is_rom_info {
 	char		load_rta_fw_name[50]; 	/* RTA */
 #endif
 	char		load_setfile_name[50];
+
 };
 
 bool is_sec_get_force_caldata_dump(void);
@@ -261,7 +249,6 @@ int is_sec_set_force_caldata_dump(bool fcd);
 
 int is_sec_get_max_cal_size(struct is_core *core, int position);
 int is_sec_get_cal_buf(int position, char **buf);
-int is_sec_get_cal_buf_rom_data(int position, char **buf);
 int is_sec_get_sysfs_finfo_by_position(int position, struct is_rom_info **finfo);
 int is_sec_get_sysfs_finfo(struct is_rom_info **finfo);
 int is_sec_get_sysfs_finfo_front(struct is_rom_info **finfo);
@@ -290,13 +277,6 @@ bool is_sec_check_rom_ver(struct is_core *core, int position);
 bool is_sec_check_fw_crc32(char *buf, u32 checksum_seed, unsigned long size);
 bool is_sec_check_cal_crc32(char *buf, int id);
 void is_sec_make_crc32_table(u32 *table, u32 id);
-bool is_sec_check_awb_lsc_crc32_post_sec2lsi(char* buf, int position, int awb_length, int lsc_length);
-bool is_sec_readcal_dump_post_sec2lsi(struct is_core *core, char *buf, int position);
-#ifdef USES_STANDARD_CAL_RELOAD
-bool is_sec_sec2lsi_check_cal_reload(void);
-bool is_sec_reload_cal(struct is_core *core, int position);
-#endif
-int is_sec_readcal_otprom_buffer(char * buf, int position);
 
 int is_sec_ldo_enable(struct device *dev, char *name, bool on);
 int is_sec_rom_power_on(struct is_core *core, int position);
@@ -306,9 +286,6 @@ int is_sec_get_pixel_size(char *header_ver);
 int is_sec_core_voltage_select(struct device *dev, char *header_ver);
 int is_get_dual_cal_buf(int slave_position, char **buf, int *size);
 int is_get_remosaic_cal_buf(int slave_position, char **buf, int *size);
-#ifdef JN1_MODIFY_REMOSAIC_CAL_ORDER
-int is_get_jn1_remosaic_cal_buf(int slave_position, char **buf, int *size);
-#endif
 
 void remove_dump_fw_file(void);
 #endif /* IS_SEC_DEFINE_H */
