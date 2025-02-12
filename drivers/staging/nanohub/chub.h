@@ -163,7 +163,6 @@ struct contexthub_baaw_info {
 	unsigned int baaw_p_apm_chub_remap;
 };
 
-#define CONTEXTHUB_IPC_INFO_LEGACY
 #define CHUB_IRQ_PIN_MAX (5)
 struct contexthub_ipc_info {
 	u32 cur_err;
@@ -335,7 +334,7 @@ int contexthub_get_sensortype(struct contexthub_ipc_info *ipc, char *buf);
 void contexthub_print_rtlog(struct contexthub_ipc_info *ipc, bool loop);
 void contexthub_handle_debug(struct contexthub_ipc_info *ipc, enum chub_err_type err);
 
-#ifdef CONFIG_SHUB
+#ifdef CONFIG_SENSORS_SSP
 int contexthub_get_token(struct contexthub_ipc_info *ipc);
 void contexthub_put_token(struct contexthub_ipc_info *ipc);
 #endif
