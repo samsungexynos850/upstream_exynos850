@@ -190,3 +190,18 @@ config EXYNOS_DECON_LCD_NT36672C_TIANMA_A14
 	depends on EXYNOS_DECON_LCD
 	tristate "NT36672C_TIANMA_A14 LCD driver"
 
+config EXYNOS_DECON_LCD_EA8076_A21S
+    depends on EXYNOS_DECON_LCD
+    tristate "EA8076_A21S LCD driver"
+
+config EXYNOS_DECON_LCD_TD4150_A21S
+    depends on EXYNOS_DECON_LCD
+    tristate "TD4150_A21S LCD driver"
+
+config EXYNOS_DECON_LCD_HX83104_A21S
+    depends on EXYNOS_DECON_LCD
+    tristate "HX83104_A21S LCD driver"
+
+config EXYNOS_DECON_LCD_NT36575_A21S
+    depends on EXYNOS_DECON_LCD
+    tristate "NT36575_A21S LCD driver"
