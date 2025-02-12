@@ -9,10 +9,6 @@ dtbo-y += exynos/exynos3830-universal3830_r02.dtbo
 dtbo-y += exynos/exynos3830-universal3830_r03.dtbo
 dtb-y  += exynos/exynos3830.dtb
 
-# Galaxy A13
-dtbo-y += samsung/a13/a13_eur_open_w00_r00.dtbo
-dtbo-y += samsung/a13/a13_eur_open_w00_r06.dtbo
-
 # Galaxy A21s
 dtbo-y += samsung/a21s/a21s_eur_open_w00_r00.dtbo
 dtbo-y += samsung/a21s/a21s_eur_open_w00_r03.dtbo
