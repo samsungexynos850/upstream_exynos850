@@ -17,9 +17,6 @@
 #include "abox.h"
 #include "abox_dma.h"
 #include <sound/smart_amp.h>
-#if IS_ENABLED(CONFIG_SND_SOC_APS_ALGO)
-#include <sound/ff_prot_spk.h>
-#endif
 
 #define TIMEOUT_MS 130
 #define READ_WRITE_ALL_PARAM 0
@@ -46,10 +43,6 @@ int dsm_offset;
 #ifdef SMART_AMP
 struct ti_smartpa_data *ti_smartpa_rd_data;
 struct ti_smartpa_data ti_smartpa_rd_data_tmp;
-#endif
-#ifdef FF_PROT_SPK
-struct ff_prot_spk_data *ff_prot_spk_rd_data;
-struct ff_prot_spk_data ff_prot_spk_rd_data_tmp;
 #endif
 #if 0
 int maxim_dsm_read(int offset, int size, void *dsm_data)
@@ -189,11 +182,7 @@ int ti_smartpa_write(void *prm_data, int offset, int size)
 		, sizeof(erap_msg->param.raw)));
 
 	dbg_abox_adaptation("");
-#if 1 /* ToDo : TI AMP firmware don't send acknowledge about write IPC */
-	abox_ipc_irq_write_avail = true;
-#else
 	abox_ipc_irq_write_avail = false;
-#endif
 
 	if(!dma_data)
 	{
@@ -216,95 +205,6 @@ int ti_smartpa_write(void *prm_data, int offset, int size)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(ti_smartpa_write);
-#endif /* SMART_AMP */
-
-#ifdef FF_PROT_SPK
-int ff_prot_spk_read(void *prm_data, int offset, int size)
-{
-	ABOX_IPC_MSG msg;
-	int ret = 0;
-	struct IPC_ERAP_MSG *erap_msg = &msg.msg.erap;
-
-	ff_prot_spk_rd_data = (struct ff_prot_spk_data *)prm_data;
-
-	msg.ipcid = IPC_ERAP;
-	erap_msg->msgtype = REALTIME_EXTRA;
-	erap_msg->param.raw.params[0] = IRON_DEVICE_VENDOR_ID;
-	erap_msg->param.raw.params[1] = RD_DATA;
-	erap_msg->param.raw.params[2] = offset;
-	erap_msg->param.raw.params[3] = size;
-
-	dbg_abox_adaptation("");
-	abox_ipc_irq_read_avail = false;
-
-	if (!dma_data) {
-		pr_err("[Iron Device-APS:%s] dma_data is NULL", __func__);
-		return ret;
-	}
-
-	ret = abox_request_ipc(dma_data->dev_abox, IPC_ERAP,
-					 &msg, sizeof(msg), 0, 0);
-	if (ret) {
-		pr_err("%s: abox_request_ipc is failed: %d\n", __func__, ret);
-		return ret;
-	}
-
-	ret = wait_event_interruptible_timeout(wq_read,
-		abox_ipc_irq_read_avail != false, msecs_to_jiffies(TIMEOUT_MS));
-	if (!ret) {
-		pr_err("%s: wait_event timeout\n", __func__);
-	} else if (ret < 0) {
-		pr_err("%s: wait_event err(%d)\n", __func__, ret);
-	} else {
-		memcpy(&ff_prot_spk_rd_data->payload[0],
-				&ff_prot_spk_rd_data_tmp.payload[0], size);
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(ff_prot_spk_read);
-
-int ff_prot_spk_write(void *prm_data, int offset, int size)
-{
-	ABOX_IPC_MSG msg;
-	int ret = 0;
-	struct IPC_ERAP_MSG *erap_msg = &msg.msg.erap;
-
-	msg.ipcid = IPC_ERAP;
-	erap_msg->msgtype = REALTIME_EXTRA;
-	erap_msg->param.raw.params[0] = IRON_DEVICE_VENDOR_ID;
-	erap_msg->param.raw.params[1] = WR_DATA;
-	erap_msg->param.raw.params[2] = offset;
-	erap_msg->param.raw.params[3] = size;
-
-	memcpy(&erap_msg->param.raw.params[4],
-		prm_data,
-		min((sizeof(uint32_t) * size)
-		, sizeof(erap_msg->param.raw)));
-
-	dbg_abox_adaptation("");
-	abox_ipc_irq_write_avail = false;
-
-	if (!dma_data) {
-		pr_err("[ID-APS:%s] dma_data is NULL", __func__);
-		return ret;
-	}
-
-	ret = abox_request_ipc(dma_data->dev_abox, IPC_ERAP,
-			&msg, sizeof(msg), 0, 0);
-	if (ret) {
-		pr_err("%s: abox_request_ipc is failed: %d\n", __func__, ret);
-		return ret;
-	}
-
-	ret = wait_event_interruptible_timeout(wq_write,
-		abox_ipc_irq_write_avail != false, msecs_to_jiffies(TIMEOUT_MS));
-	if (!ret)
-		pr_err("%s: wait_event timeout\n", __func__);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(ff_prot_spk_write);
 #endif
 
 static irqreturn_t abox_adaptation_irq_handler(int irq,
@@ -329,45 +229,15 @@ static irqreturn_t abox_adaptation_irq_handler(int irq,
 				if(erap_msg->param.raw.params[1] == RD_DATA) {
 					memcpy(&ti_smartpa_rd_data_tmp.payload[0], &erap_msg->param.raw.params[4],
 						min(sizeof(struct ti_smartpa_data), sizeof(erap_msg->param.raw)));
-					abox_ipc_irq_read_avail = true;
-					dbg_abox_adaptation("read_avail after parital read[%d]",
-							abox_ipc_irq_read_avail);
 					if (abox_ipc_irq_read_avail && waitqueue_active(&wq_read))
 						wake_up_interruptible(&wq_read);
 				}
 				else if(erap_msg->param.raw.params[1] == WR_DATA) {
-					abox_ipc_irq_write_avail = true;
-					dbg_abox_adaptation("write_avail after parital read[%d]",
-							abox_ipc_irq_write_avail);
 					if (abox_ipc_irq_write_avail && waitqueue_active(&wq_write))
 						wake_up_interruptible(&wq_write);
 				}
 				else {
 					pr_err("[TI-SmartPA] %s: Invalid callback, %d", __func__,
-						erap_msg->param.raw.params[1]);
-				}
-			}
-			ret = IRQ_HANDLED;
-#endif
-#ifdef FF_PROT_SPK
-			if (erap_msg->param.raw.params[0] == IRON_DEVICE_VENDOR_ID) {
-				if (erap_msg->param.raw.params[1] == RD_DATA) {
-					memcpy(&ff_prot_spk_rd_data_tmp.payload[0], &erap_msg->param.raw.params[4],
-						min(sizeof(struct ff_prot_spk_data), sizeof(erap_msg->param.raw)));
-					abox_ipc_irq_read_avail = true;
-					dbg_abox_adaptation("read_avail after parital read[%d]",
-							abox_ipc_irq_read_avail);
-
-					if (abox_ipc_irq_read_avail && waitqueue_active(&wq_read))
-						wake_up_interruptible(&wq_read);
-				} else if (erap_msg->param.raw.params[1] == WR_DATA) {
-					abox_ipc_irq_write_avail = true;
-					dbg_abox_adaptation("write_avail after parital read[%d]",
-							abox_ipc_irq_write_avail);
-					if (abox_ipc_irq_write_avail && waitqueue_active(&wq_write))
-						wake_up_interruptible(&wq_write);
-				} else {
-					pr_err("[Iron Device-APS] %s: Invalid callback, %d", __func__,
 						erap_msg->param.raw.params[1]);
 				}
 			}

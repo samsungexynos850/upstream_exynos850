@@ -52,7 +52,7 @@ config SND_SOC_SAMSUNG_ABOX_DRAM_SIZE
 	depends on SND_SOC_SAMSUNG_ABOX
 	default 0x1200000 if SND_SOC_SAMSUNG_ABOX_V1
 	default 0x1A00000 if SND_SOC_SAMSUNG_ABOX_V2
-	default 0x1400000 if SND_SOC_SAMSUNG_ABOX_V3
+	default 0x1200000 if SND_SOC_SAMSUNG_ABOX_V3
 
 config SEC_SND_ADAPTATION
 	tristate "Samsung ABOX Adaptation for Audio"
@@ -61,16 +61,3 @@ config SEC_SND_ADAPTATION
 	  Say Y or M if you want to add support for external devices attached to
 	  the Samsung SoC ABOX interface. You will also need to
 	  select the audio interfaces to support below.
-
-config SND_SOC_ABOX_NOCP
-	tristate "vss disable"
-	depends on SND_SOC_SAMSUNG_ABOX
-
-config SND_SOC_SAMSUNG_ABOX_CHANGE_RMEM_SIZE
-	tristate "Release some reserved memory"
-	depends on SND_SOC_SAMSUNG_ABOX
-	depends on SND_SOC_SAMSUNG_AUDIO
-	default n
-	help
-	  change reserved memory size for abox_dbg or abox_slog
-	  check debug_level or force_upload before alloc reserved memory and change the size.

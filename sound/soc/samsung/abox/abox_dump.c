@@ -18,9 +18,8 @@
 
 #include "abox_util.h"
 #include "abox.h"
-#include "abox_proc.h"
+#include "abox_dbg.h"
 #include "abox_log.h"
-#include "abox_dump.h"
 
 #define NAME_LENGTH (SZ_32)
 
@@ -38,7 +37,7 @@ struct abox_dump_info {
 	size_t pointer;
 	bool started;
 
-	struct proc_dir_entry *file;
+	struct dentry *file;
 	bool file_started;
 	size_t file_pointer;
 	wait_queue_head_t file_waitqueue;
@@ -50,7 +49,7 @@ struct abox_dump_info {
 	struct work_struct auto_work;
 };
 
-static struct proc_dir_entry *dir_dump;
+static struct dentry *dir_dump;
 static struct device *abox_dump_dev_abox;
 static LIST_HEAD(abox_dump_list_head);
 static DEFINE_SPINLOCK(abox_dump_lock);
@@ -138,11 +137,11 @@ static ssize_t abox_dump_auto_write(struct file *file, const char __user *data,
 	dev_dbg(abox_dump_dev_abox, "%s(%zu, %lld, %d)\n", __func__, count,
 			*ppos, enable);
 
-	p_buffer = buffer = kzalloc(sz_buffer, GFP_KERNEL);
+	p_buffer = buffer = kmalloc(sz_buffer, GFP_KERNEL);
 	if (!buffer)
 		return -ENOMEM;
 
-	ret = simple_write_to_buffer(buffer, sz_buffer - 1, ppos, data, count);
+	ret = simple_write_to_buffer(buffer, sz_buffer, ppos, data, count);
 	if (ret < 0)
 		goto err;
 
@@ -318,7 +317,7 @@ static ssize_t abox_dump_file_read(struct file *file, char __user *data,
 
 static int abox_dump_file_open(struct inode *i, struct file *f)
 {
-	struct abox_dump_info *info = abox_dump_get_data(f);
+	struct abox_dump_info *info = i->i_private;
 	struct device *dev = info->dev;
 
 	dev_dbg(dev, "%s\n", __func__);
@@ -327,7 +326,7 @@ static int abox_dump_file_open(struct inode *i, struct file *f)
 
 	f->private_data = info;
 	info->file_started = true;
-	info->pointer = info->file_pointer = 0;
+	info->file_pointer = 0;
 	abox_dump_request_dump(info->id);
 
 	return 0;
@@ -335,7 +334,7 @@ static int abox_dump_file_open(struct inode *i, struct file *f)
 
 static int abox_dump_file_release(struct inode *i, struct file *f)
 {
-	struct abox_dump_info *info = f->private_data;
+	struct abox_dump_info *info = i->i_private;
 	struct device *dev = info->dev;
 
 	dev_dbg(dev, "%s\n", __func__);
@@ -612,20 +611,15 @@ static struct snd_soc_card abox_dump_card = {
 	.num_links = 0,
 };
 
-struct proc_dir_entry *abox_dump_register_file(const char *name, void *data,
+struct dentry *abox_dump_register_file(const char *name, void *data,
 		const struct file_operations *fops)
 {
-	return abox_proc_create_file(name, 0664, dir_dump, fops, data, 0);
+	return debugfs_create_file(name, 0664, dir_dump, data, fops);
 }
 
-void abox_dump_unregister_file(struct proc_dir_entry *file)
+void abox_dump_unregister_file(struct dentry *file)
 {
-	abox_proc_remove_file(file);
-}
-
-void *abox_dump_get_data(const struct file *file)
-{
-	return abox_proc_data(file);
+	debugfs_remove(file);
 }
 
 static int abox_dump_register_work_single(void)
@@ -864,22 +858,23 @@ module_platform_driver(samsung_abox_dump_driver);
 void abox_dump_init(struct device *dev_abox)
 {
 	static struct platform_device *pdev;
-	static struct proc_dir_entry *auto_start, *auto_stop;
+	static struct dentry *auto_start, *auto_stop;
+	struct dentry *dbg_dir = abox_dbg_get_root_dir();
 
 	dev_info(dev_abox, "%s\n", __func__);
 
 	abox_dump_dev_abox = dev_abox;
 
 	if (IS_ERR_OR_NULL(auto_start))
-		auto_start = abox_proc_create_file("dump_auto_start", 0660,
-				NULL, &abox_dump_auto_start_fops, dev_abox, 0);
+		auto_start = debugfs_create_file("dump_auto_start", 0660,
+				dbg_dir, dev_abox, &abox_dump_auto_start_fops);
 
 	if (IS_ERR_OR_NULL(auto_stop))
-		auto_stop = abox_proc_create_file("dump_auto_stop", 0660,
-				NULL, &abox_dump_auto_stop_fops, dev_abox, 0);
+		auto_stop = debugfs_create_file("dump_auto_stop", 0660,
+				dbg_dir, dev_abox, &abox_dump_auto_stop_fops);
 
 	if (IS_ERR_OR_NULL(dir_dump))
-		dir_dump = abox_proc_mkdir("dump", NULL);
+		dir_dump = debugfs_create_dir("dump", dbg_dir);
 
 	if (IS_ERR_OR_NULL(pdev))
 		pdev = platform_device_register_data(dev_abox,

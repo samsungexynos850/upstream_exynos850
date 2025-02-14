@@ -1,7 +1,7 @@
 /*
  * sma1303.h -- sma1303 ALSA SoC Audio driver
  *
- * r017, 2021.11.10
+ * r013, 2020.05.06
  *
  * Copyright 2019 Silicon Mitus Corporation / Iron Device Corporation
  *
@@ -12,6 +12,7 @@
 
 #ifndef _SMA1303_H
 #define _SMA1303_H
+
 
 #define  SMA1303_I2C_ADDR_00		0x1e
 #define  SMA1303_I2C_ADDR_01		0x3e
@@ -111,10 +112,10 @@
 #define POWER_OFF (0<<0)
 #define POWER_ON (1<<0)
 
-/* Controller / Device Setting */
-#define CONTROLLER_DEVICE_MASK (1<<7)
-#define DEVICE_MODE	(0<<7)
-#define CONTROLLER_MODE	(1<<7)
+/* INTPUT CTRL1 : 0x01 */
+#define MASTER_SLAVE_MASK (1<<7)
+#define SLAVE_MODE	(0<<7)
+#define MASTER_MODE	(1<<7)
 
 #define I2S_MODE_MASK	(7<<4)
 #define STANDARD_I2S	(0<<4)
@@ -128,9 +129,9 @@
 #define LOW_FIRST_CH	(0<<3)
 #define HIGH_FIRST_CH	(1<<3)
 
-#define SCK_RISING_MASK	(1<<2)
-#define SCK_FALLING_EDGE	(0<<2)
-#define SCK_RISING_EDGE	(1<<2)
+#define SCK_RISING_FALLING_MASK	(1<<2)
+#define FALLING_EDGE		(0<<2)
+#define RISING_EDGE		(1<<2)
 
 /* INTPUT CTRL2 : 0x02 */
 #define IMODE_MASK (3<<6)
@@ -525,64 +526,6 @@
 #define LRCK_POL_MASK (1<<0)
 #define L_VALID (0<<0)
 #define R_VALID (1<<0)
-
-/* TDM1 FORMAT : 0xA5 */
-#define TDM_CLK_POL_MASK (1<<7)
-#define TDM_CLK_POL_RISE (0<<7)
-#define TDM_CLK_POL_FALL (1<<7)
-
-#define TDM_TX_MODE_MASK (1<<6)
-#define TDM_TX_MONO (0<<6)
-#define TDM_TX_STEREO (1<<6)
-
-#define TDM_SLOT1_RX_POS_MASK (7<<3)
-#define TDM_SLOT1_RX_POS_0 (0<<3)
-#define TDM_SLOT1_RX_POS_1 (1<<3)
-#define TDM_SLOT1_RX_POS_2 (2<<3)
-#define TDM_SLOT1_RX_POS_3 (3<<3)
-#define TDM_SLOT1_RX_POS_4 (4<<3)
-#define TDM_SLOT1_RX_POS_5 (5<<3)
-#define TDM_SLOT1_RX_POS_6 (6<<3)
-#define TDM_SLOT1_RX_POS_7 (7<<3)
-
-#define TDM_SLOT2_RX_POS_MASK (7<<0)
-#define TDM_SLOT2_RX_POS_0 (0<<0)
-#define TDM_SLOT2_RX_POS_1 (1<<0)
-#define TDM_SLOT2_RX_POS_2 (2<<0)
-#define TDM_SLOT2_RX_POS_3 (3<<0)
-#define TDM_SLOT2_RX_POS_4 (4<<0)
-#define TDM_SLOT2_RX_POS_5 (5<<0)
-#define TDM_SLOT2_RX_POS_6 (6<<0)
-#define TDM_SLOT2_RX_POS_7 (7<<0)
-
-/* TDM2 FORMAT : 0xA6 */
-#define TDM_DL_MASK (1<<7)
-#define TDM_DL_16 (0<<7)
-#define TDM_DL_32 (1<<7)
-
-#define TDM_N_SLOT_MASK (1<<6)
-#define TDM_N_SLOT_4 (0<<6)
-#define TDM_N_SLOT_8 (1<<6)
-
-#define TDM_SLOT1_TX_POS_MASK (7<<3)
-#define TDM_SLOT1_TX_POS_0 (0<<3)
-#define TDM_SLOT1_TX_POS_1 (1<<3)
-#define TDM_SLOT1_TX_POS_2 (2<<3)
-#define TDM_SLOT1_TX_POS_3 (3<<3)
-#define TDM_SLOT1_TX_POS_4 (4<<3)
-#define TDM_SLOT1_TX_POS_5 (5<<3)
-#define TDM_SLOT1_TX_POS_6 (6<<3)
-#define TDM_SLOT1_TX_POS_7 (7<<3)
-
-#define TDM_SLOT2_TX_POS_MASK (7<<0)
-#define TDM_SLOT2_TX_POS_0 (0<<0)
-#define TDM_SLOT2_TX_POS_1 (1<<0)
-#define TDM_SLOT2_TX_POS_2 (2<<0)
-#define TDM_SLOT2_TX_POS_3 (3<<0)
-#define TDM_SLOT2_TX_POS_4 (4<<0)
-#define TDM_SLOT2_TX_POS_5 (5<<0)
-#define TDM_SLOT2_TX_POS_6 (6<<0)
-#define TDM_SLOT2_TX_POS_7 (7<<0)
 
 /* STATUS1 : 0xFA */
 #define OT1_OK_STATUS (1<<7)

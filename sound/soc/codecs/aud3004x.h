@@ -1207,10 +1207,6 @@ int aud3004x_jack_remove(struct snd_soc_component *codec);
 #define AVC_PO_GAIN_1				1
 #define AVC_PO_GAIN_0				0
 
-/* AUD3004X_5C_AVC13 */
-#define AMUTE_MASKB_SHIFT			7
-#define AMUTE_MASKB_MASK			BIT(AMUTE_MASKB_SHIFT)
-
 /* AUD3004X_71_AVC34 */
 #define AVC_DELAY0_SHIFT			0
 #define AVC_DELAY0_WIDTH			8
@@ -1652,9 +1648,6 @@ int aud3004x_jack_remove(struct snd_soc_component *codec);
 
 #define AP_JACK_OUT_SHIFT			4
 #define AP_JACK_OUT_MASK			BIT(AP_JACK_OUT_SHIFT)
-
-#define SEL_ANT_RJDET_SHIFT			1
-#define SEL_ANT_RJDET_MASK			BIT(SEL_ANT_RJDET_SHIFT)
 
 /* AUD3004X_E5_DCTR_FSM4 */
 #define RST_POLE_SHIFT				3

@@ -156,19 +156,20 @@ struct snd_usb_substream *find_snd_usb_substream(unsigned int card_num,
 	}
 
 	if (!chip || atomic_read(&chip->shutdown)) {
-		pr_err("%s: instance of usb card # %d does not exist\n",
+		pr_debug("%s: instance of usb card # %d does not exist\n",
 			__func__, card_num);
 		goto err;
 	}
 
 	if (pcm_idx >= chip->pcm_devs) {
-		pr_err("%s: invalid pcm dev number %u > %d\n", __func__,
-			pcm_idx, chip->pcm_devs);
+		usb_audio_err(chip, "%s: invalid pcm dev number %u > %d\n",
+			      __func__, pcm_idx, chip->pcm_devs);
 		goto err;
 	}
 
 	if (direction > SNDRV_PCM_STREAM_CAPTURE) {
-		pr_err("%s: invalid direction %u\n", __func__, direction);
+		usb_audio_err(chip, "%s: invalid direction %u\n", __func__,
+			      direction);
 		goto err;
 	}
 
@@ -177,7 +178,7 @@ struct snd_usb_substream *find_snd_usb_substream(unsigned int card_num,
 			subs = &as->substream[direction];
 			if (subs->interface < 0 && !subs->data_endpoint &&
 			    !subs->sync_endpoint) {
-				pr_err("%s: stream disconnected, bail out\n",
+				usb_audio_err(chip, "%s: stream disconnected, bail out\n",
 					      __func__);
 				subs = NULL;
 				goto err;
@@ -251,7 +252,7 @@ static int snd_usb_create_stream(struct snd_usb_audio *chip, int ctrlif, int int
 	}
 
 	if (usb_interface_claimed(iface)) {
-		dev_err(&dev->dev, "%d:%d: skipping, already claimed\n",
+		dev_dbg(&dev->dev, "%d:%d: skipping, already claimed\n",
 			ctrlif, interface);
 		return -EINVAL;
 	}
@@ -275,7 +276,7 @@ static int snd_usb_create_stream(struct snd_usb_audio *chip, int ctrlif, int int
 	if ((altsd->bInterfaceClass != USB_CLASS_AUDIO &&
 	     altsd->bInterfaceClass != USB_CLASS_VENDOR_SPEC) ||
 	    altsd->bInterfaceSubClass != USB_SUBCLASS_AUDIOSTREAMING) {
-		dev_err(&dev->dev,
+		dev_dbg(&dev->dev,
 			"%u:%d: skipping non-supported interface %d\n",
 			ctrlif, interface, altsd->bInterfaceClass);
 		/* skip non-supported classes */
@@ -661,7 +662,6 @@ static int usb_audio_probe(struct usb_interface *intf,
 	struct usb_interface_descriptor *altsd;
 #endif
 
-	pr_info("%s\n", __func__);
 	alts = &intf->altsetting[0];
 	ifnum = get_iface_desc(alts)->bInterfaceNumber;
 	id = USB_ID(le16_to_cpu(dev->descriptor.idVendor),

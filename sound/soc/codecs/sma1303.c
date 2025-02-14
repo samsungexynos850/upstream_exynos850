@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /* sma1303.c -- sma1303 ALSA SoC Audio driver
  *
- * r017, 2021.11.10	- initial version  sma1303
+ * r013, 2020.05.06	- initial version  sma1303
  *
  * Copyright 2019 Silicon Mitus Corporation / Iron Device Corporation
  *
@@ -70,12 +70,9 @@ struct sma1303_priv {
 	unsigned int sys_clk_id;
 	unsigned int init_vol;
 	unsigned int cur_vol;
-	unsigned int tdm_slot_rx;
-	unsigned int tdm_slot_tx;
 	unsigned int tsdw_cnt;
 	unsigned int bst_vol_lvl_status;
 	unsigned int flt_vdd_gain_status;
-	bool sdo_bypass_flag;
 	bool amp_power_status;
 	bool force_amp_power_down;
 	bool stereo_two_chip;
@@ -95,7 +92,6 @@ struct sma1303_priv {
 
 static struct sma1303_pll_match sma1303_pll_matches[] = {
 /* in_clk_name, out_clk_name, input_clk post_n, n, vco, p_cp */
-PLL_MATCH("1.411MHz",  "24.595MHz", 1411200,  0x07, 0xF4, 0x8B, 0x03),
 PLL_MATCH("1.536MHz",  "24.576MHz", 1536000,  0x07, 0xE0, 0x8B, 0x03),
 PLL_MATCH("3.072MHz",  "24.576MHz", 3072000,  0x07, 0x70, 0x8B, 0x03),
 PLL_MATCH("6.144MHz",  "24.576MHz", 6144000,  0x07, 0x70, 0x8B, 0x07),
@@ -345,30 +341,6 @@ static int power_down_control_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int force_sdo_bypass_get(struct snd_kcontrol *kcontrol,
-		struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_component *component =
-		snd_soc_kcontrol_component(kcontrol);
-	struct sma1303_priv *sma1303 = snd_soc_component_get_drvdata(component);
-
-	ucontrol->value.integer.value[0] = sma1303->sdo_bypass_flag;
-
-	return 0;
-}
-
-static int force_sdo_bypass_put(struct snd_kcontrol *kcontrol,
-		struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_component *component =
-		snd_soc_kcontrol_component(kcontrol);
-	struct sma1303_priv *sma1303 = snd_soc_component_get_drvdata(component);
-	int sel = (int)ucontrol->value.integer.value[0];
-
-	sma1303->sdo_bypass_flag = (bool)sel;
-
-	return 0;
-}
 
 /* InputCTRL1 [0x01] */
 static const char * const sma1303_input_format_text[] = {
@@ -1910,8 +1882,6 @@ SOC_SINGLE_EXT("Power Up(1:Up_0:Down)", SND_SOC_NOPM, 0, 1, 0,
 	power_up_down_control_get, power_up_down_control_put),
 SOC_SINGLE_EXT("Force AMP Power Down", SND_SOC_NOPM, 0, 1, 0,
 	power_down_control_get, power_down_control_put),
-SOC_SINGLE_EXT("Force SDO Bypass", SND_SOC_NOPM, 0, 1, 0,
-	force_sdo_bypass_get, force_sdo_bypass_put),
 
 /* Input CTRL1 [0x01] */
 SOC_SINGLE("I2S/PCM Clock mode(1:M_2:S)",
@@ -2342,37 +2312,31 @@ static int sma1303_dac_feedback_event(struct snd_soc_dapm_widget *w,
 		snd_soc_dapm_to_component(w->dapm);
 	struct sma1303_priv *sma1303 = snd_soc_component_get_drvdata(component);
 
-	if (!sma1303->sdo_bypass_flag) {
-		switch (event) {
-		case SND_SOC_DAPM_PRE_PMU:
-			dev_info(component->dev,
-					"%s : DAC feedback ON\n", __func__);
-			regmap_update_bits(sma1303->regmap,
-				SMA1303_09_OUTPUT_CTRL,
-					PORT_CONFIG_MASK|PORT_OUT_SEL_MASK,
-					OUTPUT_PORT_ENABLE|SPEAKER_PATH);
-			/* even if Capture stream on, Mixer should turn on
-			 * SDO output(1:High-Z,0:Normal output)
-			 */
-			regmap_update_bits(sma1303->regmap,
-				SMA1303_A3_TOP_MAN2, SDO_OUTPUT_MASK,
-					NORMAL_OUT);
-			break;
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		dev_info(component->dev, "%s : DAC feedback ON\n", __func__);
+		regmap_update_bits(sma1303->regmap,
+			SMA1303_09_OUTPUT_CTRL,
+				PORT_CONFIG_MASK|PORT_OUT_SEL_MASK,
+				OUTPUT_PORT_ENABLE|SPEAKER_PATH);
+		/* even if Capture stream on, Mixer should turn on
+		 * SDO output(1:High-Z,0:Normal output)
+		 */
+		regmap_update_bits(sma1303->regmap,
+			SMA1303_A3_TOP_MAN2, SDO_OUTPUT_MASK,
+				NORMAL_OUT);
+		break;
 
-		case SND_SOC_DAPM_PRE_PMD:
-			dev_info(component->dev,
-					"%s : DAC feedback OFF\n", __func__);
-			regmap_update_bits(sma1303->regmap,
-				SMA1303_09_OUTPUT_CTRL, PORT_OUT_SEL_MASK,
-					OUT_SEL_DISABLE);
-			regmap_update_bits(sma1303->regmap,
-				SMA1303_A3_TOP_MAN2, SDO_OUTPUT_MASK,
-					HIGH_Z_OUT);
-			break;
-		}
-	} else
-		dev_info(component->dev,
-				"%s : Force SDO Setting Bypass\n", __func__);
+	case SND_SOC_DAPM_PRE_PMD:
+		dev_info(component->dev, "%s : DAC feedback OFF\n", __func__);
+		regmap_update_bits(sma1303->regmap,
+			SMA1303_09_OUTPUT_CTRL, PORT_OUT_SEL_MASK,
+				OUT_SEL_DISABLE);
+		regmap_update_bits(sma1303->regmap,
+			SMA1303_A3_TOP_MAN2, SDO_OUTPUT_MASK,
+				HIGH_Z_OUT);
+		break;
+	}
 
 	return 0;
 }
@@ -2404,29 +2368,24 @@ static int sma1303_setup_pll(struct snd_soc_component *component,
 
 	int i = 0;
 
-	dev_info(component->dev, "%s : BCLK = %dHz\n",
-		__func__, bclk);
+	dev_info(component->dev, "%s : BCLK = %d kHz\n",
+		__func__, bclk/1000);
 
 	if (sma1303->sys_clk_id == SMA1303_PLL_CLKIN_MCLK) {
 		dev_info(component->dev, "%s : MCLK is not supported\n",
 		__func__);
 	} else if (sma1303->sys_clk_id == SMA1303_PLL_CLKIN_BCLK) {
-		for (i = 0; i < sma1303->num_of_pll_matches; i++) {
-			if (sma1303->pll_matches[i].input_clk == bclk)
-				break;
-		}
-		if (i == sma1303->num_of_pll_matches) {
-			dev_info(component->dev, "%s : No matching value between pll table and SCK\n",
-					__func__);
-			return -EINVAL;
-		}
-
 		/* PLL operation, PLL Clock, External Clock,
 		 * PLL reference SCK clock
 		 */
 		regmap_update_bits(sma1303->regmap, SMA1303_A2_TOP_MAN1,
 				PLL_PD_MASK|PLL_REF_CLK_MASK,
 				PLL_OPERATION|PLL_SCK);
+
+		for (i = 0; i < sma1303->num_of_pll_matches; i++) {
+			if (sma1303->pll_matches[i].input_clk == bclk)
+				break;
+		}
 	}
 
 	regmap_write(sma1303->regmap, SMA1303_8B_PLL_POST_N,
@@ -2450,10 +2409,7 @@ static int sma1303_dai_hw_params_amp(struct snd_pcm_substream *substream,
 	unsigned int bclk = params_rate(params) * params_physical_width(params)
 			* params_channels(params);
 
-	dev_info(component->dev,
-			"%s : rate = %d : bit size = %d : channel = %d\n",
-			__func__, params_rate(params), params_width(params),
-			params_channels(params));
+	dev_info(component->dev, "%s : rate = %d : bit size = %d : channel = %d\n", __func__, params_rate(params), params_width(params), params_channels(params));
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 
@@ -2502,49 +2458,6 @@ static int sma1303_dai_hw_params_amp(struct snd_pcm_substream *substream,
 
 		return -EINVAL;
 		}
-
-		/* Setting TDM Rx operation */
-		if (sma1303->format == SND_SOC_DAIFMT_DSP_A) {
-			regmap_update_bits(sma1303->regmap,
-				SMA1303_A4_TOP_MAN3,
-				O_FORMAT_MASK, O_FMT_TDM);
-
-			switch (params_physical_width(params)) {
-			case 16:
-			regmap_update_bits(sma1303->regmap, SMA1303_A6_TDM2,
-					TDM_DL_MASK, TDM_DL_16);
-			break;
-			case 32:
-			regmap_update_bits(sma1303->regmap, SMA1303_A6_TDM2,
-					TDM_DL_MASK, TDM_DL_32);
-			break;
-			default:
-			dev_err(component->dev, "%s not support TDM %d bit\n",
-				__func__, params_physical_width(params));
-			}
-
-			switch (params_channels(params)) {
-			case 4:
-			regmap_update_bits(sma1303->regmap, SMA1303_A6_TDM2,
-					TDM_N_SLOT_MASK, TDM_N_SLOT_4);
-			break;
-			case 8:
-			regmap_update_bits(sma1303->regmap, SMA1303_A6_TDM2,
-					TDM_N_SLOT_MASK, TDM_N_SLOT_8);
-			break;
-			default:
-			dev_err(component->dev, "%s not support TDM %d channel\n",
-				__func__, params_channels(params));
-			}
-			/* Select a slot to process TDM Rx data */
-			if (sma1303->tdm_slot_rx < params_channels(params))
-				regmap_update_bits(sma1303->regmap,
-					SMA1303_A5_TDM1, TDM_SLOT1_RX_POS_MASK,
-					(sma1303->tdm_slot_rx) << 3);
-			else
-				dev_err(component->dev, "%s Incorrect tdm-slot-rx %d set\n",
-					__func__, sma1303->tdm_slot_rx);
-		}
 	/* substream->stream is SNDRV_PCM_STREAM_CAPTURE */
 	} else {
 
@@ -2567,22 +2480,6 @@ static int sma1303_dai_hw_params_amp(struct snd_pcm_substream *substream,
 				"%s not support data bit : %d\n", __func__,
 						params_format(params));
 			return -EINVAL;
-		}
-
-		/* Setting TDM Tx operation */
-		if (sma1303->format == SND_SOC_DAIFMT_DSP_A) {
-			regmap_update_bits(sma1303->regmap, SMA1303_A5_TDM1,
-					TDM_CLK_POL_MASK, TDM_CLK_POL_RISE);
-			regmap_update_bits(sma1303->regmap, SMA1303_A5_TDM1,
-					TDM_TX_MODE_MASK, TDM_TX_MONO);
-			/* Select a slot to process TDM Tx data */
-			if (sma1303->tdm_slot_tx < params_channels(params))
-				regmap_update_bits(sma1303->regmap,
-					SMA1303_A6_TDM2, TDM_SLOT1_TX_POS_MASK,
-					(sma1303->tdm_slot_tx) << 3);
-			else
-				dev_err(component->dev, "%s Incorrect tdm-slot-tx %d set\n",
-					__func__, sma1303->tdm_slot_tx);
 		}
 	}
 
@@ -2688,24 +2585,24 @@ static int sma1303_dai_set_fmt_amp(struct snd_soc_dai *dai,
 
 	case SND_SOC_DAIFMT_CBS_CFS:
 		dev_info(component->dev,
-				"%s : %s\n", __func__, "I2S/TDM Device mode");
-		/* I2S/PCM clock mode - Device mode */
+				"%s : %s\n", __func__, "I2S slave mode");
+		/* I2S/PCM clock mode - slave mode */
 		regmap_update_bits(sma1303->regmap, SMA1303_01_INPUT1_CTRL1,
-					CONTROLLER_DEVICE_MASK, DEVICE_MODE);
+					MASTER_SLAVE_MASK, SLAVE_MODE);
 
 		break;
 
 	case SND_SOC_DAIFMT_CBM_CFM:
 		dev_info(component->dev,
-				"%s : %s\n", __func__, "I2S/TDM Controller mode");
-		/* I2S/PCM clock mode - Controller mode */
+				"%s : %s\n", __func__, "I2S master mode");
+		/* I2S/PCM clock mode - master mode */
 		regmap_update_bits(sma1303->regmap, SMA1303_01_INPUT1_CTRL1,
-					CONTROLLER_DEVICE_MASK, CONTROLLER_MODE);
+					MASTER_SLAVE_MASK, MASTER_MODE);
 		break;
 
 	default:
 		dev_err(component->dev,
-				"Unsupported Controller/Device : 0x%x\n", fmt);
+				"Unsupported MASTER/SLAVE : 0x%x\n", fmt);
 		return -EINVAL;
 	}
 
@@ -2714,44 +2611,12 @@ static int sma1303_dai_set_fmt_amp(struct snd_soc_dai *dai,
 	case SND_SOC_DAIFMT_I2S:
 	case SND_SOC_DAIFMT_RIGHT_J:
 	case SND_SOC_DAIFMT_LEFT_J:
-	case SND_SOC_DAIFMT_DSP_A:
-	case SND_SOC_DAIFMT_DSP_B:
 		sma1303->format = fmt & SND_SOC_DAIFMT_FORMAT_MASK;
 		break;
+
 	default:
 		dev_err(component->dev,
-				"Unsupported Audio Interface Format : 0x%x\n", fmt);
-		return -EINVAL;
-	}
-
-	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
-
-	case SND_SOC_DAIFMT_IB_NF:
-		dev_info(component->dev, "%s : %s\n",
-			__func__, "Invert BCLK + Normal Frame");
-		regmap_update_bits(sma1303->regmap, SMA1303_01_INPUT1_CTRL1,
-					SCK_RISING_MASK, SCK_RISING_EDGE);
-		break;
-	case SND_SOC_DAIFMT_IB_IF:
-		dev_info(component->dev, "%s : %s\n",
-			__func__, "Invert BCLK + Invert Frame");
-		regmap_update_bits(sma1303->regmap, SMA1303_01_INPUT1_CTRL1,
-					LEFTPOL_MASK|SCK_RISING_MASK,
-					HIGH_FIRST_CH|SCK_RISING_EDGE);
-		break;
-	case SND_SOC_DAIFMT_NB_IF:
-		dev_info(component->dev, "%s : %s\n",
-			__func__, "Normal BCLK + Invert Frame");
-		regmap_update_bits(sma1303->regmap, SMA1303_01_INPUT1_CTRL1,
-					LEFTPOL_MASK, HIGH_FIRST_CH);
-		break;
-	case SND_SOC_DAIFMT_NB_NF:
-		dev_info(component->dev, "%s : %s\n",
-			__func__, "Normal BCLK + Normal Frame");
-		break;
-	default:
-		dev_err(component->dev,
-				"Unsupported Bit & Frameclock : 0x%x\n", fmt);
+				"Unsupported I2S FORMAT : 0x%x\n", fmt);
 		return -EINVAL;
 	}
 
@@ -3344,7 +3209,7 @@ static int sma1303_i2c_probe(struct i2c_client *client,
 	u32 value;
 	unsigned int device_info;
 
-	dev_info(&client->dev, "%s is here. Driver version REV017\n", __func__);
+	dev_info(&client->dev, "%s is here. Driver version REV013\n", __func__);
 
 	sma1303 = devm_kzalloc(&client->dev, sizeof(struct sma1303_priv),
 							GFP_KERNEL);
@@ -3390,24 +3255,6 @@ static int sma1303_i2c_probe(struct i2c_client *client,
 		} else {
 			dev_info(&client->dev, "Boost control setting is possible\n");
 				sma1303->impossible_bst_ctrl = false;
-		}
-		if (!of_property_read_u32(np, "tdm-slot-rx", &value)) {
-			dev_info(&client->dev,
-				"tdm slot rx is '%d' from DT\n", value);
-			sma1303->tdm_slot_rx = value;
-		} else {
-			dev_info(&client->dev,
-				"Default setting of tdm slot rx is '0'\n");
-			sma1303->tdm_slot_rx = 0;
-		}
-		if (!of_property_read_u32(np, "tdm-slot-tx", &value)) {
-			dev_info(&client->dev,
-				"tdm slot tx is '%d' from DT\n", value);
-			sma1303->tdm_slot_tx = value;
-		} else {
-			dev_info(&client->dev,
-				"Default setting of tdm slot tx is '0'\n");
-			sma1303->tdm_slot_tx = 0;
 		}
 		if (!of_property_read_u32(np, "sys-clk-id", &value)) {
 			switch (value) {
@@ -3468,7 +3315,6 @@ static int sma1303_i2c_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, sma1303);
 
-	sma1303->sdo_bypass_flag = false;
 	sma1303->force_amp_power_down = false;
 	sma1303->amp_power_status = false;
 	sma1303->check_fault_status = true;

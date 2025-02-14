@@ -73,10 +73,8 @@ static unsigned int baserate = MADERA_BASECLK_48K;
 enum FLL_ID { FLL1, FLL2, FLL3, FLLAO };
 enum CLK_ID { SYSCLK, ASYNCCLK, DSPCLK, OPCLK, OUTCLK };
 
-#if IS_ENABLED(CONFIG_DEBUG_FS)
 /* Used for debugging and test automation */
 static u32 voice_trigger_count;
-#endif
 
 /* Debugfs value overrides, default to 0 */
 static unsigned int forced_mclk1;
@@ -395,6 +393,7 @@ static int cs35l41_hw_params(struct snd_pcm_substream *substream,
 	unsigned int num_codecs = rtd->num_codecs;
 	int ret = 0, i;
 
+	return 0;
 
 	/* using bclk for sysclk */
 	clk = snd_soc_params_to_bclk(params);
@@ -402,12 +401,9 @@ static int cs35l41_hw_params(struct snd_pcm_substream *substream,
 		ret = snd_soc_component_set_sysclk(codec_dais[i]->component,
 					CLK_SRC_SCLK, 0, clk,
 					SND_SOC_CLOCK_IN);
-		if (ret < 0) {
+		if (ret < 0)
 			dev_err(card->dev, "%s: set codec sysclk failed: %d\n",
 					codec_dais[i]->name, ret);
-		} else {
-			dev_info(card->dev, "%s: set amp sysclk : %d\n", codec_dais[i]->name, clk);
-		}
 	}
 
 	return ret;
@@ -680,7 +676,6 @@ static int exynos3830_late_probe(struct snd_soc_card *card)
 	const char *name;
 	int ret, i;
 
-	dev_info(drvdata->dev, "%s: ++ \n", __func__);
 	aif_dai = get_rtd(card, MADERA_DAI_ID)->codec_dai;
 
 	if (drvdata->sysclk.valid) {
@@ -799,7 +794,6 @@ static int exynos3830_late_probe(struct snd_soc_card *card)
 		}
 	}
 
-	dev_info(drvdata->dev, "%s: -- \n", __func__);
 	return 0;
 }
 

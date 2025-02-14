@@ -9,13 +9,15 @@
  * published by the Free Software Foundation.
  */
 /* #define DEBUG */
+#include <linux/debugfs.h>
 #include <linux/mutex.h>
 #include <linux/vmalloc.h>
 #include <sound/samsung/abox.h>
+#include <sound/samsung/sec_audio_debug.h>
 
 #include "abox_util.h"
 #include "abox.h"
-#include "abox_proc.h"
+#include "abox_dbg.h"
 #include "abox_log.h"
 
 #undef VERBOSE_LOG
@@ -53,7 +55,7 @@ struct abox_log_file_info {
 };
 
 static LIST_HEAD(abox_log_list_head);
-static bool abox_log_auto_save;
+static u32 abox_log_auto_save;
 
 static void abox_log_memcpy(struct device *dev,
 	struct abox_log_kernel_buffer *kernel_buffer,
@@ -198,8 +200,7 @@ static DECLARE_DEFERRABLE_WORK(abox_log_flush_all_work,
 static void abox_log_flush_all_work_func(struct work_struct *work)
 {
 	abox_log_flush_all(NULL);
-	queue_delayed_work(system_unbound_wq, &abox_log_flush_all_work,
-			msecs_to_jiffies(1000));
+	schedule_delayed_work(&abox_log_flush_all_work, msecs_to_jiffies(3000));
 	set_bit(0, &abox_log_flush_all_work_rearm_self);
 }
 
@@ -207,8 +208,7 @@ void abox_log_schedule_flush_all(struct device *dev)
 {
 	if (test_and_clear_bit(0, &abox_log_flush_all_work_rearm_self))
 		cancel_delayed_work(&abox_log_flush_all_work);
-	queue_delayed_work(system_unbound_wq, &abox_log_flush_all_work,
-			msecs_to_jiffies(100));
+	schedule_delayed_work(&abox_log_flush_all_work, msecs_to_jiffies(100));
 }
 EXPORT_SYMBOL(abox_log_schedule_flush_all);
 
@@ -221,7 +221,7 @@ EXPORT_SYMBOL(abox_log_drain_all);
 
 static int abox_log_file_open(struct inode *inode, struct file *file)
 {
-	struct abox_log_buffer_info *info = abox_proc_data(file);
+	struct abox_log_buffer_info *info = inode->i_private;
 	struct abox_log_file_info *finfo;
 
 	dev_dbg(info->dev, "%s\n", __func__);
@@ -365,8 +365,8 @@ void abox_log_register_buffer_work_func(struct work_struct *work)
 	list_add_tail(&info->list, &abox_log_list_head);
 
 	snprintf(name, sizeof(name), "log-%02d", id);
-	abox_proc_create_file(name, 0664, NULL, &abox_log_fops,
-			info, 0);
+	debugfs_create_file(name, 0664, abox_dbg_get_root_dir(), info,
+			&abox_log_fops);
 }
 
 static DECLARE_WORK(abox_log_register_buffer_work,
@@ -433,3 +433,21 @@ static void abox_log_test_work_func(struct work_struct *work)
 	schedule_delayed_work(&abox_log_test_work, msecs_to_jiffies(1000));
 }
 #endif
+
+static int __init samsung_abox_log_late_initcall(void)
+{
+	pr_info("%s\n", __func__);
+
+	debugfs_create_u32("log_auto_save", S_IRWUG, abox_dbg_get_root_dir(),
+			&abox_log_auto_save);
+
+#ifdef TEST
+	abox_log_test_buffer = vzalloc(SZ_128);
+	abox_log_test_buffer->size = SZ_64;
+	abox_log_register_buffer(NULL, 0, abox_log_test_buffer);
+	schedule_delayed_work(&abox_log_test_work, msecs_to_jiffies(1000));
+#endif
+
+	return 0;
+}
+late_initcall(samsung_abox_log_late_initcall);

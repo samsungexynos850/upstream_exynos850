@@ -132,13 +132,6 @@ static void abox_wdma_disable_barrier(struct device *dev,
 	}
 }
 
-static int abox_wdma_backend(struct snd_pcm_substream *substream)
-{
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-
-	return (rtd->cpu_dai->id >= ABOX_WDMA0_BE);
-}
-
 static int abox_wdma_hw_params(struct snd_pcm_substream *substream,
 	struct snd_pcm_hw_params *params)
 {
@@ -155,10 +148,6 @@ static int abox_wdma_hw_params(struct snd_pcm_substream *substream,
 	ABOX_IPC_MSG msg;
 	struct IPC_PCMTASK_MSG *pcmtask_msg = &msg.msg.pcmtask;
 
-	if (abox_wdma_backend(substream) && !abox_dma_can_params(rtd, substream->stream)) {
-		dev_info(dev, "%s skip\n", __func__);
-		return 0;
-	}
 	dev_dbg(dev, "%s\n", __func__);
 
 	data->hw_params = *params;
@@ -243,10 +232,6 @@ static int abox_wdma_hw_free(struct snd_pcm_substream *substream)
 	ABOX_IPC_MSG msg;
 	struct IPC_PCMTASK_MSG *pcmtask_msg = &msg.msg.pcmtask;
 
-	if (abox_wdma_backend(substream) && !abox_dma_can_free(rtd, substream->stream)) {
-		dev_info(dev, "%s skip\n", __func__);
-		return 0;
-	}
 	dev_dbg(dev, "%s\n", __func__);
 
 	msg.ipcid = IPC_PCMCAPTURE;
@@ -277,10 +262,6 @@ static int abox_wdma_prepare(struct snd_pcm_substream *substream)
 	ABOX_IPC_MSG msg;
 	struct IPC_PCMTASK_MSG *pcmtask_msg = &msg.msg.pcmtask;
 
-	if (abox_wdma_backend(substream) && !abox_dma_can_prepare(rtd, substream->stream)) {
-		dev_info(dev, "%s skip\n", __func__);
-		return 0;
-	}
 	dev_dbg(dev, "%s\n", __func__);
 
 	data->pointer = IOVA_WDMA_BUFFER(id);
@@ -313,10 +294,6 @@ static int abox_wdma_trigger(struct snd_pcm_substream *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		if (!abox_dma_can_start(rtd, substream->stream)) {
-			dev_info(dev, "%s skip\n", __func__);
-			return 0;
-		}
 		pcmtask_msg->param.trigger = 1;
 		ret = abox_wdma_request_ipc(data, &msg, 1, 0);
 		switch (data->type) {
@@ -332,10 +309,6 @@ static int abox_wdma_trigger(struct snd_pcm_substream *substream, int cmd)
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		if (!abox_dma_can_stop(rtd, substream->stream)) {
-			dev_info(dev, "%s skip\n", __func__);
-			return 0;
-		}
 		pcmtask_msg->param.trigger = 0;
 		ret = abox_wdma_request_ipc(data, &msg, 1, 0);
 		switch (data->type) {
@@ -419,10 +392,6 @@ static int abox_wdma_open(struct snd_pcm_substream *substream)
 	ABOX_IPC_MSG msg;
 	struct IPC_PCMTASK_MSG *pcmtask_msg = &msg.msg.pcmtask;
 
-	if (abox_wdma_backend(substream) && !abox_dma_can_open(rtd, substream->stream)) {
-		dev_info(dev, "%s skip\n", __func__);
-		return 0;
-	}
 	dev_info(dev, "%s\n", __func__);
 
 	abox_wait_restored(abox_data);
@@ -464,10 +433,6 @@ static int abox_wdma_close(struct snd_pcm_substream *substream)
 	ABOX_IPC_MSG msg;
 	struct IPC_PCMTASK_MSG *pcmtask_msg = &msg.msg.pcmtask;
 
-	if (abox_wdma_backend(substream) && !abox_dma_can_close(rtd, substream->stream)) {
-		dev_info(dev, "%s skip\n", __func__);
-		return 0;
-	}
 	dev_info(dev, "%s\n", __func__);
 
 	data->substream = NULL;

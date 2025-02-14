@@ -118,7 +118,6 @@ struct aud3004x_jack {
 	int ant_ldet_delay;
 	int mdet_delay;
 	int fake_insert_retry_delay;
-	int fake_insert_log_count;
 	int mic_adc_range;
 	int mic_open_value;
 	int btn_adc_delay;

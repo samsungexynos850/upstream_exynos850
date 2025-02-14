@@ -37,21 +37,14 @@ extern void abox_dump_transfer(int id, const char *buf, size_t bytes);
  * @param[in]	fops		file operation callbacks
  * @return	file entry pointer
  */
-extern struct proc_dir_entry *abox_dump_register_file(const char *name,
-		void *data, const struct file_operations *fops);
+extern struct dentry *abox_dump_register_file(const char *name, void *data,
+		const struct file_operations *fops);
 
 /**
  * Destroy registered dump file
  * @param[in]	file		pointer to file entry
  */
-extern void abox_dump_unregister_file(struct proc_dir_entry *file);
-
-/**
- * Get given data of the dump file
- * @param[in]	file		pointer to file entry
- * @return	data which is given at registration
- */
-extern void *abox_dump_get_data(const struct file *file);
+extern void abox_dump_unregister_file(struct dentry *file);
 
 /**
  * Register abox dump

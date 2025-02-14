@@ -243,6 +243,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_WM9705 if (SND_SOC_AC97_BUS || SND_SOC_AC97_BUS_NEW)
 	select SND_SOC_WM9712 if (SND_SOC_AC97_BUS || SND_SOC_AC97_BUS_NEW)
 	select SND_SOC_WM9713 if (SND_SOC_AC97_BUS || SND_SOC_AC97_BUS_NEW)
+	select SND_SOC_SMA1303 if I2C
         help
           Normally ASoC codec drivers are only built if a machine driver which
           uses them is also built since they are only usable with a machine
@@ -477,9 +478,6 @@ config SND_SOC_CS35L41
 	tristate "Cirrus Logic CS35L41 CODEC"
 	select SND_SOC_WM_ADSP
 
-config SND_SOC_CS35L41_REINIT_SYSFS
-	tristate "Cirrus Logic CS35L41 SysFS Reinit"
-
 config SND_SOC_CS42L42
 	tristate "Cirrus Logic CS42L42 CODEC"
 	depends on I2C
@@ -605,14 +603,6 @@ config SND_SOC_AUD3004X_EXT_ANT
 config SND_SOC_SMA1303
 	tristate "SMA1303 speaker amplifier"
 	default n
-
-config SND_SOC_SMA1305
-	tristate "SMA1305 speaker amplifier"
-	default n
-
-config SND_SOC_APS_ALGO
-	tristate "Iron Device Advanced Protection Solution"
-	depends on SND_SOC_SMA1305
 
 config SND_SOC_JZ4740_CODEC
 	select REGMAP_MMIO
@@ -1428,19 +1418,13 @@ config SND_SOC_TAS2562
 	select TAS2562_CODEC
 	select TAS25XX_ALGO
 
-config SND_SMARTPA_AW882XX
-	tristate "SoC Audio for Awinic aw882xx series"
+config SND_SOC_SMA1303
+	tristate "Silicon Mitus SMA1303 speaker amplifier"
 	depends on I2C
 	help
-	  This option enables support for aw882xx series Smart PA.
-
-config SND_SOC_FS18XX
-	tristate "FourSemi fs18xx Codec Driver"
-	depends on I2C
-	help
-	  for FourSemi True Smart Amplifier
-
-# DBMDx
-source "sound/soc/codecs/dbmdx/Kconfig"
+	  Config of SMA1303. It is a Smart power
+	  amplifier which contain speaker protection,
+	  multi-band DRC, equalizer function. It would
+	  be set to yes if device with SMA1303 on it.
 
 endmenu

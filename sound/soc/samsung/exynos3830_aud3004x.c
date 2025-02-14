@@ -17,8 +17,6 @@
 #include <sound/soc.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/gpio.h>
-#include <linux/of_gpio.h>
 #include <linux/clk.h>
 #include <linux/slab.h>
 
@@ -26,10 +24,6 @@
 #include <sound/samsung/abox.h>
 
 #include "exynos3830_aud3004x_sysfs_cb.h"
-
-#if IS_ENABLED(CONFIG_SND_SOC_DBMDX)
-#define USE_MIC_BIAS_EN_GPIO
-#endif
 
 #if IS_ENABLED(CONFIG_SND_SOC_MADERA)
 #include <linux/mfd/madera/core.h>
@@ -53,7 +47,6 @@
 #define CLK_SRC_DAI 0
 #define CLK_SRC_CODEC 1
 
-#define AW88230_DAI_ID			0x88230
 #define MADERA_DAI_ID			0x4793
 #define CS35L41_DAI_ID			0x3541
 #define ABOX_BE_DAI_ID(c, i)		(0xbe00 | (c) << 4 | (i))
@@ -81,11 +74,6 @@ static unsigned int baserate = MADERA_BASECLK_48K;
 
 enum FLL_ID { FLL1, FLL2, FLL3, FLLAO };
 enum CLK_ID { SYSCLK, ASYNCCLK, DSPCLK, OPCLK, OUTCLK };
-
-#if IS_ENABLED(CONFIG_DEBUG_FS)
-/* Used for debugging and test automation */
-static u32 voice_trigger_count;
-#endif
 
 /* Debugfs value overrides, default to 0 */
 static unsigned int forced_mclk1;
@@ -120,14 +108,10 @@ struct madera_drvdata {
 
 	int left_amp_dai;
 	int right_amp_dai;
-
-#ifdef USE_MIC_BIAS_EN_GPIO
-	int mic_bias_gpio;
-#endif
 	struct clk *clk[MADERA_MAX_CLOCKS];
 };
 
-static struct madera_drvdata exynos3830_drvdata;
+static struct madera_drvdata exynos9820_drvdata;
 
 static int map_fllid_with_name(const char *name)
 {
@@ -304,7 +288,7 @@ static int madera_set_clock(struct snd_soc_card *card,
 	dev_dbg(card->dev, "Setting %s freq to %u Hz\n", config->name, freq);
 
 	ret = snd_soc_component_set_sysclk(codec, config->id,
-						config->source, freq, dir);
+				       config->source, freq, dir);
 	if (ret)
 		dev_err(card->dev, "Failed to set %s to %u Hz\n",
 			config->name, freq);
@@ -367,7 +351,7 @@ static const struct snd_soc_ops wdma_ops = {
 };
 
 static int madera_hw_params(struct snd_pcm_substream *substream,
-					struct snd_pcm_hw_params *params)
+			       struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_card *card = rtd->card;
@@ -399,7 +383,7 @@ static const struct snd_soc_ops uaif0_ops = {
 };
 
 static int cs35l41_hw_params(struct snd_pcm_substream *substream,
-					struct snd_pcm_hw_params *params)
+			       struct snd_pcm_hw_params *params)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_card *card = rtd->card;
@@ -408,6 +392,7 @@ static int cs35l41_hw_params(struct snd_pcm_substream *substream,
 	unsigned int num_codecs = rtd->num_codecs;
 	int ret = 0, i;
 
+	return 0;
 
 	/* using bclk for sysclk */
 	clk = snd_soc_params_to_bclk(params);
@@ -415,12 +400,9 @@ static int cs35l41_hw_params(struct snd_pcm_substream *substream,
 		ret = snd_soc_component_set_sysclk(codec_dais[i]->component,
 					CLK_SRC_SCLK, 0, clk,
 					SND_SOC_CLOCK_IN);
-		if (ret < 0) {
+		if (ret < 0)
 			dev_err(card->dev, "%s: set codec sysclk failed: %d\n",
 					codec_dais[i]->name, ret);
-		} else {
-			dev_info(card->dev, "%s: set amp sysclk : %d\n", codec_dais[i]->name, clk);
-		}
 	}
 
 	return ret;
@@ -431,83 +413,6 @@ static const struct snd_soc_ops cs35l41_ops = {
 };
 
 static const struct snd_soc_ops uaif_ops = {
-};
-
-static int nacho_dai_ops_hw_params(struct snd_pcm_substream *substream,
-					struct snd_pcm_hw_params *params)
-{
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_card *card = rtd->card;
-	struct snd_soc_dai_link *dai_link = rtd->dai_link;
-	int ret = 0;
-
-	dev_info(card->dev, "%s-%d: 0x%x: hw_param\n",
-			rtd->dai_link->name, substream->stream, dai_link->id);
-
-	switch (dai_link->id) {
-	case AW88230_DAI_ID:
-		snd_soc_dai_set_tristate(rtd->cpu_dai, 0); /* enable bclk */
-		break;
-	default:
-		break;
-	}
-
-	return ret;
-}
-
-static int nacho_dai_ops_prepare(struct snd_pcm_substream *substream)
-{
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_card *card = rtd->card;
-	struct snd_soc_dai_link *dai_link = rtd->dai_link;
-	int ret = 0;
-
-	dev_info(card->dev, "%s-%d: 0x%x: prepare\n",
-			rtd->dai_link->name, substream->stream, dai_link->id);
-
-	return ret;
-}
-
-static void nacho_dai_ops_shutdown(struct snd_pcm_substream *substream)
-{
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_card *card = rtd->card;
-	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-	struct snd_soc_dai_link *dai_link = rtd->dai_link;
-
-	dev_info(card->dev,
-		"%s-%d: 0x%x: shutdown: play: %d, cap: %d\n",
-		rtd->dai_link->name, substream->stream, dai_link->id,
-		codec_dai->playback_active, codec_dai->capture_active);
-
-}
-
-static int nacho_dai_ops_free(struct snd_pcm_substream *substream)
-{
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_card *card = rtd->card;
-	struct snd_soc_dai_link *dai_link = rtd->dai_link;
-	int ret = 0;
-
-	dev_info(card->dev, "%s-%d: 0x%x: free\n",
-			rtd->dai_link->name, substream->stream, dai_link->id);
-
-	switch (dai_link->id) {
-	case AW88230_DAI_ID:
-		snd_soc_dai_set_tristate(rtd->cpu_dai, 1); /* disable bclk */
-		break;
-	default:
-		break;
-	}
-
-	return ret;
-}
-
-static const struct snd_soc_ops uaif1_ops = {
-	.hw_params = nacho_dai_ops_hw_params,
-	.prepare = nacho_dai_ops_prepare,
-	.shutdown = nacho_dai_ops_shutdown,
-	.hw_free = nacho_dai_ops_free,
 };
 
 static int exynos3830_uaif0_init(struct snd_soc_pcm_runtime *rtd)
@@ -578,8 +483,8 @@ static int madera_set_bias_level(struct snd_soc_card *card,
 }
 
 static int madera_set_bias_level_post(struct snd_soc_card *card,
-					struct snd_soc_dapm_context *dapm,
-					enum snd_soc_bias_level level)
+					 struct snd_soc_dapm_context *dapm,
+					 enum snd_soc_bias_level level)
 {
 	struct snd_soc_dai *codec_dai;
 	struct madera_drvdata *drvdata = card->drvdata;
@@ -628,7 +533,7 @@ static int madera_set_bias_level_post(struct snd_soc_card *card,
 
 #if IS_ENABLED(CONFIG_SND_SOC_MADERA)
 static int madera_notify(struct notifier_block *nb,
-				unsigned long event, void *data)
+				   unsigned long event, void *data)
 {
 	const struct madera_hpdet_notify_data *hp_inf;
 	const struct madera_micdet_notify_data *md_inf;
@@ -666,13 +571,13 @@ static int madera_notify(struct notifier_block *nb,
 }
 #else
 static int madera_notify(struct notifier_block *nb,
-				unsigned long event, void *data)
+				   unsigned long event, void *data)
 {
 	return 0;
 }
 
 static int madera_register_notifier(struct snd_soc_component *component,
-					struct notifier_block *nb)
+                                           struct notifier_block *nb)
 {
 	return 0;
 }
@@ -719,7 +624,7 @@ static void madera_init_debugfs(struct snd_soc_card *card)
 	debugfs_create_u32("forced_dspclk", 0664, root, &forced_dspclk);
 
 	debugfs_create_file("force_fll1_enable", 0664, root, card,
-				&madera_force_fll1_enable_fops);
+			    &madera_force_fll1_enable_fops);
 }
 #else
 static void madera_init_debugfs(struct snd_soc_card *card)
@@ -753,14 +658,14 @@ static int madera_amp_late_probe(struct snd_soc_card *card, int dai)
 		dev_err(card->dev, "Failed to set TDM: %d\n", ret);
 
 	ret = snd_soc_component_set_sysclk(amp, 0, 0, drvdata->opclk.rate,
-					SND_SOC_CLOCK_IN);
+				       SND_SOC_CLOCK_IN);
 	if (ret != 0) {
 		dev_err(card->dev, "Failed to set amp SYSCLK: %d\n", ret);
 		return ret;
 	}
 
 	ret = snd_soc_dai_set_sysclk(amp_dai, 0, MADERA_AMP_BCLK,
-						SND_SOC_CLOCK_IN);
+				     SND_SOC_CLOCK_IN);
 	if (ret != 0) {
 		dev_err(card->dev, "Failed to set amp DAI clock: %d\n", ret);
 		return ret;
@@ -779,7 +684,6 @@ static int exynos3830_late_probe(struct snd_soc_card *card)
 	const char *name;
 	int ret, i;
 
-	dev_info(drvdata->dev, "%s: ++\n", __func__);
 	aif_dai = get_rtd(card, MADERA_DAI_ID)->codec_dai;
 
 	if (drvdata->sysclk.valid) {
@@ -856,20 +760,6 @@ static int exynos3830_late_probe(struct snd_soc_card *card)
 		madera_register_notifier(codec, &drvdata->nb);
 	}
 
-	if (IS_ENABLED(CONFIG_SND_SMARTPA_AW882XX)) {
-		struct snd_soc_component *amp;
-		aif_dai = get_rtd(card, AW88230_DAI_ID)->codec_dai;
-
-		amp = aif_dai->component;
-
-		dapm = snd_soc_component_get_dapm(amp);
-		snd_soc_dapm_ignore_suspend(dapm, "Speaker_Playback");
-		snd_soc_dapm_ignore_suspend(dapm, "Speaker_Capture");
-		snd_soc_dapm_ignore_suspend(dapm, "audio_out");
-		snd_soc_dapm_ignore_suspend(dapm, "iv_in");
-		snd_soc_dapm_sync(dapm);
-	}
-
 	list_for_each_entry(link, &card->dai_link_list, list) {
 		rtd = snd_soc_get_pcm_runtime(card, link->name);
 		if (!rtd)
@@ -912,7 +802,6 @@ static int exynos3830_late_probe(struct snd_soc_card *card)
 		}
 	}
 
-	dev_info(drvdata->dev, "%s: --\n", __func__);
 	return 0;
 }
 
@@ -1297,12 +1186,9 @@ static struct snd_soc_dai_link exynos3830_dai[100] = {
 		.ignore_suspend = 1,
 		.ignore_pmdown_time = 1,
 		.be_hw_params_fixup = abox_hw_params_fixup_helper,
-		.ops = &uaif1_ops,
+		.ops = &uaif_ops,
 		.dpcm_playback = 1,
 		.dpcm_capture = 1,
-#if IS_ENABLED(CONFIG_SND_SMARTPA_AW882XX)
-		.id = AW88230_DAI_ID,
-#endif
 	},
 	{
 		.name = "UAIF2",
@@ -1741,34 +1627,6 @@ static struct snd_soc_dai_link exynos3830_dai[100] = {
 	},
 };
 
-#ifdef USE_MIC_BIAS_EN_GPIO
-static int get_mic_bias_en(struct snd_kcontrol *kcontrol,
-			struct snd_ctl_elem_value *ucontrol)
-{
-	struct madera_drvdata *drvdata = &exynos3830_drvdata;
-	unsigned int val = gpio_get_value(drvdata->mic_bias_gpio);
-
-	dev_info(drvdata->dev, "%s: %d\n", __func__, val);
-
-	ucontrol->value.integer.value[0] = val;
-
-	return 0;
-}
-
-static int set_mic_bias_en(struct snd_kcontrol *kcontrol,
-			struct snd_ctl_elem_value *ucontrol)
-{
-	struct madera_drvdata *drvdata = &exynos3830_drvdata;
-	unsigned int val = (unsigned int)ucontrol->value.integer.value[0];
-
-	dev_info(drvdata->dev, "%s: %d\n", __func__, val);
-
-	gpio_set_value(drvdata->mic_bias_gpio, val ? 1 : 0);
-
-	return 0;
-}
-#endif
-
 static const char * const vts_output_texts[] = {
 	"None",
 	"DMIC1",
@@ -1788,10 +1646,6 @@ static const struct snd_kcontrol_new exynos3830_controls[] = {
 	SOC_DAPM_PIN_SWITCH("DMIC2"),
 	SOC_DAPM_PIN_SWITCH("DMIC3"),
 	SOC_DAPM_PIN_SWITCH("DMIC4"),
-#ifdef USE_MIC_BIAS_EN_GPIO
-	SOC_SINGLE_BOOL_EXT("MIC BIAS EN",
-				0, get_mic_bias_en, set_mic_bias_en),
-#endif
 };
 
 static const struct snd_soc_dapm_widget exynos3830_widgets[] = {
@@ -1834,7 +1688,7 @@ static struct snd_soc_codec_conf codec_conf[MADERA_CODEC_MAX];
 static struct snd_soc_aux_dev aux_dev[MADERA_AUX_MAX];
 
 static struct snd_soc_card exynos3830_madera = {
-	.name = "Exynos3830-aud3004x",
+	.name = "Exynos3830-Madera",
 	.owner = THIS_MODULE,
 	.dai_link = exynos3830_dai,
 	.num_links = ARRAY_SIZE(exynos3830_dai),
@@ -1852,7 +1706,7 @@ static struct snd_soc_card exynos3830_madera = {
 	.set_bias_level = madera_set_bias_level,
 	.set_bias_level_post = madera_set_bias_level_post,
 
-	.drvdata = (void *)&exynos3830_drvdata,
+	.drvdata = (void *)&exynos9820_drvdata,
 
 	.codec_conf = codec_conf,
 	.num_configs = ARRAY_SIZE(codec_conf),
@@ -1906,7 +1760,7 @@ static int read_clk_conf(struct device_node *np,
 }
 
 static int read_platform(struct device_node *np, const char * const prop,
-						struct device_node **dai)
+			      struct device_node **dai)
 {
 	int ret = 0;
 
@@ -2017,41 +1871,41 @@ static int exynos3830_audio_probe(struct platform_device *pdev)
 	}
 
 	ret = read_clk_conf(np, "cirrus,sysclk",
-						&drvdata->sysclk, false);
+				      &drvdata->sysclk, false);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse sysclk: %d\n", ret);
 	ret = read_clk_conf(np, "cirrus,asyncclk",
-						&drvdata->asyncclk, false);
+				      &drvdata->asyncclk, false);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse asyncclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,dspclk",
-						&drvdata->dspclk, false);
+				      &drvdata->dspclk, false);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse dspclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,opclk",
-						&drvdata->opclk, false);
+				      &drvdata->opclk, false);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse opclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,fll1-refclk",
-						&drvdata->fll1_refclk, true);
+				      &drvdata->fll1_refclk, true);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse fll1-refclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,fll2-refclk",
-						&drvdata->fll2_refclk, true);
+				      &drvdata->fll2_refclk, true);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse fll2-refclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,fllao-refclk",
-						&drvdata->fllao_refclk, true);
+				      &drvdata->fllao_refclk, true);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse fllao-refclk: %d\n", ret);
 
 	ret = read_clk_conf(np, "cirrus,outclk",
-						&drvdata->outclk, false);
+				      &drvdata->outclk, false);
 	if (ret)
 		dev_dbg(card->dev, "Failed to parse outclk: %d\n", ret);
 
@@ -2162,22 +2016,6 @@ static int exynos3830_audio_probe(struct platform_device *pdev)
 	}
 	card->num_aux_devs = i;
 
-#ifdef USE_MIC_BIAS_EN_GPIO
-	drvdata->mic_bias_gpio = of_get_named_gpio(np, "mic_bias", 0);
-	if (!gpio_is_valid(drvdata->mic_bias_gpio)) {
-		dev_err(drvdata->dev, "(%s) mic bias invalid. Disable mic_bias control\n",
-			__func__);
-		drvdata->mic_bias_gpio = -EINVAL;
-	} else {
-		ret = gpio_request_one(drvdata->mic_bias_gpio, GPIOF_OUT_INIT_HIGH,
-					"MIC_BIAS_EN");
-		if (ret)
-			gpio_set_value(drvdata->mic_bias_gpio, 1);
-		dev_info(drvdata->dev, "(%s) Enable elna_gpio control :%d\n",
-			__func__, gpio_get_value(drvdata->mic_bias_gpio));
-	}
-#endif /* USE_MIC_BIAS_EN_GPIO */
-
 	schedule_work(&exynos3830_register_card_work);
 
 	return ret;
@@ -2185,29 +2023,19 @@ static int exynos3830_audio_probe(struct platform_device *pdev)
 
 static int exynos3830_audio_remove(struct platform_device *pdev)
 {
-	struct snd_soc_card *card;
-	struct madera_drvdata *drvdata;
+	struct snd_soc_card *card = platform_get_drvdata(pdev);
+	struct madera_drvdata *drvdata = snd_soc_card_get_drvdata(card);
 	int i;
 
-	card = platform_get_drvdata(pdev);
-	if (!card)
-		return 0;
-
-	drvdata = snd_soc_card_get_drvdata(card);
-	if (!drvdata)
-		return 0;
-
-	for (i = 0; i < MADERA_MAX_CLOCKS; ++i) {
-		if (drvdata->clk[i])
-			clk_disable_unprepare(drvdata->clk[i]);
-	}
+	for (i = 0; i < MADERA_MAX_CLOCKS; ++i)
+		clk_disable_unprepare(drvdata->clk[i]);
 
 	return 0;
 }
 
 #if IS_ENABLED(CONFIG_OF)
 static const struct of_device_id exynos3830_audio_of_match[] = {
-	{ .compatible = "samsung,exynos3830-aud3004x", },
+	{ .compatible = "samsung,exynos3830-madera", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, exynos3830_audio_of_match);
@@ -2231,5 +2059,4 @@ MODULE_DESCRIPTION("ALSA SoC Exynos3830 Audio Driver");
 MODULE_AUTHOR("Charles Keepax <ckeepax@opensource.wolfsonmicro.com>");
 MODULE_AUTHOR("Gyeongtaek Lee <gt82.lee@samsung.com>");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:exynos3830-aud3004x");
-
+MODULE_ALIAS("platform:exynos3830-madera");

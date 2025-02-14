@@ -123,7 +123,7 @@ struct abox_compr_data {
 };
 
 struct abox_dma_dump {
-	struct proc_dir_entry *file;
+	struct dentry *file;
 	wait_queue_head_t waitqueue;
 	void *area;
 	phys_addr_t addr;
@@ -277,61 +277,5 @@ extern int abox_dma_hw_params_put(struct snd_kcontrol *kcontrol,
  */
 extern struct snd_soc_dai *abox_dma_get_dai(struct device *dev,
 		enum abox_dma_dai type);
-
-/**
-  * Test dma can be closed
-  * @param[in]   rtd     asoc runtime
-  * @param[in]   stream  stream direction
-  * @return      true or false
-  */
-extern int abox_dma_can_close(struct snd_soc_pcm_runtime *rtd, int stream);
-
-/**
-  * Test dma can be freed
-  * @param[in]   rtd     asoc runtime
-  * @param[in]   stream  stream direction
-  * @return      true or false
-  */
-extern int abox_dma_can_free(struct snd_soc_pcm_runtime *rtd, int stream);
-
-/**
-  * Test dma can be stopped
-  * @param[in]   rtd     asoc runtime
-  * @param[in]   stream  stream direction
-  * @return      true or false
-  */
-extern int abox_dma_can_stop(struct snd_soc_pcm_runtime *rtd, int stream);
-
-/**
-  * Test dma can be started
-  * @param[in]   rtd     asoc runtime
-  * @param[in]   stream  stream direction
-  * @return      true or false
-  */
-extern int abox_dma_can_start(struct snd_soc_pcm_runtime *rtd, int stream);
-
-/**
-  * Test dma can be prepared
-  * @param[in]   rtd     asoc runtime
-  * @param[in]   stream  stream direction
-  * @return      true or false
-  */
-extern int abox_dma_can_prepare(struct snd_soc_pcm_runtime *rtd, int stream);
-
-/**
-  * Test dma can be configured
-  * @param[in]   rtd     asoc runtime
-  * @param[in]   stream  stream direction
-  * @return      true or false
-  */
-extern int abox_dma_can_params(struct snd_soc_pcm_runtime *rtd, int stream);
-
-/**
-  * Test dma can be opened
-  * @param[in]   rtd     asoc runtime
-  * @param[in]   stream  stream direction
-  * @return      true or false
-  */
-extern int abox_dma_can_open(struct snd_soc_pcm_runtime *rtd, int stream);
 
 #endif /* __SND_SOC_ABOX_DMA_H */

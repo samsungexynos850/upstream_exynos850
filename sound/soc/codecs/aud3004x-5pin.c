@@ -26,7 +26,7 @@
 #include "aud3004x.h"
 #include "aud3004x-5pin.h"
 
-#define AUD3004X_JACK_VER 20017
+#define AUD3004X_JACK_VER 10015
 
 #define ADC_SAMPLE_SIZE 5
 #define ADC_TRACE_NUM		5

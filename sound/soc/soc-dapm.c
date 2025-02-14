@@ -808,14 +808,11 @@ static void dapm_set_mixer_path_status(struct snd_soc_dapm_path *p, int i,
 	} else {
 		/* since a virtual mixer has no backing registers to
 		 * decide which path to connect, it will try to match
-		 * with initial value 0.  This is to ensure
+		 * with initial state.  This is to ensure
 		 * that the default mixer choice will be
 		 * correctly powered up during initialization.
 		 */
-		val = 0;
-		if (invert)
-			val = max - val;
-		p->connect = !!val;
+		p->connect = invert;
 	}
 }
 
@@ -2016,7 +2013,7 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 	dapm_pre_sequence_async(&card->dapm, 0);
 	/* Run other bias changes in parallel */
 	list_for_each_entry(d, &card->dapm_list, list) {
-		if (d != &card->dapm)
+		if (d != &card->dapm && d->bias_level != d->target_bias_level)
 			async_schedule_domain(dapm_pre_sequence_async, d,
 						&async_domain);
 	}
@@ -2040,7 +2037,7 @@ static int dapm_power_widgets(struct snd_soc_card *card, int event)
 
 	/* Run all the bias changes in parallel */
 	list_for_each_entry(d, &card->dapm_list, list) {
-		if (d != &card->dapm)
+		if (d != &card->dapm && d->bias_level != d->target_bias_level)
 			async_schedule_domain(dapm_post_sequence_async, d,
 						&async_domain);
 	}

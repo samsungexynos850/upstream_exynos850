@@ -26,7 +26,7 @@
 #include "aud3004x.h"
 #include "aud3004x-6pin.h"
 
-#define AUD3004X_JACK_VER 20017
+#define AUD3004X_JACK_VER 10015
 
 #define ADC_SAMPLE_SIZE 5
 #define ADC_TRACE_NUM		5
@@ -43,7 +43,6 @@
 #define AUD3004X_GDET_DELAY					20
 #define AUD3004X_MDET_DELAY					300
 #define AUD3004X_ANT_LDET_DELAY				250
-#define AUD3004X_FAKE_INSERT_RETRY_DELAY	300
 #define AUD3004X_MIC_ADC_DEFAULT			800
 #define AUD3004X_MIC_OPEN_DEFAULT			3400
 #define AUD3004X_BTN_ADC_DELAY				15
@@ -513,8 +512,7 @@ static bool aud3004x_jackstate_register(struct aud3004x_jack *jackdet)
 			if (prv_jack & JACK_SURGE_OUT)
 				dev_dbg(dev, "Priv: JACK_SURGE_OUT -> Cur: JACK_OUT\n");
 
-			aud3004x_update_bits(aud3004x, AUD3004X_E4_DCTR_FSM3,
-					AP_POLLING_MASK | AP_JACK_IN_MASK | AP_JACK_OUT_MASK, 0);
+			aud3004x_write(aud3004x, AUD3004X_E4_DCTR_FSM3, 0x00);
 			/* Pole Value Reset */
 			aud3004x_write(aud3004x, AUD3004X_E3_DCTR_FSM2, 0x00);
 			/* HQ Mode Reset */
@@ -531,12 +529,9 @@ static bool aud3004x_jackstate_register(struct aud3004x_jack *jackdet)
 		} else if (prv_jack & JACK_APCHK) {
 			dev_dbg(dev, "Priv: JACK_APCHK -> Cur: JACK_OUT\n");
 
-			aud3004x_update_bits(aud3004x, AUD3004X_E4_DCTR_FSM3,
-					AP_POLLING_MASK | AP_JACK_IN_MASK | AP_JACK_OUT_MASK,
-					AP_POLLING_MASK | AP_JACK_IN_MASK | AP_JACK_OUT_MASK);
+			aud3004x_write(aud3004x, AUD3004X_E4_DCTR_FSM3, 0x10);
 			aud3004x_usleep(JACK_DEFAULT_USEC);
-			aud3004x_update_bits(aud3004x, AUD3004X_E4_DCTR_FSM3,
-					AP_POLLING_MASK | AP_JACK_IN_MASK | AP_JACK_OUT_MASK, 0);
+			aud3004x_write(aud3004x, AUD3004X_E4_DCTR_FSM3, 0x00);
 
 			/* IRQ Masking OFF */
 			aud3004x_write(aud3004x, AUD3004X_08_IRQ1M, 0x00);
@@ -596,11 +591,10 @@ static bool aud3004x_jackstate_register(struct aud3004x_jack *jackdet)
 				dev_dbg(dev, "Priv: JACK_3POLE -> Cur: JACK_SURGE_IN\n");
 			if (prv_jack & JACK_4POLE)
 				dev_dbg(dev, "Priv: JACK_4POLE -> Cur: JACK_SURGE_IN\n");
-#if 0
+
 			/* AP ANT Masking */
 			aud3004x_update_bits(aud3004x, AUD3004X_E4_DCTR_FSM3,
 					AP_ANT_RJIN_MASK, AP_ANT_RJIN_MASK);
-#endif
 		} else {
 			goto err;
 		}
@@ -629,13 +623,12 @@ static bool aud3004x_jackstate_register(struct aud3004x_jack *jackdet)
 			aud3004x_write(aud3004x, AUD3004X_08_IRQ1M, 0x00);
 			aud3004x_write(aud3004x, AUD3004X_09_IRQ2M, 0x00);
 
-#if 0
 			/* AP ANT Unmasking */
 			aud3004x_usleep(JACK_ANT_USEC);
 			if (!jackdet->is_aux_inserted)
 				aud3004x_update_bits(aud3004x, AUD3004X_E4_DCTR_FSM3,
 						AP_ANT_RJIN_MASK, 0);
-#endif
+
 			queue_delayed_work(jackdet->surge_out_wq, &jackdet->surge_out_work,
 					msecs_to_jiffies(100));
 		} else {
@@ -687,11 +680,10 @@ static bool aud3004x_jackstate_register(struct aud3004x_jack *jackdet)
 			/* ANT MDET Masking */
 			aud3004x_update_bits(aud3004x, AUD3004X_D2_DCTR_TEST2,
 					T_PDB_ANT_MDET_MASK, T_PDB_ANT_MDET_MASK);
-#if 0
 			/* AP ANT Masking */
 			aud3004x_update_bits(aud3004x, AUD3004X_E4_DCTR_FSM3,
 					AP_ANT_RJIN_MASK, AP_ANT_RJIN_MASK);
-#endif
+
 			/* Need to ANT Comp. Delay in AUX */
 			msleep(jackdet->ant_ldet_delay);
 
@@ -934,13 +926,11 @@ static int return_gdet_adc_thd(struct aud3004x_jack *jackdet)
 	if (jackstate->gdet_adc < jackdet->adc_thd_fake_jack)
 		return JACK_RET_JACK;
 	else if (jackstate->gdet_adc >= jackdet->adc_thd_fake_jack &&
-			jackstate->gdet_adc < jackdet->adc_thd_water_in)
+			jackstate->gdet_adc < jackdet->adc_thd_auxcable)
 		return JACK_RET_FAKE;
-#if 0
 	else if (jackstate->gdet_adc >= jackdet->adc_thd_auxcable &&
 			jackstate->gdet_adc < jackdet->adc_thd_water_in)
 		return JACK_RET_JACK;
-#endif
 	else if (jackstate->gdet_adc >= jackdet->adc_thd_water_in &&
 			jackstate->gdet_adc < jackdet->adc_thd_water_out)
 		return JACK_RET_WATER;
@@ -968,13 +958,13 @@ static void read_gdet_adc(struct aud3004x_jack *jackdet)
 		/* GDET Pull-up registance 500k */
 		aud3004x_write(aud3004x, AUD3004X_D1_DCTR_TEST1, 0x08);
 		aud3004x_update_bits(aud3004x, AUD3004X_C0_ACTR_JD1,
-				CTRV_GDET_POP_MASK, GDET_POP_500K << CTRV_GDET_POP_SHIFT);
+				CTRV_GDET_POP_MASK, GDET_POP_500K);
 
 		jackstate->gdet_adc = adc_get_value(jackdet, 0);
 
 		/* GDET Pull-up registance 1M */
 		aud3004x_update_bits(aud3004x, AUD3004X_C0_ACTR_JD1,
-				CTRV_GDET_POP_MASK, GDET_POP_1000K << CTRV_GDET_POP_SHIFT);
+				CTRV_GDET_POP_MASK, GDET_POP_1000K);
 		aud3004x_write(aud3004x, AUD3004X_D1_DCTR_TEST1, 0x00);
 
 		regcache_cache_switch(aud3004x, true);
@@ -1021,23 +1011,18 @@ static void aud3004x_gdet_adc_work(struct work_struct *work)
 	/* read gdet adc value */
 	read_gdet_adc(jackdet);
 
+	dev_dbg(dev, "%s called, gdet adc: %d\n", __func__, jackstate->gdet_adc);
+
 	switch (return_gdet_adc_thd(jackdet)) {
 	case JACK_RET_JACK:
-		dev_dbg(dev, "%s called, gdet adc: %d\n", __func__, jackstate->gdet_adc);
 		/* Jack state: pole value decision */
 		aud3004x_jackstate_set(jackdet, JACK_POLE_DEC);
 		break;
 	case JACK_RET_FAKE:
-		if (jackdet->fake_insert_log_count == 10) {
-			dev_dbg(dev, "%s called, gdet adc: %d\n", __func__, jackstate->gdet_adc);
-			jackdet->fake_insert_log_count = 0;
-		}
-		jackdet->fake_insert_log_count++;
 		queue_delayed_work(jackdet->gdet_adc_wq, &jackdet->gdet_adc_work,
 				msecs_to_jiffies(jackdet->fake_insert_retry_delay));
 		break;
 	case JACK_RET_AUX:
-		dev_dbg(dev, "%s called, gdet adc: %d\n", __func__, jackstate->gdet_adc);
 #ifdef CONFIG_SND_SOC_AUD3004X_EXT_ANT
 		/* Jack state: Ext Ant */
 		aud3004x_jackstate_set(jackdet, JACK_POLE_DEC);
@@ -1047,12 +1032,10 @@ static void aud3004x_gdet_adc_work(struct work_struct *work)
 #endif
 		break;
 	case JACK_RET_WATER:
-		dev_dbg(dev, "%s called, gdet adc: %d\n", __func__, jackstate->gdet_adc);
 		/* Jack state: water detection */
 		aud3004x_jackstate_set(jackdet, JACK_WATER);
 		break;
 	case JACK_RET_OUT:
-		dev_dbg(dev, "%s called, gdet adc: %d\n", __func__, jackstate->gdet_adc);
 		/* Jack state: water or jack out */
 		aud3004x_jackstate_set(jackdet, JACK_OUT);
 		break;
@@ -1148,8 +1131,7 @@ static void aud3004x_jack_parse_dt(struct aud3004x_priv *aud3004x)
 	struct aud3004x_jack *jackdet = aud3004x->p_jackdet;
 	struct device *dev = aud3004x->dev;
 	struct of_phandle_args args;
-	int bias_v_conf, mic_range, mic_open_value, btn_rel_val;
-	int delay, ant_ldet_delay, fake_insert_retry_delay;
+	int bias_v_conf, mic_range, mic_open_value, btn_rel_val, delay, ant_ldet_delay;
 	int jackin_dbnc, jackout_dbnc, ant_ldetin_dbnc, ant_ldetout_dbnc;
 	int thd_adc, gdet_value;
 	int i, ret;
@@ -1220,17 +1202,10 @@ static void aud3004x_jack_parse_dt(struct aud3004x_priv *aud3004x)
 	else
 		jackdet->ant_ldet_delay = AUD3004X_ANT_LDET_DELAY;
 
-	/* Fake jack retry delay time */
-	ret = of_property_read_u32(dev->of_node, "fake-insert-retry-delay", &fake_insert_retry_delay);
-	if (!ret)
-		jackdet->fake_insert_retry_delay = fake_insert_retry_delay;
-	else
-		jackdet->fake_insert_retry_delay = AUD3004X_FAKE_INSERT_RETRY_DELAY;
-
 	dev_dbg(dev, "GDET delay: %d, MDET delay: %d, ANT LDET delay: %d, Mic adc range: %d,"
-			" Mic open value: %d, Fake jack retry delay: %d\n", jackdet->gdet_delay,
-			jackdet->mdet_delay, jackdet->ant_ldet_delay, jackdet->mic_adc_range,
-			jackdet->mic_open_value, jackdet->fake_insert_retry_delay);
+			" Mic open value: %d\n", jackdet->gdet_delay, jackdet->mdet_delay,
+			jackdet->ant_ldet_delay, jackdet->mic_adc_range, jackdet->mic_open_value);
+
 
 	/*
 	 * Jack Detect Tuning Values
@@ -1397,16 +1372,11 @@ static void aud3004x_jack_register_initialize(struct snd_soc_component *codec)
 	aud3004x_write(aud3004x, AUD3004X_0C_IRQ5M, 0xDF);
 	aud3004x_write(aud3004x, AUD3004X_0D_IRQ6M, 0xDF);
 
-	aud3004x_write(aud3004x, AUD3004X_D6_DCTR_TEST6, 0x20);
-
 	aud3004x_write(aud3004x, AUD3004X_8B_OVP_INTR_POS, 0xCF);
 	aud3004x_write(aud3004x, AUD3004X_8C_OVP_INTR_NEG, 0xCF);
 	/* ANT MDET Masking */
 	aud3004x_update_bits(aud3004x, AUD3004X_D2_DCTR_TEST2,
 			T_PDB_ANT_MDET_MASK, T_PDB_ANT_MDET_MASK);
-
-	aud3004x_update_bits(aud3004x, AUD3004X_E4_DCTR_FSM3,
-			AP_ANT_RJIN_MASK, AP_ANT_RJIN_MASK);
 #if 0
 	/* 5 Pin Mode */
 	aud3004x_write(aud3004x, AUD3004X_D0_DCTR_CM, 0x0B);
@@ -1765,7 +1735,6 @@ int aud3004x_jack_probe(struct snd_soc_component *codec)
 	/* Initialize jack state variable */
 	jackdet->jack_ver = AUD3004X_JACK_VER;
 	jackdet->is_aux_inserted = false;
-	jackdet->fake_insert_log_count = 10;
 	jackstate->prv_jack_state = JACK_OUT;
 	jackstate->cur_jack_state = JACK_OUT;
 	jackstate->gdet_adc = -EINVAL;

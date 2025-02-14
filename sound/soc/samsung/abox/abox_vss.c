@@ -86,22 +86,17 @@ static int samsung_abox_vss_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
-#ifdef CONFIG_SND_SOC_ABOX_NOCP
-#else
 	void __iomem *magic_addr;
-#endif
 
 	dev_dbg(dev, "%s\n", __func__);
 
 	of_samsung_property_read_u32(dev, np, "magic-offset", &MAGIC_OFFSET);
 	dev_info(dev, "magic-offset = 0x%08X\n", MAGIC_OFFSET);
-#ifdef CONFIG_SND_SOC_ABOX_NOCP
-#else
 	if (!IS_ERR_OR_NULL(shm_get_vss_region())) {
 		magic_addr = shm_get_vss_region() + MAGIC_OFFSET;
 		writel(0, magic_addr);
 	}
-#endif
+
 	return 0;
 }
 

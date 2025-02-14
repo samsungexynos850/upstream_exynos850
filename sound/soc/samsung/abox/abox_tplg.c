@@ -265,7 +265,7 @@ static int abox_tplg_ipc_put(struct device *dev, int gid, int id,
 	int i, ret;
 
 	dev_dbg(dev, "%s(%#x, %d, %u, %d, %d)\n", __func__, gid, id,
-                        value[0], count, sync);
+			value[0], count, sync);
 
 	msg.ipcid = IPC_SYSTEM;
 	system_msg->msgtype = ABOX_UPDATE_COMPONENT_CONTROL;
@@ -280,7 +280,7 @@ static int abox_tplg_ipc_put(struct device *dev, int gid, int id,
 		reinit_completion(&update_control_completion);
 		timeout = wait_for_completion_timeout(
 				&update_control_completion,
-				msecs_to_jiffies(1000));
+				abox_get_waiting_jiffies(true));
 		if (timeout <= 0)
 			return -ETIME;
 	}
@@ -299,7 +299,7 @@ static int abox_tplg_ipc_put_complete(int gid, int id, unsigned int *value)
 
 			for (i = 0; i < kdata->count; i++) {
 				dev_dbg(dev, "%s: %#x, %#x, %d\n", __func__,
-                                                gid, id, value[i]);
+						gid, id, value[i]);
 				kdata->value[i] = value[i];
 			}
 			complete(&update_control_completion);
@@ -362,7 +362,7 @@ static int abox_tplg_val_put(struct device *dev,
 	if (kdata->synchronous) {
 		timeout = wait_for_completion_timeout(
 				&update_control_completion,
-				msecs_to_jiffies(500));
+				abox_get_waiting_jiffies(true));
 		if (timeout <= 0)
 			return -ETIME;
 	}

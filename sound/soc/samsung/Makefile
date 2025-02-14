@@ -19,6 +19,7 @@ obj-$(CONFIG_SND_SAMSUNG_PCM) += snd-soc-pcm.o
 obj-$(CONFIG_SND_SAMSUNG_I2S) += snd-soc-i2s.o
 obj-$(CONFIG_SND_SAMSUNG_I2S) += snd-soc-idma.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_DISPLAYPORT) += snd-soc-dp_dma.o
+obj-$(CONFIG_SND_SOC_SAMSUNG_ABOX) += abox/
 obj-$(CONFIG_SND_SOC_SAMSUNG_VTS) += vts/
 
 # S3C24XX Machine Support
@@ -74,4 +75,3 @@ obj-$(CONFIG_SND_SOC_SAMSUNG_EXYNOS9630_SOUND) += exynos9630_sound.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_EXYNOS3830_SOUND) += exynos3830_sound.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_EXYNOS3830_AUD3004X) += snd-soc-exynos3830-aud3004x.o
 obj-$(CONFIG_SND_SOC_SAMSUNG_AUDIO) += sec_audio_sysfs.o sec_audio_debug.o
-obj-$(CONFIG_SND_SOC_SAMSUNG_ABOX) += abox/

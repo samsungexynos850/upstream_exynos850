@@ -13,7 +13,7 @@
 #include <linux/sched/clock.h>
 
 #include "abox.h"
-#include "abox_proc.h"
+#include "abox_dbg.h"
 #include "abox_qos.h"
 
 static DEFINE_SPINLOCK(abox_qos_lock);
@@ -375,5 +375,6 @@ void abox_qos_init(struct device *adev)
 	dev_abox = adev;
 	abox_qos_wq = alloc_ordered_workqueue("abox_qos",
 			WQ_FREEZABLE | WQ_MEM_RECLAIM);
-	abox_proc_create_file("qos", 0660, NULL, &abox_qos_fops, NULL, 0);
+	debugfs_create_file("qos", 0660, abox_dbg_get_root_dir(), NULL,
+			&abox_qos_fops);
 }

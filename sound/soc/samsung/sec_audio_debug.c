@@ -19,7 +19,6 @@
  */
 
 #include <linux/debugfs.h>
-#include <linux/proc_fs.h>
 #include <linux/io.h>
 #include <linux/iommu.h>
 #include <linux/kernel.h>
@@ -45,10 +44,7 @@
 
 #define SEC_AUDIO_DEBUG_STRING_WQ_NAME "sec_audio_dbg_str_wq"
 
-static size_t rmem_size_min[TYPE_SIZE_MAX] = {0xab0cab0c, 0xab0cab0c};
-//static size_t rmem_size_min[TYPE_SIZE_MAX] = {0xab0cab0c, 0x0};
 struct device *debug_dev;
-int audio_debug_level;
 
 struct sec_audio_debug_data {
 	char *dbg_str_buf;
@@ -63,20 +59,17 @@ struct sec_audio_debug_data {
 
 static struct sec_audio_debug_data *p_debug_data;
 
-static struct proc_dir_entry *audio_procfs;
-static struct dentry *audio_debugfs_link;
+static struct dentry *audio_debugfs;
 static struct sec_audio_log_data *p_debug_log_data;
 static struct sec_audio_log_data *p_debug_bootlog_data;
 static struct sec_audio_log_data *p_debug_pmlog_data;
 static unsigned int debug_buff_switch;
 
-int aboxlog_file_opened;
-static DEFINE_MUTEX(aboxlog_file_lock);
-int half2_buff_use;
+int aboxlog_file_opened = 0;
+int half2_buff_use = 0;
 #define ABOXLOG_BUFF_SIZE SZ_2M
 
 ssize_t aboxlog_file_index;
-static DEFINE_MUTEX(aboxlog_file_index_lock);
 struct abox_log_kernel_buffer {
 	char *buffer;
 	unsigned int index;
@@ -86,7 +79,7 @@ struct abox_log_kernel_buffer {
 };
 static struct abox_log_kernel_buffer *p_debug_aboxlog_data;
 
-static int read_half_buff_id;
+static int read_half_buff_id = 0;
 
 static void send_half_buff_full_event(int buffer_id)
 {
@@ -136,13 +129,6 @@ void abox_log_extra_copy(char *src_base, unsigned int index_reader,
 {
 	mutex_lock(&p_debug_aboxlog_data->abox_log_lock);
 
-	if ((index_reader > src_buff_size) || (index_writer > src_buff_size)) {
-		pr_err("%s(%pK, %u, %u, %u): out of bound index\n", __func__,
-			(void *) src_base, index_reader, index_writer, src_buff_size);
-		mutex_unlock(&p_debug_aboxlog_data->abox_log_lock);
-		return;
-	}
-
 	if (index_reader > index_writer) {
 		abox_log_copy(src_base + index_reader,
 				src_buff_size - index_reader);
@@ -173,12 +159,12 @@ static void abox_debug_string_update_workfunc(struct work_struct *wk)
 {
 	struct abox_data *data = abox_get_abox_data();
 	int core_id, index;
-	int gpr_id[] = {0, 1, 2, 3, 4, 14, 31}; /* R0~R4, R14, PC */
+	int gpr_id[] = {0,1,2,3,4,14,31}; /* R0~R4, R14, PC */
 	int gpr_count = sizeof(gpr_id) / sizeof(int);
 	unsigned int len = 0;
 /*
- *	struct sec_audio_debug_data *dbg_data = container_of(wk,
- *					   struct sec_audio_debug_data, debug_string_work);
+	struct sec_audio_debug_data *dbg_data = container_of(wk,
+					   struct sec_audio_debug_data, debug_string_work);
 */
 	if (!p_debug_data)
 		return;
@@ -209,7 +195,7 @@ static void abox_debug_string_update_workfunc(struct work_struct *wk)
 			for (core_id = 0; core_id < 2; core_id++) {
 				for (index = 0; index < gpr_count; index++) {
 					len += snprintf(p_debug_data->dbg_str_buf + len, DBG_STR_BUFF_SZ - len,
-								"%08x ", abox_core_read_gpr_dump(core_id, gpr_id[index],
+								"%08x ",abox_core_read_gpr_dump(core_id, gpr_id[index], 
 								p_debug_data->abox_dbg_addr));
 					if (len >= DBG_STR_BUFF_SZ - 1)
 						goto buff_done;
@@ -228,7 +214,7 @@ static void abox_debug_string_update_workfunc(struct work_struct *wk)
 			for (core_id = 0; core_id < 2; core_id++) {
 				for (index = 0; index < gpr_count; index++) {
 					len += snprintf(p_debug_data->dbg_str_buf + len, DBG_STR_BUFF_SZ - len,
-								"%08x ", abox_core_read_gpr(core_id, gpr_id[index]));
+								"%08x ",abox_core_read_gpr(core_id, gpr_id[index]));
 					if (len >= DBG_STR_BUFF_SZ - 1)
 						goto buff_done;
 				}
@@ -252,7 +238,7 @@ buff_done:
 void abox_debug_string_update(enum abox_debug_err_type type, void *addr)
 {
 	p_debug_data->debug_err_type = type;
-	p_debug_data->abox_dbg_addr = (unsigned int *) addr;
+	p_debug_data->abox_dbg_addr = (unsigned int*) addr;
 
 	queue_work(p_debug_data->debug_string_wq, &p_debug_data->debug_string_work);
 }
@@ -327,15 +313,12 @@ static int set_debug_buffer_switch(struct snd_kcontrol *kcontrol,
 	val = (unsigned int)ucontrol->value.integer.value[0];
 
 	if (val) {
-		ret = alloc_sec_audio_log(p_debug_log_data, SZ_1M);
+		alloc_sec_audio_log(p_debug_log_data, SZ_1M);
 		debug_buff_switch = SZ_1M;
 	} else {
-		ret = alloc_sec_audio_log(p_debug_log_data, 0);
+		alloc_sec_audio_log(p_debug_log_data, 0);
 		debug_buff_switch = 0;
 	}
-	if (ret < 0)
-		pr_err("%s: allocation failed at sec_audio_log\n",
-			__func__);
 
 	return ret;
 }
@@ -353,7 +336,6 @@ int register_debug_mixer(struct snd_soc_card *card)
 }
 EXPORT_SYMBOL_GPL(register_debug_mixer);
 
-#if 0
 static int audio_log_open_file(struct inode *inode, struct  file *file)
 {
 	struct sec_audio_log_data *p_dbg_log_data;
@@ -413,7 +395,6 @@ static const struct file_operations audio_log_fops = {
 	.read = audio_log_read_file,
 	.llseek = default_llseek,
 };
-#endif
 
 static void free_sec_audio_log(struct sec_audio_log_data *p_dbg_log_data)
 {
@@ -441,11 +422,11 @@ int alloc_sec_audio_log(struct sec_audio_log_data *p_dbg_log_data, size_t buffer
 		return 0;
 	}
 
-	if (p_dbg_log_data->virtual)
+	if (p_dbg_log_data->virtual) {
 		p_dbg_log_data->audio_log_buffer = vzalloc(buffer_len);
-	else
+	} else {
 		p_dbg_log_data->audio_log_buffer = kzalloc(buffer_len, GFP_KERNEL);
-
+	}
 	if (p_dbg_log_data->audio_log_buffer == NULL) {
 		pr_err("%s: Failed to alloc audio_log_buffer for %s\n", __func__, p_dbg_log_data->name);
 		p_dbg_log_data->sz_log_buff = 0;
@@ -458,7 +439,6 @@ int alloc_sec_audio_log(struct sec_audio_log_data *p_dbg_log_data, size_t buffer
 }
 EXPORT_SYMBOL_GPL(alloc_sec_audio_log);
 
-#if 0
 static ssize_t log_enable_read_file(struct file *file, char __user *user_buf,
 					size_t count, loff_t *ppos)
 {
@@ -506,7 +486,6 @@ static const struct file_operations log_enable_fops = {
 	.write = log_enable_write_file,
 	.llseek = default_llseek,
 };
-#endif
 
 static ssize_t make_prefix_msg(char *buff, int level, struct device *dev)
 {
@@ -516,7 +495,7 @@ static ssize_t make_prefix_msg(char *buff, int level, struct device *dev)
 
 	msg_size = scnprintf(buff, LOG_MSG_BUFF_SZ, "<%d> [%5lu.%06lu] %s %s: ",
 						level, (unsigned long) time, nanosec_t / 1000,
-						(dev) ? dev_driver_string(dev) : "NULL", (dev) ? dev_name(dev) : "NULL");
+						(dev)? dev_driver_string(dev): "NULL", (dev)? dev_name(dev): "NULL");
 	return msg_size;
 }
 
@@ -538,8 +517,9 @@ void sec_audio_log(int level, struct device *dev, const char *fmt, ...)
 	ssize_t temp_buff_idx = 0;
 	struct sec_audio_log_data *p_dbg_log_data = p_debug_log_data;
 
-	if (!p_dbg_log_data->sz_log_buff)
+	if (!p_dbg_log_data->sz_log_buff) {
 		return;
+	}
 
 	temp_buff_idx = make_prefix_msg(temp_buf, level, dev);
 
@@ -560,8 +540,9 @@ void sec_audio_bootlog(int level, struct device *dev, const char *fmt, ...)
 	ssize_t temp_buff_idx = 0;
 	struct sec_audio_log_data *p_dbg_log_data = p_debug_bootlog_data;
 
-	if (!p_dbg_log_data->sz_log_buff)
+	if (!p_dbg_log_data->sz_log_buff) {
 		return;
+	}
 
 	temp_buff_idx = make_prefix_msg(temp_buf, level, dev);
 
@@ -582,8 +563,9 @@ void sec_audio_pmlog(int level, struct device *dev, const char *fmt, ...)
 	ssize_t temp_buff_idx = 0;
 	struct sec_audio_log_data *p_dbg_log_data = p_debug_pmlog_data;
 
-	if (!p_dbg_log_data->sz_log_buff)
+	if (!p_dbg_log_data->sz_log_buff) {
 		return;
+	}
 
 	temp_buff_idx = make_prefix_msg(temp_buf, level, dev);
 
@@ -607,22 +589,18 @@ static int aboxhalflog_file_open(struct inode *inode, struct  file *file)
 {
 	pr_debug("%s\n", __func__);
 
-	mutex_lock(&aboxlog_file_lock);
 	if (aboxlog_file_opened) {
 		pr_err("%s: already opened\n", __func__);
-		mutex_unlock(&aboxlog_file_lock);
 		return -EBUSY;
 	}
 
 	aboxlog_file_opened = 1;
-	mutex_unlock(&aboxlog_file_lock);
 
-	mutex_lock(&aboxlog_file_index_lock);
-	if (read_half_buff_id == 0)
+	if (read_half_buff_id == 0) {
 		aboxlog_file_index = 0;
-	else
+	} else {
 		aboxlog_file_index = ABOXLOG_BUFF_SIZE / 2;
-	mutex_unlock(&aboxlog_file_index_lock);
+	}
 
 	return 0;
 }
@@ -631,9 +609,7 @@ static int aboxhalflog_file_release(struct inode *inode, struct file *file)
 {
 	pr_debug("%s\n", __func__);
 
-	mutex_lock(&aboxlog_file_lock);
 	aboxlog_file_opened = 0;
-	mutex_unlock(&aboxlog_file_lock);
 
 	return 0;
 }
@@ -646,15 +622,14 @@ static ssize_t aboxhalflog_file_read(struct file *file, char __user *user_buf,
 
 	pr_debug("%s(%zu, %lld)\n", __func__, count, *ppos);
 
-	if (read_half_buff_id == 0)
+	if (read_half_buff_id == 0) {
 		end = (ABOXLOG_BUFF_SIZE / 2) - 1;
-	else
+	} else {
 		end = ABOXLOG_BUFF_SIZE - 1;
+	}
 
-	mutex_lock(&aboxlog_file_index_lock);
 	if (aboxlog_file_index > end) {
 		pr_err("%s: read done\n", __func__);
-		mutex_unlock(&aboxlog_file_index_lock);
 		return copy_len;
 	}
 
@@ -663,11 +638,9 @@ static ssize_t aboxhalflog_file_read(struct file *file, char __user *user_buf,
 	ret = copy_to_user(user_buf, p_debug_aboxlog_data->buffer + aboxlog_file_index, copy_len);
 	if (ret) {
 		pr_err("%s: copy fail %d\n", __func__, (int) ret);
-		mutex_unlock(&aboxlog_file_index_lock);
 		return -EFAULT;
 	}
 	aboxlog_file_index += copy_len;
-	mutex_unlock(&aboxlog_file_index_lock);
 
 	return copy_len;
 }
@@ -695,51 +668,6 @@ static ssize_t aboxhalflog_file_write(struct file *file, const char __user *user
 	return size;
 }
 
-int check_upload_mode_disabled(void)
-{
-	int val = 0;
-#if IS_ENABLED(CONFIG_SEC_DEBUG)
-	val = secdbg_mode_enter_upload();
-#endif
-
-	if (val == 0x5)
-		return 0;
-	else
-		return 1;
-}
-EXPORT_SYMBOL_GPL(check_upload_mode_disabled);
-
-static int __init check_audio_debug_level(char *arg)
-{
-	audio_debug_level = 0;
-	get_option(&arg, &audio_debug_level);
-
-	return 0;
-}
-
-early_param("androidboot.debug_level", check_audio_debug_level);
-
-int check_debug_level_low(void)
-{
-	int debug_level_low = 0;
-
-	if (audio_debug_level == 0x4f4c) {
-		debug_level_low = 1;
-	} else {
-		debug_level_low = 0;
-	}
-	
-	pr_info("%s: 0x%x\n", __func__, audio_debug_level);
-	return debug_level_low;
-}
-EXPORT_SYMBOL_GPL(check_debug_level_low);
-
-size_t get_rmem_size_min(enum rmem_size_type id)
-{
-	return rmem_size_min[id];
-}
-EXPORT_SYMBOL_GPL(get_rmem_size_min);
-
 static const struct file_operations aboxhalflog_fops = {
 	.open = aboxhalflog_file_open,
 	.release = aboxhalflog_file_release,
@@ -751,23 +679,6 @@ static const struct file_operations aboxhalflog_fops = {
 
 static int sec_audio_debug_probe(struct platform_device *pdev)
 {
-	int ret = 0;
-	struct device_node *np = pdev->dev.of_node;
-	struct device *dev = &pdev->dev;
-	unsigned int val = 0;
-	printk(KERN_INFO "sec_audio_debug_probe\n");
-	ret = of_property_read_u32(np, "abox_dbg_size_min", &val);
-	if (ret < 0)
-		dev_err(dev, "%s: failed to get abox_dbg_size_min %d\n", __func__, ret);
-	else
-		rmem_size_min[TYPE_ABOX_DBG_SIZE] = (size_t) val;
-
-	ret = of_property_read_u32(np, "abox_slog_size_min", &val);
-	if (ret < 0)
-		dev_err(dev, "%s: failed to get abox_slog_size_min %d\n", __func__, ret);
-	else
-		rmem_size_min[TYPE_ABOX_SLOG_SIZE] = (size_t) val;
-
 	debug_dev = &pdev->dev;
 
 	return 0;
@@ -813,17 +724,9 @@ static int __init sec_audio_debug_init(void)
 	p_debug_data = data;
 	mutex_init(&p_debug_data->dbg_lock);
 
-	audio_procfs = proc_mkdir("audio", NULL);
-	if (!audio_procfs) {
-		pr_err("Failed to create audio procfs\n");
-		ret = -EPERM;
-		goto err_data;
-	}
-
-	audio_debugfs_link = debugfs_create_symlink("audio", NULL,
-			"/proc/audio");
-	if (!audio_debugfs_link) {
-		pr_err("Failed to create audio debugfs link\n");
+	audio_debugfs = debugfs_create_dir("audio", NULL);
+	if (!audio_debugfs) {
+		pr_err("Failed to create audio debugfs\n");
 		ret = -EPERM;
 		goto err_data;
 	}
@@ -832,9 +735,16 @@ static int __init sec_audio_debug_init(void)
 	if (!log_data) {
 		pr_err("%s: failed to alloc log_data\n", __func__);
 		ret = -ENOMEM;
-		goto err_procfs;
+		goto err_debugfs;
 	}
 	p_debug_log_data = log_data;
+/*
+	p_debug_log_data->audio_log_buffer = NULL;
+	p_debug_log_data->buff_idx = 0;
+	p_debug_log_data->full = 0;
+	p_debug_log_data->read_idx = 0;
+	p_debug_log_data->sz_log_buff = 0;
+*/
 	p_debug_log_data->virtual = 1;
 	p_debug_log_data->name = kasprintf(GFP_KERNEL, "runtime");
 
@@ -883,31 +793,37 @@ static int __init sec_audio_debug_init(void)
 
 	INIT_WORK(&p_debug_data->debug_string_work, abox_debug_string_update_workfunc);
 
-#if 0
-	proc_create_data("log_enable", 0660,
-			audio_procfs, &log_enable_fops, p_debug_log_data);
+	debugfs_create_file("log_enable",
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+			audio_debugfs, p_debug_log_data, &log_enable_fops);
 
-	proc_create_data("log", 0660,
-			audio_procfs, &audio_log_fops, p_debug_log_data);
+	debugfs_create_file("log",
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+			audio_debugfs, p_debug_log_data, &audio_log_fops);
 
-	proc_create_data("bootlog_enable", 0660,
-			audio_procfs, &log_enable_fops, p_debug_bootlog_data);
+	debugfs_create_file("bootlog_enable",
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+			audio_debugfs, p_debug_bootlog_data, &log_enable_fops);
 
-	proc_create_data("bootlog", 0660,
-			audio_procfs, &audio_log_fops, p_debug_bootlog_data);
+	debugfs_create_file("bootlog",
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+			audio_debugfs, p_debug_bootlog_data, &audio_log_fops);
 
-	proc_create_data("pmlog_enable", 0660,
-			audio_procfs, &log_enable_fops, p_debug_pmlog_data);
+	debugfs_create_file("pmlog_enable",
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+			audio_debugfs, p_debug_pmlog_data, &log_enable_fops);
 
-	proc_create_data("pmlog", 0660,
-			audio_procfs, &audio_log_fops, p_debug_pmlog_data);
-#endif
+	debugfs_create_file("pmlog",
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+			audio_debugfs, p_debug_pmlog_data, &audio_log_fops);
 
-	proc_create_data("abox_qos", 0660,
-			audio_procfs, &abox_qos_fops, NULL);
+	debugfs_create_file("abox_qos",
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+			audio_debugfs, NULL, &abox_qos_fops);
 
-	proc_create_data("aboxhalflog", 0660,
-			audio_procfs, &aboxhalflog_fops, NULL);
+	debugfs_create_file("aboxhalflog",
+			S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
+			audio_debugfs, NULL, &aboxhalflog_fops);
 
 	return 0;
 
@@ -932,8 +848,8 @@ err_log_data:
 	kfree(p_debug_log_data);
 	p_debug_log_data = NULL;
 
-err_procfs:
-	proc_remove(audio_procfs);
+err_debugfs:
+	debugfs_remove_recursive(audio_debugfs);
 
 err_data:
 	mutex_destroy(&p_debug_data->dbg_lock);
@@ -948,31 +864,35 @@ static void __exit sec_audio_debug_exit(void)
 {
 	mutex_destroy(&p_debug_aboxlog_data->abox_log_lock);
 	kfree_const(p_debug_aboxlog_data->buffer);
-	kfree(p_debug_aboxlog_data);
+	if (p_debug_aboxlog_data)
+		kfree(p_debug_aboxlog_data);
 	p_debug_aboxlog_data = NULL;
 
 	if (p_debug_pmlog_data->sz_log_buff)
 		free_sec_audio_log(p_debug_pmlog_data);
 	kfree_const(p_debug_pmlog_data->name);
-	kfree(p_debug_pmlog_data);
+	if (p_debug_pmlog_data)
+		kfree(p_debug_pmlog_data);
 	p_debug_pmlog_data = NULL;
 
 	if (p_debug_bootlog_data->sz_log_buff)
 		free_sec_audio_log(p_debug_bootlog_data);
 	kfree_const(p_debug_bootlog_data->name);
-	kfree(p_debug_bootlog_data);
+	if (p_debug_bootlog_data)
+		kfree(p_debug_bootlog_data);
 	p_debug_bootlog_data = NULL;
 
 	if (p_debug_log_data->sz_log_buff)
 		free_sec_audio_log(p_debug_log_data);
 	kfree_const(p_debug_log_data->name);
-	kfree(p_debug_log_data);
+	if (p_debug_log_data)
+		kfree(p_debug_log_data);
 	p_debug_log_data = NULL;
 
 	destroy_workqueue(p_debug_data->debug_string_wq);
 	p_debug_data->debug_string_wq = NULL;
 
-	proc_remove(audio_procfs);
+	debugfs_remove_recursive(audio_debugfs);
 
 	mutex_destroy(&p_debug_data->dbg_lock);
 	kfree(p_debug_data);
