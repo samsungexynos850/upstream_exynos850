@@ -65,8 +65,7 @@ static const char * const power_supply_charge_type_text[] = {
 static const char * const power_supply_health_text[] = {
 	"Unknown", "Good", "Overheat", "Dead", "Over voltage",
 	"Unspecified failure", "Cold", "Watchdog timer expire",
-	"Safety timer expire", "Over current", "Calibration required",
-	"Warm", "Cool", "Hot"
+	"Safety timer expire", "Over current", "Warm", "Cool", "Hot"
 };
 
 static const char * const power_supply_technology_text[] = {
@@ -104,7 +103,6 @@ static const char * const power_supply_usbc_pr_text[] = {
 static const char * const power_supply_typec_src_rp_text[] = {
 	"Rp-Default", "Rp-1.5A", "Rp-3A"
 };
-
 
 static ssize_t power_supply_show_property(struct device *dev,
 					  struct device_attribute *attr,
@@ -225,6 +223,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(present),
 	POWER_SUPPLY_ATTR(online),
 	POWER_SUPPLY_ATTR(authentic),
+	POWER_SUPPLY_ATTR(charging_enabled),
 	POWER_SUPPLY_ATTR(technology),
 	POWER_SUPPLY_ATTR(cycle_count),
 	POWER_SUPPLY_ATTR(voltage_max),
@@ -235,9 +234,11 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(voltage_avg),
 	POWER_SUPPLY_ATTR(voltage_ocv),
 	POWER_SUPPLY_ATTR(voltage_boot),
+	POWER_SUPPLY_ATTR(input_voltage_regulation),
 	POWER_SUPPLY_ATTR(current_max),
 	POWER_SUPPLY_ATTR(current_now),
 	POWER_SUPPLY_ATTR(current_avg),
+	POWER_SUPPLY_ATTR(current_full),
 	POWER_SUPPLY_ATTR(current_boot),
 	POWER_SUPPLY_ATTR(power_now),
 	POWER_SUPPLY_ATTR(power_avg),
@@ -248,6 +249,9 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(charge_now),
 	POWER_SUPPLY_ATTR(charge_avg),
 	POWER_SUPPLY_ATTR(charge_counter),
+	POWER_SUPPLY_ATTR(charge_otg_control),
+	POWER_SUPPLY_ATTR(charge_powered_otg_control),
+	POWER_SUPPLY_ATTR(charge_temp),
 	POWER_SUPPLY_ATTR(constant_charge_current),
 	POWER_SUPPLY_ATTR(constant_charge_current_max),
 	POWER_SUPPLY_ATTR(constant_charge_voltage),
@@ -255,6 +259,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(charge_control_limit),
 	POWER_SUPPLY_ATTR(charge_control_limit_max),
 	POWER_SUPPLY_ATTR(input_current_limit),
+	POWER_SUPPLY_ATTR(charge_counter_shadow),
 	POWER_SUPPLY_ATTR(energy_full_design),
 	POWER_SUPPLY_ATTR(energy_empty_design),
 	POWER_SUPPLY_ATTR(energy_full),
@@ -278,7 +283,7 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(time_to_full_now),
 	POWER_SUPPLY_ATTR(time_to_full_avg),
 	POWER_SUPPLY_ATTR(type),
-	POWER_SUPPLY_ATTR(usb_type),
+    POWER_SUPPLY_ATTR(usb_type),
 	POWER_SUPPLY_ATTR(scope),
 	POWER_SUPPLY_ATTR(precharge_current),
 	POWER_SUPPLY_ATTR(charge_term_current),
@@ -452,6 +457,24 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(battery_type),
 	POWER_SUPPLY_ATTR(cycle_counts),
 	POWER_SUPPLY_ATTR(serial_number),
+	POWER_SUPPLY_ATTR(afc_charger_mode),
+	POWER_SUPPLY_ATTR(vchgin),
+	POWER_SUPPLY_ATTR(vwcin),
+	POWER_SUPPLY_ATTR(vbyp),
+	POWER_SUPPLY_ATTR(vsys),
+	POWER_SUPPLY_ATTR(vbat),
+	POWER_SUPPLY_ATTR(vgpadc),
+	POWER_SUPPLY_ATTR(vcc1),
+	POWER_SUPPLY_ATTR(vcc2),
+	POWER_SUPPLY_ATTR(ichgin),
+	POWER_SUPPLY_ATTR(iwcin),
+	POWER_SUPPLY_ATTR(iotg),
+	POWER_SUPPLY_ATTR(itx),
+	POWER_SUPPLY_ATTR(co_enable),
+	POWER_SUPPLY_ATTR(rr_enable),
+	POWER_SUPPLY_ATTR(pm_factory),
+	POWER_SUPPLY_ATTR(tdie),
+	POWER_SUPPLY_ATTR(fast_iavg),
 };
 
 static struct attribute *
