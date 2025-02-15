@@ -10,31 +10,17 @@ CONFIG_EXTRA_FIRMWARE_DIR="firmware"
 fwdir := $(subst $(quote),,$(CONFIG_EXTRA_FIRMWARE_DIR))
 fwabs := $(addprefix $(srctree)/,$(filter-out /%,$(fwdir)))$(filter /%,$(fwdir))
 
-fw-shipped-$(CONFIG_TOUCHSCREEN_SEC_TS_A552) += tsp_sec/hero2la.bin
-fw-shipped-$(CONFIG_TOUCHSCREEN_SEC_TS) += tsp_sec/y761_dream1.fw
+fw-external-$(CONFIG_SENSORS_SSP) += sensorhub/shub_nacho_bl.bin
+fw-external-$(CONFIG_SENSORS_SSP_A21S) += sensorhub/shub_nacho_a21s.bin
+fw-external-$(CONFIG_SENSORS_SSP_A21S) += sensorhub/a21s_bring_up.bin
 
-fw-external-$(CONFIG_TOUCHSCREEN_FTS_FT820X) += tsp_focaltech/ft8203_gtmotorwifi.bin tsp_focaltech/ft8203_gtmotory24wifi.bin
-fw-external-$(CONFIG_TOUCHSCREEN_FTS_FT8720) += tsp_focaltech/ft8720_m13.bin tsp_focaltech/ft8720_m13_ramtest.bin
-fw-external-$(CONFIG_TOUCHSCREEN_HIMAX_IC_HX83112) += tsp_himax/hx83112f_a13.bin
 fw-external-$(CONFIG_TOUCHSCREEN_SYNAPTICS_TCM) += tsp_synaptics/td4150_a21s.bin
-fw-external-$(CONFIG_KEYBOARD_STM_FSR) += key_stm/sidekey.fw.20190725
-fw-external-$(CONFIG_TOUCHSCREEN_HIMAX_IC_HX83102) += tsp_himax/hx83102e_gta4s_init.bin tsp_himax/hx83102e_gth.bin
-fw-external-$(CONFIG_TOUCHSCREEN_NOVATEK_NT36523_SPI) += tsp_novatek/nt36672_a13_csot.bin tsp_novatek/nt36672_a13_csot_mp.bin \
-								tsp_novatek/nt36672_a13_tianma.bin tsp_novatek/nt36672_a13_tianma_mp.bin \
-								tsp_novatek/nt36525c_a04s_csot.bin tsp_novatek/nt36525c_a04s_csot_mp.bin \
-								tsp_novatek/nt36525c_a04s_tianma.bin tsp_novatek/nt36525c_a04s_tianma_mp.bin \
-								tsp_novatek/nt36525c_a04s_dtc.bin tsp_novatek/nt36525c_a04s_dtc_mp.bin \
-								tsp_novatek/nt36672_a14_tianma.bin tsp_novatek/nt36672_a14_tianma_mp.bin
-fw-external-$(CONFIG_TOUCHSCREEN_OVT_TD4150_SPI) += tsp_ovt/td4375_a13_boe.bin tsp_ovt/td4162_a04s_boe.bin tsp_ovt/td4160_a13x_boe.bin
-fw-external-$(CONFIG_TOUCHSCREEN_ILITEK_ILI9881X_SPI) += tsp_ilitek/ili7807_m13_f13.hex
-fw-external-$(CONFIG_TOUCHSCREEN_HIMAX_HX83XXX_SPI) += tsp_himax/hx83112f_boe_m13_f13.bin
-fw-external-$(CONFIG_SENSORS_A96T396_BENZ2) += abov/a96t396_benz2_main.bin
-fw-external-$(CONFIG_SENSORS_A96T396_A13) += abov/a96t396_a13_main.bin
-fw-external-$(CONFIG_SENSORS_A96T396_A13_KOR) += abov/a96t396_a13_kor_main.bin
 
-fw-external-$(CONFIG_KEYBOARD_A96T396) += tk_abov/a96t396_gshhwifi.bin
+fw-external-$(CONFIG_TOUCHSCREEN_HIMAX_CHIPSET) += tsp_himax/hx83112a_a21s.bin
+fw-external-$(CONFIG_TOUCHSCREEN_NT36xxx_HOSTDL_SPI) += tsp_novatek/nt36675_a21s_csot.bin tsp_novatek/nt36675_a21s_mp_csot.bin
 
-fw-external-$(CONFIG_SHUB) += sensorhub/shub_nacho_bl.bin sensorhub/shub_nacho_a13.bin sensorhub/shub_nacho_gthhwifi.bin sensorhub/shub_nacho_m13.bin sensorhub/shub_nacho_a04s.bin sensorhub/shub_nacho_a14.bin
+quiet_cmd_ihex  = IHEX    $@
+      cmd_ihex  = $(OBJCOPY) -Iihex -Obinary $< $@
 
 quiet_cmd_fwbin = MK_FW   $@
       cmd_fwbin = FWNAME="$(patsubst firmware/%.gen.S,%,$@)";		     \
@@ -70,10 +56,15 @@ wordsize_deps := $(wildcard include/config/64bit.h include/config/32bit.h \
 
 $(patsubst %,$(obj)/%.gen.S, $(fw-external-y)): %: $(wordsize_deps) \
 		include/config/extra/firmware/dir.h
-	$(call cmd,fwbin,$(fwabs)/$(patsubst $(obj)/%.gen.S,%,$@))
+	$(call cmd,fwbin,$(patsubst %.gen.S,%,$@))
 
 # The .o files depend on the binaries directly; the .S files don't.
 $(patsubst %,$(obj)/%.gen.o, $(fw-external-y)): $(obj)/%.gen.o: $(fwdir)/%
+
+# .ihex is used just as a simple way to hold binary files in a source tree
+# where binaries are frowned upon. They are directly converted with objcopy.
+$(obj)/%: $(obj)/%.ihex
+	$(call cmd,ihex)
 
 obj-y				 += $(patsubst %,%.gen.o, $(fw-external-y))
 
