@@ -394,24 +394,20 @@ int __set_panel_power(struct panel_device *panel, int power)
 	if (power == PANEL_POWER_ON) {
 		run_list(panel->dev, "panel_power_enable");
 
-		if (get_regulator_use_count(NULL, "lcd_bl_en") >= 2)
+		if (get_regulator_use_count(NULL, "gpio_lcd_bl_en") >= 2) {
 			panel_info("%s PANEL_I2C_INIT_SEQ SKIP\n", __func__);
-		else
+		} else {
 			panel_do_seqtbl_by_index_nolock(panel, PANEL_I2C_INIT_SEQ);
-
-		panel_do_seqtbl_by_index_nolock(panel, PANEL_I2C_DUMP_SEQ);
-
-		run_list(panel->dev, "panel_power_enable_2");
+			panel_do_seqtbl_by_index_nolock(panel, PANEL_I2C_DUMP_SEQ);
+		}
 
 	} else {
 		run_list(panel->dev, "panel_reset_disable");
 
-		if (get_regulator_use_count(NULL, "lcd_bl_en") >= 2)
+		if (get_regulator_use_count(NULL, "gpio_lcd_bl_en") >= 2)
 			panel_info("%s PANEL_I2C_EXIT_SEQ SKIP\n", __func__);
 		else
 			panel_do_seqtbl_by_index_nolock(panel, PANEL_I2C_EXIT_SEQ);
-
-		panel_do_seqtbl_by_index_nolock(panel, PANEL_I2C_DUMP_SEQ);
 
 		run_list(panel->dev, "panel_power_disable");
 	}
@@ -815,10 +811,10 @@ static struct common_panel_info *panel_detect(struct panel_device *panel)
 {
 	u8 id[3];
 	u32 panel_id;
-//	int ret = 0;
+	int ret = 0;
 	struct common_panel_info *info;
 	struct panel_info *panel_data;
-//	bool detect = true;
+	bool detect = true;
 
 	if (panel == NULL) {
 		panel_err("%s, panel is null\n", __func__);
@@ -827,18 +823,11 @@ static struct common_panel_info *panel_detect(struct panel_device *panel)
 	panel_data = &panel->panel_data;
 
 	memset(id, 0, sizeof(id));
-
-#if 0
 	ret = read_panel_id(panel, id);
 	if (unlikely(ret < 0)) {
 		panel_err("%s, failed to read id(ret %d)\n", __func__, ret);
 		detect = false;
 	}
-#else
-	id[0] = (boot_panel_id & 0xFF0000) >> 16;
-	id[1] = (boot_panel_id & 0x00FF00) >> 8;
-	id[2] = (boot_panel_id & 0x0000FF) >> 0;
-#endif
 
 	panel_id = (id[0] << 16) | (id[1] << 8) | id[2];
 	memcpy(panel_data->id, id, sizeof(id));
@@ -2007,20 +1996,7 @@ static int panel_set_active(struct panel_device *panel, void *arg)
 	return 0;
 }
 
-
-#ifdef CONFIG_PANEL_NOTIFY
-static inline void panel_send_ubconn_notify(u32 state)
-{
-	struct panel_ub_con_event_data data;
-
-	data.state = state;
-	panel_notifier_call_chain(PANEL_EVENT_UB_CON_CHANGED, &data);
-	panel_info("call EVENT_UB_CON notifier %d\n", data.state);
-}
-
-#endif
-
-
+#define MAX_DSIM_CNT_FOR_PANEL (MAX_DSIM_CNT)
 static int panel_ioctl_dsim_probe(struct v4l2_subdev *sd, void *arg)
 {
 	int *param = (int *)arg;
@@ -2028,7 +2004,7 @@ static int panel_ioctl_dsim_probe(struct v4l2_subdev *sd, void *arg)
 	struct panel_device *panel = container_of(sd, struct panel_device, sd);
 
 	panel_info("PANEL:INFO:%s:PANEL_IOC_DSIM_PROBE\n", __func__);
-	if (param == NULL) {
+	if (param == NULL || *param >= MAX_DSIM_CNT_FOR_PANEL) {
 		panel_err("PANEL:ERR:%s:invalid arg\n", __func__);
 		return -EINVAL;
 	}
@@ -2063,7 +2039,6 @@ static int panel_ioctl_dsim_ops(struct v4l2_subdev *sd)
 	panel->mipi_drv.parse_dt = mipi_ops->parse_dt;
 	panel->mipi_drv.get_lcd_info = mipi_ops->get_lcd_info;
 	panel->mipi_drv.set_lpdt = mipi_ops->set_lpdt;
-	panel->mipi_drv.decon_disable = mipi_ops->decon_disable;
 
 	return 0;
 }
@@ -2503,6 +2478,7 @@ static int panel_drv_set_gpios(struct panel_device *panel)
 	} else {
 		panel->state.cur_state = PANEL_STATE_NORMAL;
 		/* to increase regulator ref count */
+		run_list(panel->dev, "panel_power_enable_boot");
 		panel->state.power = PANEL_POWER_ON;
 		panel->state.disp_on = PANEL_DISPLAY_ON;
 	}
@@ -2788,11 +2764,6 @@ int panel_register_isr(struct panel_device *panel)
 
 		snprintf(name, 64, "panel%d:%s",
 				panel->id, panel_work_names[iw]);
-
-		/* W/A: clear pending irq before request_irq */
-		irq_set_irq_type(gpio[i].irq, gpio[i].irq_type);
-		clear_pending_bit(gpio[i].irq);
-
 		ret = devm_request_irq(panel->dev, gpio[i].irq, panel_work_isr,
 				gpio[i].irq_type, name, &panel->work[iw]);
 		if (ret < 0) {
@@ -3061,60 +3032,19 @@ void panel_send_ubconn_uevent(struct panel_device *panel)
 	panel_info("%s, %s, %s\n", __func__, uevent_conn_str[0], uevent_conn_str[1]);
 }
 
-#ifdef CONFIG_SEC_FACTORY
-#define CONN_DET_CHECK_MAX	(30)
-#define CONN_DET_CHECK_DELAY	(10)
-#endif
-
 void conn_det_handler(struct work_struct *data)
 {
 	struct panel_work *w = container_of(to_delayed_work(data),
 		struct panel_work, dwork);
 	struct panel_device *panel =
 		container_of(w, struct panel_device, work[PANEL_WORK_CONN_DET]);
-#ifdef CONFIG_SEC_FACTORY
-	int check_cnt = 0;
-#endif
 	panel_info("%s state:%d cnt:%d\n",
 		__func__, ub_con_disconnected(panel), panel->panel_data.props.ub_con_cnt);
-
-#ifdef CONFIG_PANEL_NOTIFY
-	panel_send_ubconn_notify((ub_con_disconnected(panel) ?
-		PANEL_EVENT_UB_CON_DISCONNECTED : PANEL_EVENT_UB_CON_CONNECTED));
-#endif
-
-#ifdef CONFIG_SEC_FACTORY
-	/* TFM : check 30 times * 10ms */
-	while (check_cnt++ < CONN_DET_CHECK_MAX) {
-		mdelay(CONN_DET_CHECK_DELAY);
-
-		panel_info("%s state:%d cnt:%d check_cnt:%d\n",
-			__func__, ub_con_disconnected(panel), panel->panel_data.props.ub_con_cnt, check_cnt);
-
-		if (ub_con_disconnected(panel))
-			break;
-
-		if ( check_cnt == CONN_DET_CHECK_MAX) {
-			panel_info("%s cancel.\n", __func__);
-			return;
-		}
-	}
-#else
-	/* USER : once */
-	if (!ub_con_disconnected(panel)) {
-		panel_info("%s cancel.\n", __func__);
+	if (!ub_con_disconnected(panel))
 		return;
-	}
-#endif
-
 	if (panel->panel_data.props.conn_det_enable)
 		panel_send_ubconn_uevent(panel);
 	panel->panel_data.props.ub_con_cnt++;
-
-#ifdef CONFIG_SEC_FACTORY
-	if (panel->mipi_drv.decon_disable)
-		panel->mipi_drv.decon_disable(panel->dsi_id);
-#endif
 }
 
 void err_fg_handler(struct work_struct *data)
@@ -3437,7 +3367,7 @@ static int panel_drv_probe(struct platform_device *pdev)
 	panel_drv_init_work(panel);
 
 	panel->fb_notif.notifier_call = panel_fb_notifier;
-	ret = decon_register_notifier(&panel->fb_notif);
+	ret = fb_register_client(&panel->fb_notif);
 	if (ret) {
 		panel_err("PANEL:ERR:%s:failed to register fb notifier callback\n", __func__);
 		goto probe_err;
