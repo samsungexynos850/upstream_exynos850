@@ -33,8 +33,6 @@
 #include <dt-bindings/input/gpio-keys.h>
 #include <linux/debug-snapshot.h>
 #include <linux/sec_class.h>
-//#include "../sec_input/sec_input.h"
-#define SECLOG				"[sec_input]"
 
 static struct gpio_keys_drvdata *g_ddata;
 
@@ -378,7 +376,7 @@ static struct attribute *gpio_keys_attrs[] = {
 
 static const struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
-};
+}; 
 
 static ssize_t key_pressed_show(struct device *dev,
 				struct device_attribute *attr, char *buf)

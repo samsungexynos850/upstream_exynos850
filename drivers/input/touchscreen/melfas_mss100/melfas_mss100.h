@@ -40,11 +40,7 @@
 
 #include "melfas_mss100_reg.h"
 
-#if defined(CONFIG_DRV_SAMSUNG)
 #include <linux/sec_class.h>
-#else
-#include <linux/sec_sysfs.h>
-#endif
 #ifdef CONFIG_BATTERY_SAMSUNG
 #include <linux/sec_batt.h>
 #endif

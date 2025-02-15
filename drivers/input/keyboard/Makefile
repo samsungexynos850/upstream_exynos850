@@ -70,4 +70,3 @@ obj-$(CONFIG_KEYBOARD_W90P910)		+= w90p910_keypad.o
 obj-$(CONFIG_KEYBOARD_STM_FSR)		+= stm/fsr1ad04/
 obj-$(CONFIG_KEYBOARD_S2MPU10)		+= s2mpu10-key.o
 obj-$(CONFIG_KEYBOARD_S2MPU12)		+= s2mpu12-key.o
-obj-$(CONFIG_KEYBOARD_A96T396)          += abov/

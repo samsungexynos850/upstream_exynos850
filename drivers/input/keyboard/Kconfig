@@ -768,6 +768,5 @@ config KEYBOARD_MTK_PMIC
 	  module will be called pmic-keys.
 
 source "drivers/input/keyboard/stm/fsr1ad04/Kconfig"
-source "drivers/input/keyboard/abov/Kconfig"
 
 endif

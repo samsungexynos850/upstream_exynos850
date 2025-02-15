@@ -35,11 +35,7 @@
 #include <linux/mfd/samsung/s2mpu12-regulator.h>
 #include <linux/wakelock.h>
 #include <linux/notifier.h>
-#if defined(CONFIG_DRV_SAMSUNG)
 #include <linux/sec_class.h>
-#else
-#include <linux/sec_sysfs.h>
-#endif
 #include <linux/debug-snapshot.h>
 
 #ifdef CONFIG_SLEEP_MONITOR
@@ -823,7 +819,7 @@ static int power_keys_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto fail1;
 	}
-	input->name	= "sec-pmic-key"; //pdata->name ? : pdev->name;
+	input->name	= pdata->name ? : pdev->name;
 	input->phys	= "s2mpu12-keys/input0";
 	input->dev.parent = dev;
 	input->open	= power_keys_open;

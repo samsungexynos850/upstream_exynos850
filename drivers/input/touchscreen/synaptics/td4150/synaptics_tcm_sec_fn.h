@@ -34,45 +34,38 @@
  * DOLLARS.
  */
 
-#ifndef _SYNAPTICS_TCM_H_
-#define _SYNAPTICS_TCM_H_
+#include "synaptics_tcm_core.h"
+#include "synaptics_tcm_testing.h"
 
-#define I2C_MODULE_NAME "synaptics_tcm_i2c"
-#define SPI_MODULE_NAME "synaptics_tcm_spi"
+#include <linux/vmalloc.h>
+#include <linux/uaccess.h>
+#include <linux/spu-verify.h>
 
-struct syna_tcm_board_data {
-	bool x_flip;
-	bool y_flip;
-	bool swap_axes;
-	int irq_gpio;
-	int irq_on_state;
-	int cs_gpio;
-	int power_gpio;
-	int power_on_state;
-	int reset_gpio;
-	int reset_on_state;
-	int tpio_reset_gpio;
-	unsigned int spi_mode;
-	unsigned int power_delay_ms;
-	unsigned int reset_delay_ms;
-	unsigned int reset_active_ms;
-	unsigned int byte_delay_us;
-	unsigned int block_delay_us;
-	unsigned int ubl_i2c_addr;
-	unsigned int ubl_max_freq;
-	unsigned int ubl_byte_delay_us;
-	unsigned long irq_flags;
-	const char *pwr_reg_name;
-	const char *bus_reg_name;
-	const char *fw_name;
-	const char *regulator_lcd_vdd;
-	const char *regulator_lcd_reset;
-	const char *regulator_lcd_bl;
-	struct pinctrl *pinctrl;
-	u32	area_indicator;
-	u32	area_navigation;
-	u32	area_edge;
-	bool enable_settings_aot;
+#define TEST_MODE_MIN_MAX		false
+#define TEST_MODE_ALL_NODE		true
+#define CMD_RESULT_WORD_LEN		10
+#define SENSITIVITY_POINT_CNT	9
+
+/* factory test mode */
+struct sec_factory_test_mode {
+	u8 type;
+	short min;
+	short max;
+	bool allnode;
 };
 
-#endif
+enum FW_SIGN {
+	NORMAL = 0,
+	SIGNING = 1,
+};
+
+int run_test(struct syna_tcm_hcd *tcm_hcd, struct sec_factory_test_mode *mode, enum test_code test_code);
+int test_abs_cap(struct sec_cmd_data *sec, struct sec_factory_test_mode *mode);
+int test_noise(struct sec_cmd_data *sec, struct sec_factory_test_mode *mode);
+int test_open_short(struct sec_cmd_data *sec, struct sec_factory_test_mode *mode);
+int raw_data_gap_x(struct sec_cmd_data *sec, struct sec_factory_test_mode *mode);
+int raw_data_gap_y(struct sec_cmd_data *sec, struct sec_factory_test_mode *mode);
+int test_fw_crc(struct sec_cmd_data *sec);
+int test_check_connection(struct sec_cmd_data *sec);
+int test_sensitivity(void);
+int test_init(struct syna_tcm_hcd *tcm_hcd);
