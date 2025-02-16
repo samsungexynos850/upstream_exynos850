@@ -1612,8 +1612,7 @@
 					phandle = <0x67>;
 
 					vbmeta {
-						compatible = "android,vbmeta";
-						parts = "vbmeta,boot,system,vendor,product,odm,prism,optics,vbmeta_samsung,recovery,dtbo,keystorage";
+						status = "disabled";
 					};
 				};
 			};
