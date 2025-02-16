@@ -970,8 +970,6 @@ static void qdisc_destroy(struct Qdisc *qdisc)
 	const struct Qdisc_ops *ops;
 	struct sk_buff *skb, *tmp;
 
-	if (!qdisc)
-		return;
 	ops = qdisc->ops;
 
 #ifdef CONFIG_NET_SCHED
@@ -1003,6 +1001,9 @@ static void qdisc_destroy(struct Qdisc *qdisc)
 
 void qdisc_put(struct Qdisc *qdisc)
 {
+	if (!qdisc)
+		return;
+
 	if (qdisc->flags & TCQ_F_BUILTIN ||
 	    !refcount_dec_and_test(&qdisc->refcnt))
 		return;
@@ -1358,6 +1359,7 @@ void psched_ratecfg_precompute(struct psched_ratecfg *r,
 {
 	memset(r, 0, sizeof(*r));
 	r->overhead = conf->overhead;
+	r->mpu = conf->mpu;
 	r->rate_bytes_ps = max_t(u64, conf->rate, rate64);
 	r->linklayer = (conf->linklayer & TC_LINKLAYER_MASK);
 	r->mult = 1;
