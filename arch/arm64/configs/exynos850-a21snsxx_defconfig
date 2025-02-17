@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 4.19.288 Kernel Configuration
+# Linux/arm64 4.19.300 Kernel Configuration
 #
 
 #
@@ -1173,8 +1173,6 @@ CONFIG_NET_CLS_BASIC=y
 CONFIG_NET_CLS_U32=y
 # CONFIG_CLS_U32_PERF is not set
 # CONFIG_CLS_U32_MARK is not set
-# CONFIG_NET_CLS_RSVP is not set
-# CONFIG_NET_CLS_RSVP6 is not set
 # CONFIG_NET_CLS_FLOW is not set
 # CONFIG_NET_CLS_CGROUP is not set
 CONFIG_NET_CLS_BPF=y
@@ -4741,6 +4739,10 @@ CONFIG_EXYNOS_ADC=y
 # CONFIG_TI_ADS8688 is not set
 # CONFIG_TI_TLC4541 is not set
 # CONFIG_VF610_ADC is not set
+
+#
+# Analog to digital and digital to analog converters
+#
 
 #
 # Analog Front Ends

@@ -43,6 +43,7 @@
 #include <linux/mfd/syscon.h>
 #include <linux/regmap.h>
 
+#include <linux/platform_data/touchscreen-s3c2410.h>
 
 /* Semaphore for peterson algorithm  */
 #define AP_TURN 0
@@ -138,6 +139,7 @@
 /* Bit definitions common for ADC_V1, ADC_V2, ADC_V3 */
 #define ADC_CON_EN_START	(1u << 0)
 #define ADC_DATX_MASK		0xFFF
+#define ADC_DATX_PRESSED	(1u << 15)
 #define ADC_DATY_MASK		0xFFF
 
 #define EXYNOS_ADC_TIMEOUT	(msecs_to_jiffies(100))
@@ -165,6 +167,9 @@ struct exynos_adc {
 	u32			value;
 	unsigned int            version;
 	int			idle_ip_index;
+	bool			read_ts;
+	u32			ts_x;
+	u32			ts_y;
 };
 
 struct exynos_adc_data {
@@ -745,7 +750,6 @@ err_unlock:
 	return ret;
 }
 
-#ifdef ADC_TS
 static int exynos_read_s3c64xx_ts(struct iio_dev *indio_dev, int *x, int *y)
 {
 	struct exynos_adc *info = iio_priv(indio_dev);
@@ -780,29 +784,6 @@ static int exynos_read_s3c64xx_ts(struct iio_dev *indio_dev, int *x, int *y)
 	mutex_unlock(&indio_dev->mlock);
 
 	return ret;
-}
-
-static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
-{
-	struct exynos_adc *info = dev_id;
-	u32 mask = info->data->mask;
-
-	/* Read value */
-	if (info->read_ts) {
-		info->ts_x = readl(ADC_V1_DATX(info->regs));
-		info->ts_y = readl(ADC_V1_DATY(info->regs));
-		writel(ADC_TSC_WAIT4INT | ADC_S3C2443_TSC_UD_SEN, ADC_V1_TSC(info->regs));
-	} else {
-		info->value = readl(ADC_V1_DATX(info->regs)) & mask;
-	}
-
-	/* clear irq */
-	if (info->data->clear_irq)
-		info->data->clear_irq(info);
-
-	complete(&info->completion);
-
-	return IRQ_HANDLED;
 }
 
 /*
@@ -844,7 +825,6 @@ static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
 
 	return IRQ_HANDLED;
 }
-#endif
 
 static int exynos_adc_reg_access(struct iio_dev *indio_dev,
 			      unsigned reg, unsigned writeval,
@@ -906,7 +886,6 @@ static int exynos_adc_remove_devices(struct device *dev, void *c)
 	return 0;
 }
 
-#ifdef ADC_TS
 static int exynos_adc_ts_open(struct input_dev *dev)
 {
 	struct exynos_adc *info = input_get_drvdata(dev);
@@ -961,14 +940,15 @@ static int exynos_adc_ts_init(struct exynos_adc *info)
 
 	return ret;
 }
-#endif
 
 static int exynos_adc_probe(struct platform_device *pdev)
 {
 	struct exynos_adc *info = NULL;
 	struct device_node *np = pdev->dev.of_node;
+	struct s3c2410_ts_mach_info *pdata = dev_get_platdata(&pdev->dev);
 	struct iio_dev *indio_dev = NULL;
 	struct resource	*mem;
+	bool has_ts = false;
 	int ret = -ENODEV;
 	int irq;
 	unsigned int sysreg;
@@ -1021,6 +1001,12 @@ static int exynos_adc_probe(struct platform_device *pdev)
 		}
 	}
 
+	/* leave out any TS related code if unreachable */
+	if (IS_REACHABLE(CONFIG_INPUT)) {
+		has_ts = of_property_read_bool(pdev->dev.of_node,
+					       "has-touchscreen") || pdata;
+	}
+
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0) {
 		dev_err(&pdev->dev, "no irq resource?\n");
@@ -1028,11 +1014,15 @@ static int exynos_adc_probe(struct platform_device *pdev)
 	}
 	info->irq = irq;
 
-	irq = platform_get_irq(pdev, 1);
-	if (irq == -EPROBE_DEFER)
-		return irq;
+	if (has_ts) {
+		irq = platform_get_irq(pdev, 1);
+		if (irq == -EPROBE_DEFER)
+			return irq;
 
-	info->tsirq = irq;
+		info->tsirq = irq;
+	} else {
+		info->tsirq = -1;
+	}
 
 	info->dev = &pdev->dev;
 #ifdef CONFIG_ARCH_EXYNOS_PM
@@ -1092,6 +1082,19 @@ static int exynos_adc_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_irq;
 
+	if (info->data->init_hw)
+		info->data->init_hw(info);
+
+	if (pdata)
+		info->delay = pdata->delay;
+	else
+		info->delay = 10000;
+
+	if (has_ts)
+		ret = exynos_adc_ts_init(info);
+	if (ret)
+		goto err_iio;
+
 	ret = of_platform_populate(np, exynos_adc_match, NULL, &indio_dev->dev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "failed adding child nodes\n");
@@ -1106,10 +1109,8 @@ err_of_populate:
 	device_for_each_child(&indio_dev->dev, NULL,
 				exynos_adc_remove_devices);
 
-#ifdef ADC_TS
 err_iio:
 	iio_device_unregister(indio_dev);
-#endif
 err_irq:
 	free_irq(info->irq, info);
 err_disable_clk:

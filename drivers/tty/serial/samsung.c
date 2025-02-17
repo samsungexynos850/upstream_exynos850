@@ -1384,10 +1384,11 @@ static unsigned int s3c24xx_serial_getclk(struct s3c24xx_uart_port *ourport,
 			unsigned int *clk_num)
 {
 	struct s3c24xx_uart_info *info = ourport->info;
+	struct clk *clk;
 	unsigned long rate;
 	unsigned int cnt, baud, quot, best_quot = 0;
+	char clkname[MAX_CLK_NAME_LENGTH];
 	int calc_deviation, deviation = (1 << 30) - 1;
-	int ret;
 
 	for (cnt = 0; cnt < info->num_clks; cnt++) {
 		/* Keep selected clock if provided */
@@ -1395,21 +1396,18 @@ static unsigned int s3c24xx_serial_getclk(struct s3c24xx_uart_port *ourport,
 			!(ourport->cfg->clk_sel & (1 << cnt)))
 			continue;
 
-		rate = clk_get_rate(ourport->clk);
-
-		if (!rate)
-		{
-			ret = clk_set_rate(ourport->clk, ourport->src_clk_rate);
-			if (ret < 0)
-				dev_err(&ourport->pdev->dev, "UART clk set failed\n");
-
-			rate = clk_get_rate(ourport->clk);
-		}
-
-		dev_info(&ourport->pdev->dev, " Clock rate : %ld\n", rate);
-
-		if (!rate)
+		sprintf(clkname, "clk_uart_baud%d", cnt);
+		clk = clk_get(ourport->port.dev, clkname);
+		if (IS_ERR(clk))
 			continue;
+
+		rate = clk_get_rate(clk);
+		if (!rate) {
+			dev_err(ourport->port.dev,
+				"Failed to get clock rate for %s.\n", clkname);
+			clk_put(clk);
+			continue;
+		}
 
 		if (ourport->info->has_divslot) {
 			unsigned long div = rate / req_baud;
@@ -1435,10 +1433,18 @@ static unsigned int s3c24xx_serial_getclk(struct s3c24xx_uart_port *ourport,
 			calc_deviation = -calc_deviation;
 
 		if (calc_deviation < deviation) {
-			*best_clk = ourport->clk;
+			/*
+			 * If we find a better clk, release the previous one, if
+			 * any.
+			 */
+			if (!IS_ERR(*best_clk))
+				clk_put(*best_clk);
+			*best_clk = clk;
 			best_quot = quot;
 			*clk_num = cnt;
 			deviation = calc_deviation;
+		} else {
+			clk_put(clk);
 		}
 	}
 
