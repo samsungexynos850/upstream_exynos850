@@ -428,7 +428,7 @@ void die(const char *str, struct pt_regs *regs, int err)
 		local_irq_restore(flags);
 
 	if (ret != NOTIFY_STOP)
-		do_exit(SIGSEGV);
+		make_task_dead(SIGSEGV);
 }
 
 static bool show_unhandled_signals_ratelimited(void)
