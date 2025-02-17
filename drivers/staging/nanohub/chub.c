@@ -1516,7 +1516,7 @@ static void __iomem *get_iomem(struct platform_device *pdev,
 	return ret;
 }
 
-static __init int contexthub_ipc_hw_init(struct platform_device *pdev,
+static int contexthub_ipc_hw_init(struct platform_device *pdev,
 					 struct contexthub_ipc_info *chub)
 {
 	int ret;
