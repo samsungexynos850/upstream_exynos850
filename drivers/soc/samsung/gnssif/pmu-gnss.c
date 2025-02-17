@@ -168,7 +168,7 @@ static bool check_apm_int_pending()
 	return ret;
 }
 #else
-static bool check_apm_int_pending()
+static bool check_apm_int_pending(void)
 {
 	return true;
 }
