@@ -38,16 +38,15 @@ extern const struct device_type typec_port_dev_type;
 extern struct class typec_mux_class;
 
 struct typec_switch {
-	struct device dev;
-	typec_switch_set_fn_t set;
+	struct device *dev;
+    struct list_head entry;
+    int (*set)(struct typec_switch *sw, enum typec_orientation orientation);
 };
 
 struct typec_mux {
-	struct device dev;
-	typec_mux_set_fn_t set;
+	struct device *dev;
+    struct list_head entry;
+    int (*set)(struct typec_mux *mux, int state);
 };
-
-#define to_typec_switch(_dev_) container_of(_dev_, struct typec_switch, dev)
-#define to_typec_mux(_dev_) container_of(_dev_, struct typec_mux, dev)
 
 #endif /* __USB_TYPEC_ALTMODE_H__ */
