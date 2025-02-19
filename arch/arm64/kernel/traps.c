@@ -27,6 +27,7 @@
 #include <linux/syscalls.h>
 #include <linux/mm_types.h>
 #include <linux/kasan.h>
+#include <linux/sec_debug.h>
 
 #include <asm/atomic.h>
 #include <asm/bug.h>
@@ -82,6 +83,100 @@ static void dump_kernel_instr(const char *lvl, struct pt_regs *regs)
 	printk("%sCode: %s\n", lvl, str);
 }
 
+#if IS_ENABLED(CONFIG_SEC_DEBUG)
+static unsigned long __get_par_to_addr(u64 par, unsigned long vaddr)
+{
+	u64 tmp, rpar;
+
+	tmp = (u64)vaddr & (0xfff);
+	rpar = ((par & ~(0xfffUL << 52)) & ~(0xfff));
+	rpar = rpar | tmp;
+
+	return rpar;
+}
+
+static unsigned long secdbg_get_pa_from_mmu(unsigned long vaddr)
+{
+	unsigned long flags;
+	u64 par, dfsc;
+
+	local_irq_save(flags);
+	asm volatile("at s1e1r, %0" :: "r" (vaddr));
+	isb();
+	par = read_sysreg_par();
+	local_irq_restore(flags);
+
+	if (par & SYS_PAR_EL1_F) {
+		dfsc = FIELD_GET(SYS_PAR_EL1_FST, par);
+		pr_err("failed to get v:0x%lx, p:0x%lx, fsc:0x%lx\n",
+			vaddr, par, dfsc);
+		return 0;
+	}
+
+	return __get_par_to_addr(par, vaddr);
+}
+
+static int _dump_kernel_hex_line(unsigned long start_addr, unsigned int lines,
+					unsigned long paddr, unsigned long pc_val)
+{
+	unsigned int val, bad;
+	u32 *addr = (u32 *)start_addr;
+	char str[sizeof(" 00000000 ") * 4 + 1];
+	int i;
+	char *p = str;
+	char *end = p + sizeof(str);
+
+	for (i = 0; i < 4; i++) {
+		bool ispc = (addr + i == (u32 *)pc_val);
+
+		bad = aarch64_insn_read(addr + i, &val);
+
+		if (!bad)
+			p += snprintf(p, end - p, ispc ? "(%08x)" : " %08x ", val);
+		else {
+			p += snprintf(p, end - p, "bad PC value");
+			break;
+		}
+	}
+
+	pr_info(" %9x :%s\n", paddr, str);
+
+	return bad;
+}
+
+static void secdbg_dump_kernel_instr_ext(struct pt_regs *regs)
+{
+	unsigned long pc_val = instruction_pointer(regs);
+	unsigned long start_addr = (pc_val & ~(0x40 - 1)) - 0x40;
+	unsigned long paddr = 0x0;
+	int i;
+
+	if (user_mode(regs))
+		return;
+
+	for (i = 0; i < 12; i++) {
+		unsigned int bad;
+		u32 *addr = (u32 *)start_addr + 4 * i;
+
+		if (i == 0 || offset_in_page(addr) == 0)
+			paddr = secdbg_get_pa_from_mmu((unsigned long)addr);
+		else
+			paddr += 0x10;
+
+		if (i && (i % 4) == 0)
+			pr_info("\n");
+
+		bad = _dump_kernel_hex_line((unsigned long)addr, 4, paddr, pc_val);
+		if (bad)
+			break;
+	}
+}
+#else
+static inline void secdbg_dump_kernel_instr_ext(struct pt_regs *regs)
+{
+}
+#endif
+
 #ifdef CONFIG_PREEMPT
 #define S_PREEMPT " PREEMPT"
 #elif defined(CONFIG_PREEMPT_RT)
@@ -106,7 +201,12 @@ static int __die(const char *str, int err, struct pt_regs *regs)
 		return ret;
 
 	print_modules();
+#ifdef CONFIG_SEC_DEBUG_AUTO_COMMENT
+	__show_regs(regs);
+	dump_backtrace_auto_comment(regs, NULL);
+#else
 	show_regs(regs);
+#endif
 
 	dump_kernel_instr(KERN_EMERG, regs);
 
@@ -397,6 +497,17 @@ void arm64_notify_segfault(unsigned long addr)
 	force_signal_inject(SIGSEGV, code, addr, 0);
 }
 
+#ifdef CONFIG_S3C2410_BUILTIN_WATCHDOG
+extern int s3c2410wdt_builtin_expire_watchdog(void);
+static inline void do_s3c2410wdt_builtin_expire_watchdog(void)
+{
+	s3c2410wdt_builtin_expire_watchdog();
+}
+#else
+static inline void do_s3c2410wdt_builtin_expire_watchdog(void)
+{
+}
+#endif
 void do_undefinstr(struct pt_regs *regs)
 {
 	/* check for AArch32 breakpoint instructions */
@@ -407,6 +518,19 @@ void do_undefinstr(struct pt_regs *regs)
 		return;
 
 	trace_android_rvh_do_undefinstr(regs, user_mode(regs));
+
+	if (!user_mode(regs))
+		do_s3c2410wdt_builtin_expire_watchdog();
+
+	if (IS_ENABLED(CONFIG_SEC_DEBUG_FAULT_MSG_ADV) && !user_mode(regs)) {
+		pr_auto(ASL1, "%s: pc=0x%016llx\n",
+			"undefined instruction", regs->pc);
+		dump_kernel_instr(KERN_INFO, regs);
+		secdbg_dump_kernel_instr_ext(regs);
+		do_s3c2410wdt_builtin_expire_watchdog();
+		die("undefined instruction", regs, 0);
+	}
+	
 	BUG_ON(!user_mode(regs));
 	force_signal_inject(SIGILL, ILL_ILLOPC, regs->pc, 0);
 }
@@ -764,7 +888,7 @@ asmlinkage void notrace bad_mode(struct pt_regs *regs, int reason, unsigned int 
 
 	console_verbose();
 
-	pr_crit("Bad mode in %s handler detected on CPU%d, code 0x%08x -- %s\n",
+	pr_auto(ASL1, "Bad mode in %s handler detected on CPU%d, code 0x%08x -- %s\n",
 		handler[reason], smp_processor_id(), esr,
 		esr_get_class_string(esr));
 
@@ -802,6 +926,7 @@ asmlinkage void noinstr handle_bad_stack(struct pt_regs *regs)
 	unsigned int esr = read_sysreg(esr_el1);
 	unsigned long far = read_sysreg(far_el1);
 
+	secdbg_base_built_check_handle_bad_stack();
 	arm64_enter_nmi(regs);
 
 	console_verbose();
@@ -832,7 +957,7 @@ void __noreturn arm64_serror_panic(struct pt_regs *regs, u32 esr)
 {
 	console_verbose();
 
-	pr_crit("SError Interrupt on CPU%d, code 0x%08x -- %s\n",
+	pr_auto(ASL1, "SError Interrupt on CPU%d, code 0x%08x -- %s\n",
 		smp_processor_id(), esr, esr_get_class_string(esr));
 
 	trace_android_rvh_arm64_serror_panic(regs, esr);

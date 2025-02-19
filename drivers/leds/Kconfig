@@ -116,6 +116,7 @@ config LEDS_AS3645A
 config LEDS_AW2013
 	tristate "LED support for Awinic AW2013"
 	depends on LEDS_CLASS && I2C && OF
+	select REGMAP_I2C
 	help
 	  This option enables support for the AW2013 3-channel
 	  LED driver.
@@ -929,6 +930,20 @@ config LEDS_ACER_A500
 	  This option enables support for the Power Button LED of
 	  Acer Iconia Tab A500.
 
+config ERD_LEDS_S2MU106_FLASH
+	tristate "FLASH LED support for the S2MU106"
+	depends on (ERD_MFD_S2MU106) && I2C
+	help
+	  If you say yes here you will get support for
+	  for the ERD_LEDS_S2MU106_FLASH led chip.
+	  
+config LEDS_S2MU106_FLASH
+	tristate "FLASH LED support for the S2MU106"
+    depends on (MFD_S2MU106) && I2C
+	help
+	  If you say yes here you will get support for
+	  for the LEDS_S2MU106_FLASH led chip.
+	  
 comment "LED Triggers"
 source "drivers/leds/trigger/Kconfig"
 

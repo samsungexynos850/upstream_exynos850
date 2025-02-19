@@ -91,7 +91,8 @@ obj-$(CONFIG_ARM_TEGRA186_CPUFREQ)	+= tegra186-cpufreq.o
 obj-$(CONFIG_ARM_TEGRA194_CPUFREQ)	+= tegra194-cpufreq.o
 obj-$(CONFIG_ARM_TI_CPUFREQ)		+= ti-cpufreq.o
 obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
-
+obj-$(CONFIG_ARM_EXYNOS_ACME)           += exynos-acme.o
+obj-$(CONFIG_ARM_FREQ_QOS_TRACER)       += freq-qos-tracer.o
 
 ##################################################################################
 # PowerPC platform drivers

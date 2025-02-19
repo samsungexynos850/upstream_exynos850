@@ -44,7 +44,11 @@ struct fscrypt_name {
 #define fname_len(p)		((p)->disk_name.len)
 
 /* Maximum value for the third parameter of fscrypt_operations.set_context(). */
+#if defined(CONFIG_FSCRYPT_SDP) || defined(CONFIG_DDAR)
+#define FSCRYPT_SET_CONTEXT_MAX_SIZE	44
+#else
 #define FSCRYPT_SET_CONTEXT_MAX_SIZE	40
+#endif
 
 #ifdef CONFIG_FS_ENCRYPTION
 
@@ -303,6 +307,8 @@ int fscrypt_ioctl_add_key(struct file *filp, void __user *arg);
 int fscrypt_ioctl_remove_key(struct file *filp, void __user *arg);
 int fscrypt_ioctl_remove_key_all_users(struct file *filp, void __user *arg);
 int fscrypt_ioctl_get_key_status(struct file *filp, void __user *arg);
+int fscrypt_register_key_removal_notifier(struct notifier_block *nb);
+int fscrypt_unregister_key_removal_notifier(struct notifier_block *nb);
 
 /* keysetup.c */
 int fscrypt_prepare_new_inode(struct inode *dir, struct inode *inode,
@@ -510,6 +516,18 @@ static inline int fscrypt_ioctl_get_key_status(struct file *filp,
 					       void __user *arg)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline int fscrypt_register_key_removal_notifier(
+						struct notifier_block *nb)
+{
+	return 0;
+}
+
+static inline int fscrypt_unregister_key_removal_notifier(
+						struct notifier_block *nb)
+{
+	return 0;
 }
 
 /* keysetup.c */

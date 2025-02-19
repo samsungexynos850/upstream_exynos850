@@ -72,6 +72,10 @@ DECLARE_RESTRICTED_HOOK(android_rvh_set_user_nice,
 	TP_PROTO(struct task_struct *p, long *nice, bool *allowed),
 	TP_ARGS(p, nice, allowed), 1);
 
+DECLARE_RESTRICTED_HOOK(android_rvh_set_user_nice_locked,
+	TP_PROTO(struct task_struct *p, long *nice),
+	TP_ARGS(p, nice), 1);
+
 DECLARE_RESTRICTED_HOOK(android_rvh_setscheduler,
 	TP_PROTO(struct task_struct *p),
 	TP_ARGS(p), 1);
@@ -274,6 +278,10 @@ DECLARE_RESTRICTED_HOOK(android_rvh_replace_next_task_fair,
 			bool simple, struct task_struct *prev),
 	TP_ARGS(rq, p, se, repick, simple, prev), 1);
 
+DECLARE_RESTRICTED_HOOK(android_rvh_do_sched_yield,
+	TP_PROTO(struct rq *rq),
+	TP_ARGS(rq), 1);
+
 DECLARE_RESTRICTED_HOOK(android_rvh_util_est_update,
 	TP_PROTO(struct cfs_rq *cfs_rq, struct task_struct *p, bool task_sleep, int *ret),
 	TP_ARGS(cfs_rq, p, task_sleep, ret), 1);
@@ -302,10 +310,6 @@ DECLARE_RESTRICTED_HOOK(android_rvh_cpumask_any_and_distribute,
 	TP_PROTO(struct task_struct *p, const struct cpumask *cpu_valid_mask ,
 		const struct cpumask *new_mask, int *dest_cpu),
 	TP_ARGS(p, cpu_valid_mask, new_mask, dest_cpu), 1);
-
-DECLARE_RESTRICTED_HOOK(android_rvh_do_sched_yield,
-	TP_PROTO(struct rq *rq),
-	TP_ARGS(rq), 1);
 
 DECLARE_HOOK(android_vh_free_task,
 	TP_PROTO(struct task_struct *p),

@@ -62,6 +62,8 @@ obj-$(CONFIG_ARM64_MTE)			+= mte.o
 
 obj-y					+= vdso/ probes/
 obj-$(CONFIG_COMPAT_VDSO)		+= vdso32/
+
+obj-$(CONFIG_UH)			+= uh_entry.o
 head-y					:= head.o
 extra-y					+= $(head-y) vmlinux.lds
 

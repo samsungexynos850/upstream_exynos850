@@ -1271,6 +1271,11 @@ static unsigned char __swap_entry_free_locked(struct swap_info_struct *p,
 }
 
 /*
+ * Note that when only holding the PTL, swapoff might succeed immediately
+ * after freeing a swap entry. Therefore, immediately after
+ * __swap_entry_free(), the swap info might become stale and should not
+ * be touched without a prior get_swap_device().
+ *
  * Check whether swap entry is valid in the swap device.  If so,
  * return pointer to swap_info_struct, and keep the swap entry valid
  * via preventing the swap device from being swapoff, until
@@ -1797,13 +1802,19 @@ int free_swap_and_cache(swp_entry_t entry)
 	if (non_swap_entry(entry))
 		return 1;
 
-	p = _swap_info_get(entry);
+	p = get_swap_device(entry);
 	if (p) {
+		if (WARN_ON(data_race(!p->swap_map[swp_offset(entry)]))) {
+			put_swap_device(p);
+			return 0;
+		}
+
 		count = __swap_entry_free(p, entry);
 		if (count == SWAP_HAS_CACHE &&
 		    !swap_page_trans_huge_swapped(p, entry))
 			__try_to_reclaim_swap(p, swp_offset(entry),
 					      TTRS_UNMAPPED | TTRS_FULL);
+		put_swap_device(p);
 	}
 	return p != NULL;
 }
@@ -3164,6 +3175,14 @@ static bool swap_discardable(struct swap_info_struct *si)
 	return true;
 }
 
+#if IS_ENABLED(CONFIG_ZRAM)
+zram_oem_func zram_oem_fn;
+unsigned long __nocfi zram_oem_fn_nocfi(int cmd, void *priv, unsigned long param)
+{
+	return zram_oem_fn(cmd, priv, param);
+}
+#endif
+
 SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 {
 	struct swap_info_struct *p;
@@ -3424,6 +3443,15 @@ out:
 		inode_unlock(inode);
 	if (!error)
 		enable_swap_slots_cache();
+#if IS_ENABLED(CONFIG_ZRAM)
+	if (!error && !zram_oem_fn) {
+		const struct block_device_operations *ops;
+
+		ops = p->bdev->bd_disk->fops;
+		if (ops->android_oem_data1)
+			zram_oem_fn = (zram_oem_func)ops->android_oem_data1;
+	}
+#endif
 	return error;
 }
 

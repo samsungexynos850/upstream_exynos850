@@ -80,7 +80,6 @@ config ARCH_EXYNOS
 	select COMMON_CLK_SAMSUNG
 	select EXYNOS_CHIPID
 	select EXYNOS_PM_DOMAINS if PM_GENERIC_DOMAINS
-	select EXYNOS_PMU
 	select HAVE_S3C_RTC if RTC_CLASS
 	select PINCTRL
 	select PINCTRL_EXYNOS
@@ -321,5 +320,10 @@ config ARCH_ZYNQMP
 	bool "Xilinx ZynqMP Family"
 	help
 	  This enables support for Xilinx ZynqMP Family
+
+config SOC_EXYNOS3830_ANDROID_VERSION_T
+        bool "Samsung EXYNOS3830 Android version T"
+        help
+          This enables support for Android version T of EXYNOS3830
 
 endmenu

@@ -776,4 +776,51 @@ config RN5T618_POWER
 	  This driver can also be built as a module. If so, the module will be
 	  called rn5t618_power.
 
+config ERD_FUELGAUGE_S2MU106
+       tristate "S2MU106 fuelgauge driver"
+       default n
+       depends on I2C
+       help
+        say y to include support
+        for s.lsi S2MU106 fuelgauge driver.
+
+config ERD_CHARGER_S2MU106
+	tristate "S2MU106 charger support"
+	depends on (ERD_MFD_S2MU106) && I2C
+	help
+	 Say Y here to enable support for the S2MU106 charger
+	 S2MU106 incluse pmic, led driver.
+	 You have to define ERD_MFD_S2MU106
+
+config ERD_PM_S2MU106
+	tristate "S2MU106 power meter support"
+	depends on (ERD_MFD_S2MU106) && I2C
+	help
+	 Say Y here to enable support for the S2MU106 power meter.
+	 S2MU106 power meter is dependent on ERD_MFD_S2MU106
+	 so it needs to be defined.
+
+config ERD_FAKE_BATT
+	tristate "SMDK board only support"
+	help
+	  Say Y here to enable support for S2MXXXX charging manager driver on SMDK board.
+
+config ERD_MANAGER_S2M_CHARGER
+	tristate "S2M_CHG_MANAGER battery driver"
+	help
+	  Say Y here to enable support for S2MXXXX charging manager driver.
+	  This charging manager driver supports only the basic functions.
+
+config ERD_BLOCK_CHG_SMDK_S2MU106
+	tristate "S2ASL01 SWITCHING IC support"
+	depends on I2C
+	help
+	 Say Y here to block charging mode for S2MU106 charger.
+
+config ERD_S2M_THERMAL
+	tristate "PMIC Thermal Function"
+	depends on ERD_MANAGER_S2M_CHARGER
+	help
+	  Say Y here to enable PMIC thermal function.
+
 endif # POWER_SUPPLY

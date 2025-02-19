@@ -111,6 +111,10 @@ config MANDATORY_FILE_LOCKING
 
 	  To the best of my knowledge this is dead code that no one cares about.
 
+config VFSMOUNT_DATA_OPS
+	bool "Enable private mount data operations to mount points"
+	default n
+
 source "fs/crypto/Kconfig"
 
 source "fs/verity/Kconfig"
@@ -121,6 +125,7 @@ source "fs/quota/Kconfig"
 
 source "fs/autofs/Kconfig"
 source "fs/fuse/Kconfig"
+source "fs/sdcardfs/Kconfig"
 source "fs/overlayfs/Kconfig"
 source "fs/incfs/Kconfig"
 
@@ -144,6 +149,7 @@ if BLOCK
 menu "DOS/FAT/EXFAT/NT Filesystems"
 
 source "fs/fat/Kconfig"
+source "fs/sdfat/Kconfig"
 source "fs/exfat/Kconfig"
 source "fs/ntfs/Kconfig"
 

@@ -194,6 +194,10 @@ config SND_SOC_ODROID
 	help
 	  Say Y here to enable audio support for the Odroid XU3/XU4.
 
+config SND_SOC_SAMSUNG_EXYNOS3830_SOUND
+	tristate "Sound card support on exynos3830"
+	select SND_SOC_SAMSUNG_ABOX
+
 config SND_SOC_ARNDALE
 	tristate "Audio support for Arndale Board"
 	depends on I2C
@@ -232,5 +236,17 @@ config SND_SOC_SAMSUNG_MIDAS_WM1811
 	select SND_SOC_WM8994
 	help
 	  Say Y if you want to add support for SoC audio on the Midas boards.
+	  
+config SND_SOC_SAMSUNG_AUDIO
+	tristate "Audio support for Samsung Projects"
+	help
+	  Say Y here to enable audio support for the Samsung Audio.
+
+config SND_SOC_SAMSUNG_SYSFS_EARJACK
+	tristate "Audio support for earjack sysfs node"
+	help
+	  Say Y here to enable audio support for earjack sysfs node
+
+source "sound/soc/samsung/abox/Kconfig"
 
 endif #SND_SOC_SAMSUNG

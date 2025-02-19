@@ -6,6 +6,11 @@ config COMMON_CLK_SAMSUNG
 	# EXYNOS_ARM64_COMMON_CLK to avoid building them on ARMv7:
 	select EXYNOS_ARM64_COMMON_CLK if ARM64 && ARCH_EXYNOS
 
+config COMPOSITE_CLK_SAMSUNG
+        tristate "Samsung Exynos clock controller support"
+        select COMMON_CLK_SAMSUNG
+        depends on CAL_IF
+
 config EXYNOS_ARM64_COMMON_CLK
 	bool "Samsung Exynos ARMv8-family clock controller support" if COMPILE_TEST
 	depends on COMMON_CLK_SAMSUNG

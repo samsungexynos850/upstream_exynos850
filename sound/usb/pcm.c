@@ -1054,14 +1054,14 @@ static int snd_usb_pcm_prepare(struct snd_pcm_substream *substream)
 	struct usb_interface *iface;
 	int ret;
 
-	ret = snd_vendor_set_pcm_buf(subs->dev, subs->cur_audiofmt->iface);
-	if (ret)
-		return ret;
-
 	if (! subs->cur_audiofmt) {
 		dev_err(&subs->dev->dev, "no format is specified!\n");
 		return -ENXIO;
 	}
+
+	ret = snd_vendor_set_pcm_buf(subs->dev, subs->cur_audiofmt->iface);
+	if (ret)
+		return ret;
 
 	ret = snd_usb_lock_shutdown(subs->stream->chip);
 	if (ret < 0)

@@ -6,6 +6,8 @@
 
 struct list_head;
 
+#define SEC_DEBUG_LISTSORT_CONST
+
 typedef int __attribute__((nonnull(2,3))) (*list_cmp_func_t)(void *,
 		const struct list_head *, const struct list_head *);
 

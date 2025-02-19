@@ -35,7 +35,13 @@
 #include <asm/mmu_context.h>
 #include <asm/ptdump.h>
 #include <asm/tlbflush.h>
+#ifdef CONFIG_RKP
+#include <linux/rkp.h>
+#endif
+
 #include <asm/pgalloc.h>
+
+#include <trace/hooks/mm.h>
 
 #define NO_BLOCK_MAPPINGS	BIT(0)
 #define NO_CONT_MAPPINGS	BIT(1)
@@ -263,6 +269,10 @@ static void alloc_init_cont_pmd(pud_t *pudp, unsigned long addr,
 	if (pud_none(pud)) {
 		phys_addr_t pmd_phys;
 		BUG_ON(!pgtable_alloc);
+#ifdef CONFIG_RKP
+		pmd_phys = rkp_ro_alloc_phys(PMD_SHIFT);
+		if (!pmd_phys)
+#endif
 		pmd_phys = pgtable_alloc(PMD_SHIFT);
 		__pud_populate(pudp, pmd_phys, PUD_TYPE_TABLE);
 		pud = READ_ONCE(*pudp);
@@ -294,7 +304,11 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
 	if (((addr | next | phys) & ~PUD_MASK) != 0)
 		return false;
 
+#ifdef CONFIG_RKP
+	return false;
+#else
 	return true;
+#endif
 }
 
 static void alloc_init_pud(pgd_t *pgdp, unsigned long addr, unsigned long end,
@@ -386,7 +400,11 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
 
 static phys_addr_t __pgd_pgtable_alloc(int shift)
 {
+#ifdef CONFIG_RKP
+	void *ptr = rkp_ro_alloc();
+#else
 	void *ptr = (void *)__get_free_page(GFP_PGTABLE_KERNEL);
+#endif
 	BUG_ON(!ptr);
 
 	/* Ensure the zeroed page is visible to the page table walker */
@@ -612,6 +630,33 @@ static void __init map_kernel_segment(pgd_t *pgdp, void *va_start, void *va_end,
 	vm_area_add_early(vma);
 }
 
+#ifdef CONFIG_RKP
+static void __init map_kernel_text_segment(pgd_t *pgdp, void *va_start, void *va_end,
+                                      pgprot_t prot, struct vm_struct *vma,
+                                      int flags, unsigned long vm_flags)
+{
+        phys_addr_t pa_start = __pa_symbol(va_start);
+        unsigned long size = va_end - va_start;
+
+        WARN_ON(!PAGE_ALIGNED(pa_start));
+        WARN_ON(!PAGE_ALIGNED(size));
+
+        __create_pgd_mapping(pgdp, pa_start, (unsigned long)va_start, size, prot,
+                             rkp_ro_alloc_phys, flags);
+
+        if (!(vm_flags & VM_NO_GUARD))
+                size += PAGE_SIZE;
+
+        vma->addr       = (void *)((unsigned long)va_start & PMD_MASK);
+        vma->phys_addr  = (phys_addr_t)((unsigned long)pa_start & PMD_MASK);
+        vma->size       = size + (unsigned long)va_start - (unsigned long)vma->addr;
+        vma->flags      = VM_MAP | vm_flags;
+        vma->caller     = __builtin_return_address(0);
+
+        vm_area_add_early(vma);
+}
+#endif
+
 static int __init parse_rodata(char *arg)
 {
 	int ret = strtobool(arg, &rodata_enabled);
@@ -708,8 +753,13 @@ static void __init map_kernel(pgd_t *pgdp)
 	 * Only rodata will be remapped with different permissions later on,
 	 * all other segments are allowed to use contiguous mappings.
 	 */
+#ifdef CONFIG_RKP
+	map_kernel_text_segment(pgdp, _stext, _etext, text_prot, &vmlinux_text, 0,
+			   VM_NO_GUARD);
+#else
 	map_kernel_segment(pgdp, _text, _etext, text_prot, &vmlinux_text, 0,
 			   VM_NO_GUARD);
+#endif
 	map_kernel_segment(pgdp, __start_rodata, __inittext_begin, PAGE_KERNEL,
 			   &vmlinux_rodata, NO_CONT_MAPPINGS, VM_NO_GUARD);
 	map_kernel_segment(pgdp, __inittext_begin, __inittext_end, text_prot,
@@ -761,9 +811,12 @@ void __init paging_init(void)
 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
 	init_mm.pgd = swapper_pg_dir;
 
+// RKP don't need to block below part.
+//#ifndef CONFIG_RKP
+#if 0
 	memblock_free(__pa_symbol(init_pg_dir),
 		      __pa_symbol(init_pg_end) - __pa_symbol(init_pg_dir));
-
+#endif
 	memblock_allow_resize();
 }
 
@@ -1491,6 +1544,14 @@ int pud_free_pmd_page(pud_t *pudp, unsigned long addr)
 int p4d_free_pud_page(p4d_t *p4d, unsigned long addr)
 {
 	return 0;	/* Don't attempt a block mapping */
+}
+
+bool should_flush_tlb_when_young(void)
+{
+	bool skip = false;
+
+	trace_android_vh_ptep_clear_flush_young(&skip);
+	return !skip;
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG

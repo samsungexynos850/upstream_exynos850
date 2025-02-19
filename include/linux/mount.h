@@ -69,15 +69,28 @@ struct fs_context;
 #define MNT_UMOUNT		0x8000000
 #define MNT_CURSOR		0x10000000
 
+#ifdef CONFIG_VFSMOUNT_DATA_OPS
+struct vfsmount_data_operations {
+	void *(*alloc)(struct fs_context *fc);
+	void *(*clone)(void *data);
+	void (*copy)(void *old, void *new);
+};
+#endif
+
 struct vfsmount {
 	struct dentry *mnt_root;	/* root of the mounted tree */
 	struct super_block *mnt_sb;	/* pointer to superblock */
 	int mnt_flags;
-
+#ifdef CONFIG_VFSMOUNT_DATA_OPS
+	const struct vfsmount_data_operations *ops;
+	void *data;
+#endif
 	ANDROID_KABI_RESERVE(1);
 	ANDROID_KABI_RESERVE(2);
+#ifndef CONFIG_VFSMOUNT_DATA_OPS
 	ANDROID_KABI_RESERVE(3);
 	ANDROID_KABI_RESERVE(4);
+#endif
 } __randomize_layout;
 
 struct file; /* forward dec */

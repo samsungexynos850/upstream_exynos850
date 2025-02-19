@@ -36,6 +36,7 @@
 #include <linux/cpuset.h>
 #include <linux/random.h>
 #include <uapi/linux/sched/types.h>
+#include <linux/sec_debug.h>
 
 #include <trace/events/power.h>
 #define CREATE_TRACE_POINTS
@@ -46,6 +47,7 @@
 #include <trace/hooks/cpu.h>
 
 #include "smpboot.h"
+#include "sched/sched.h"
 
 /**
  * cpuhp_cpu_state - Per cpu hotplug state storage
@@ -250,7 +252,9 @@ static bool cpuhp_is_ap_state(enum cpuhp_state state)
 static inline void wait_for_ap_thread(struct cpuhp_cpu_state *st, bool bringup)
 {
 	struct completion *done = bringup ? &st->done_up : &st->done_down;
+	secdbg_dtsk_built_set_data(DTYPE_CPUHP, (void *)st->thread);
 	wait_for_completion(done);
+	secdbg_dtsk_built_clear_data();
 }
 
 static inline void complete_ap_thread(struct cpuhp_cpu_state *st, bool bringup)
@@ -1161,8 +1165,6 @@ int remove_cpu(unsigned int cpu)
 }
 EXPORT_SYMBOL_GPL(remove_cpu);
 
-extern int  dl_cpu_busy(int cpu, struct task_struct *p);
-
 int __pause_drain_rq(struct cpumask *cpus)
 {
 	unsigned int cpu;
@@ -1210,7 +1212,7 @@ int pause_cpus(struct cpumask *cpus)
 	cpumask_and(cpus, cpus, cpu_active_mask);
 
 	for_each_cpu(cpu, cpus) {
-		if (!cpu_online(cpu) || dl_cpu_busy(cpu, NULL) ||
+		if (!cpu_online(cpu) || dl_bw_check_overflow(cpu) ||
 			get_cpu_device(cpu)->offline_disabled == true) {
 			err = -EBUSY;
 			goto err_cpu_maps_update;
@@ -2878,7 +2880,8 @@ enum cpu_mitigations {
 };
 
 static enum cpu_mitigations cpu_mitigations __ro_after_init =
-	CPU_MITIGATIONS_AUTO;
+	IS_ENABLED(CONFIG_CPU_MITIGATIONS) ? CPU_MITIGATIONS_AUTO :
+					     CPU_MITIGATIONS_OFF;
 
 static int __init mitigations_parse_cmdline(char *arg)
 {

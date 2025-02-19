@@ -33,6 +33,7 @@
 #include <linux/usb/audio-v2.h>
 #include <linux/usb/audio-v3.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 
 #include <sound/control.h>
 #include <sound/core.h>
@@ -895,6 +896,10 @@ static int usb_audio_probe(struct usb_interface *intf,
 	struct usb_host_interface *alts;
 	int ifnum;
 	u32 id;
+
+	pr_info("%s\n", __func__);
+
+	msleep(1000);
 
 	alts = &intf->altsetting[0];
 	ifnum = get_iface_desc(alts)->bInterfaceNumber;

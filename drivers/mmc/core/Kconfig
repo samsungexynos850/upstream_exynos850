@@ -89,3 +89,10 @@ config MMC_CRYPTO
 	  Enabling this makes it possible for the kernel to use the crypto
 	  capabilities of the MMC device (if present) to perform crypto
 	  operations on data being transferred to/from the device.
+
+config MMC_SANITIZE
+	bool "Enable Sanitize (Default No)"
+	default n
+	help
+	  Sanitize is diabled when there is a concern 
+	  about lifetime and performance.

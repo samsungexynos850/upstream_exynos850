@@ -211,7 +211,7 @@ static int __init softdog_init(void)
 
 	return 0;
 }
-module_init(softdog_init);
+late_initcall(softdog_init);
 
 static void __exit softdog_exit(void)
 {

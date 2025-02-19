@@ -110,6 +110,9 @@ struct fs_context {
 	bool			need_free:1;	/* Need to call ops->free() */
 	bool			global:1;	/* Goes into &init_user_ns */
 	bool			oldapi:1;	/* Coming from mount(2) */
+#ifdef CONFIG_VFSMOUNT_DATA_OPS
+	const struct vfsmount_data_operations *vfsmnt_ops;
+#endif
 };
 
 struct fs_context_operations {
@@ -129,6 +132,9 @@ extern struct fs_context *fs_context_for_mount(struct file_system_type *fs_type,
 extern struct fs_context *fs_context_for_reconfigure(struct dentry *dentry,
 						unsigned int sb_flags,
 						unsigned int sb_flags_mask);
+extern struct fs_context *__fs_context_for_reconfigure(struct dentry *dentry,
+		unsigned int sb_flags, unsigned int sb_flags_mask,
+		void *private);
 extern struct fs_context *fs_context_for_submount(struct file_system_type *fs_type,
 						struct dentry *reference);
 

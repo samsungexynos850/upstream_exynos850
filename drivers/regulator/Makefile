@@ -158,5 +158,7 @@ obj-$(CONFIG_REGULATOR_WM831X) += wm831x-ldo.o
 obj-$(CONFIG_REGULATOR_WM8350) += wm8350-regulator.o
 obj-$(CONFIG_REGULATOR_WM8400) += wm8400-regulator.o
 obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
+obj-$(CONFIG_REGULATOR_S2MPU12) += s2mpu12-regulator.o
+obj-$(CONFIG_DRV_SAMSUNG_PMIC) += pmic_class.o
 
 ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG

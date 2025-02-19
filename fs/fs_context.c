@@ -225,7 +225,8 @@ static struct fs_context *alloc_fs_context(struct file_system_type *fs_type,
 				      struct dentry *reference,
 				      unsigned int sb_flags,
 				      unsigned int sb_flags_mask,
-				      enum fs_context_purpose purpose)
+				      enum fs_context_purpose purpose,
+				      void *private_for_init)
 {
 	int (*init_fs_context)(struct fs_context *);
 	struct fs_context *fc;
@@ -242,6 +243,7 @@ static struct fs_context *alloc_fs_context(struct file_system_type *fs_type,
 	fc->cred	= get_current_cred();
 	fc->net_ns	= get_net(current->nsproxy->net_ns);
 	fc->log.prefix	= fs_type->name;
+	fc->fs_private	= private_for_init;
 
 	mutex_init(&fc->uapi_mutex);
 
@@ -279,23 +281,33 @@ struct fs_context *fs_context_for_mount(struct file_system_type *fs_type,
 					unsigned int sb_flags)
 {
 	return alloc_fs_context(fs_type, NULL, sb_flags, 0,
-					FS_CONTEXT_FOR_MOUNT);
+					FS_CONTEXT_FOR_MOUNT, NULL);
 }
 EXPORT_SYMBOL(fs_context_for_mount);
+
+struct fs_context *__fs_context_for_reconfigure(struct dentry *dentry,
+		unsigned int sb_flags, unsigned int sb_flags_mask,
+		void *private)
+{
+	return alloc_fs_context(dentry->d_sb->s_type, dentry, sb_flags,
+				sb_flags_mask, FS_CONTEXT_FOR_RECONFIGURE,
+				private);
+}
 
 struct fs_context *fs_context_for_reconfigure(struct dentry *dentry,
 					unsigned int sb_flags,
 					unsigned int sb_flags_mask)
 {
-	return alloc_fs_context(dentry->d_sb->s_type, dentry, sb_flags,
-				sb_flags_mask, FS_CONTEXT_FOR_RECONFIGURE);
+	return __fs_context_for_reconfigure(dentry, sb_flags, sb_flags_mask,
+			NULL);
 }
 EXPORT_SYMBOL(fs_context_for_reconfigure);
 
 struct fs_context *fs_context_for_submount(struct file_system_type *type,
 					   struct dentry *reference)
 {
-	return alloc_fs_context(type, reference, 0, 0, FS_CONTEXT_FOR_SUBMOUNT);
+	return alloc_fs_context(type, reference, 0, 0, FS_CONTEXT_FOR_SUBMOUNT,
+			NULL);
 }
 EXPORT_SYMBOL(fs_context_for_submount);
 
@@ -614,7 +626,7 @@ static int legacy_reconfigure(struct fs_context *fc)
 		return 0;
 
 	return sb->s_op->remount_fs(sb, &fc->sb_flags,
-				    ctx ? ctx->legacy_data : NULL);
+				     ctx ? ctx->legacy_data : NULL);
 }
 
 const struct fs_context_operations legacy_fs_context_ops = {

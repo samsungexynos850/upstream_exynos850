@@ -34,6 +34,10 @@
 #include <linux/log2.h>
 #include <linux/nospec.h>
 
+#ifdef CONFIG_RKP
+#include <linux/rkp.h>
+#endif
+
 #include <asm/barrier.h>
 #include <asm/unaligned.h>
 
@@ -604,7 +608,11 @@ static __always_inline int bpf_tree_comp(void *key, struct latch_tree_node *n)
 
 	if (val < ksym->start)
 		return -1;
-	if (val >= ksym->end)
+	/* Ensure that we detect return addresses as part of the program, when
+	 * the final instruction is a call for a program part of the stack
+	 * trace. Therefore, do val > ksym->end instead of val >= ksym->end.
+	 */
+	if (val > ksym->end)
 		return  1;
 
 	return 0;
@@ -905,6 +913,9 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
 void bpf_jit_binary_free(struct bpf_binary_header *hdr)
 {
 	u32 pages = hdr->pages;
+#ifdef CONFIG_RKP
+	uh_call(UH_APP_RKP, RKP_BPF_LOAD, (u64)hdr, (u64)(hdr->pages * 0x1000), 1, 0);
+#endif
 
 	trace_android_vh_set_memory_rw((unsigned long)hdr, pages);
 	trace_android_vh_set_memory_nx((unsigned long)hdr, pages);

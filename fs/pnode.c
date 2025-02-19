@@ -600,3 +600,20 @@ int propagate_umount(struct list_head *list)
 
 	return 0;
 }
+
+#ifdef CONFIG_VFSMOUNT_DATA_OPS
+void propagate_mnt_data_change(struct mount *mnt)
+{
+	struct mount *parent = mnt->mnt_parent;
+	struct mount *p = mnt, *m;
+
+	if (!mnt->mnt.ops || !mnt->mnt.ops->copy)
+		return;
+	for (p = propagation_next(parent, parent); p;
+			p = propagation_next(p, parent)) {
+		m = __lookup_mnt(&p->mnt, mnt->mnt_mountpoint);
+		if (m)
+			mnt->mnt.ops->copy(m->mnt.data, mnt->mnt.data);
+	}
+}
+#endif

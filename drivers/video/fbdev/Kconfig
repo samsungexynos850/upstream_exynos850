@@ -2013,7 +2013,7 @@ config FB_COBALT
 	depends on FB && MIPS_COBALT
 
 config FB_SH7760
-	bool "SH7760/SH7763/SH7720/SH7721 LCDC support"
+	tristate "SH7760/SH7763/SH7720/SH7721 LCDC support"
 	depends on FB && (CPU_SUBTYPE_SH7760 || CPU_SUBTYPE_SH7763 \
 		|| CPU_SUBTYPE_SH7720 || CPU_SUBTYPE_SH7721)
 	select FB_CFB_FILLRECT
@@ -2205,6 +2205,8 @@ config FB_SIMPLE
 
 	  Configuration re: surface address, size, and format must be provided
 	  through device tree, or plain old platform data.
+
+source "drivers/video/fbdev/exynos/Kconfig"
 
 config FB_SSD1307
 	tristate "Solomon SSD1307 framebuffer support"

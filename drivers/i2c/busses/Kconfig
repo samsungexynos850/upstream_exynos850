@@ -624,6 +624,12 @@ config I2C_EXYNOS5
 	help
 	  High-speed I2C controller on Exynos5 and newer Samsung SoCs.
 
+config EXYNOS_ACPM_MFD_BUS
+        tristate "SAMSUNG EXYNOS ACPM_MFD_BUS driver"
+        depends on ARCH_EXYNOS && OF
+        help
+	  ACPM MFD BUS on Exynos based Samsung SoCs.
+
 config I2C_GPIO
 	tristate "GPIO-based bitbanging I2C"
 	depends on GPIOLIB || COMPILE_TEST
@@ -956,6 +962,7 @@ config I2C_RK3X
 
 config HAVE_S3C2410_I2C
 	bool
+	default y
 	help
 	  This will include I2C support for Samsung SoCs. If you want to
 	  include I2C support for any machine, kindly select this in the

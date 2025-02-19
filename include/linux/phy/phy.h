@@ -75,7 +75,7 @@ struct phy_ops {
 	int	(*power_on)(struct phy *phy);
 	int	(*power_off)(struct phy *phy);
 	int	(*set_mode)(struct phy *phy, enum phy_mode mode, int submode);
-
+        int     (*set)(struct phy *phy, int option, void *info);
 	/**
 	 * @configure:
 	 *

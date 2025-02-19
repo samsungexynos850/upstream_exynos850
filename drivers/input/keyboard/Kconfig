@@ -788,4 +788,9 @@ config KEYBOARD_MTK_PMIC
 	  To compile this driver as a module, choose M here: the
 	  module will be called pmic-keys.
 
+config KEYBOARD_S2MPU12
+	tristate "Samsung Electronics S2MPU12 Powerkey Controller"
+	depends on I2C
+	depends on MFD_S2MPU12
+	select SEC_PMIC_PWRKEY
 endif

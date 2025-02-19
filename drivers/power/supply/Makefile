@@ -98,3 +98,7 @@ obj-$(CONFIG_CHARGER_BD70528)	+= bd70528-charger.o
 obj-$(CONFIG_CHARGER_BD99954)	+= bd99954-charger.o
 obj-$(CONFIG_CHARGER_WILCO)	+= wilco-charger.o
 obj-$(CONFIG_RN5T618_POWER)	+= rn5t618_power.o
+obj-$(CONFIG_ERD_FUELGAUGE_S2MU106) += s2mu106_fuelgauge.o
+obj-$(CONFIG_ERD_CHARGER_S2MU106)   += s2mu106_charger.o
+obj-$(CONFIG_ERD_PM_S2MU106)  		+= s2mu106_pmeter.o
+obj-$(CONFIG_ERD_MANAGER_S2M_CHARGER)   += s2m_chg_manager.o
